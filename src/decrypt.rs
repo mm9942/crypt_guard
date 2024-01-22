@@ -8,27 +8,14 @@ use aes::cipher::{
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use std::{fs, path::PathBuf};
+use std::io::Write;
 
 pub struct Decrypt;
 
 impl Decrypt {
-    fn generate_original_filename(encrypted_path: &str, encrypt_extension: &str) -> String {
-        let path = std::path::Path::new(encrypted_path);
-        let dir = path.parent().unwrap();
-
-        // Get file name and split at the last period
-        let mut file_name_with_extension = path.file_name().unwrap().to_str().unwrap().to_string();
-        if let Some(last_dot_index) = file_name_with_extension.find('.') {
-            let (file_name, extension) = file_name_with_extension.split_at_mut(last_dot_index);
-            if extension.starts_with('_') && extension.ends_with(&format!(".{}", encrypt_extension)) {
-                file_name_with_extension = format!("{}{}", file_name, extension);
-            }
-        }
-
-        dir.join(file_name_with_extension).to_str().unwrap().to_string()
-    }
-    fn generate_original(encrypted_path: &str) -> String {
-        let path = std::path::Path::new(encrypted_path);
+    pub async fn generate_original_filename(encrypted_path: &str) -> String {
+       // let encrypted_path = format!("./{}", encrypted_path);
+        let path = std::path::Path::new(&encrypted_path);
         let dir = path.parent().unwrap_or_else(|| std::path::Path::new(""));
         let mut file_name = path.file_stem().unwrap().to_str().unwrap().to_string();
 
@@ -100,26 +87,33 @@ impl Decrypt {
         Ok(decrypted_data)
     }
 
-    pub async fn decrypt_file(encrypted_file_path: &PathBuf, key: &dyn SharedSecret, hmac_key: &[u8]) -> Result<(), CryptError> {
+    pub async fn decrypt_file(encrypted_file_path: &PathBuf, key: &dyn SharedSecret, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let decrypted_file_path = encrypted_file_path.as_os_str().to_str().ok_or(CryptError::PathError)?;
-        let decrypt_file_path = Decrypt::generate_original(decrypted_file_path);
+        let decrypt_file_path = Decrypt::generate_original_filename(decrypted_file_path).await;
         println!("Decrypted file path: {:?}", decrypt_file_path);
 
         let data_with_hmac = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
         let encrypted_data = Decrypt::verify_hmac(hmac_key, &data_with_hmac, 64).unwrap();
         let decrypted_data = Decrypt::decrypt_with_aes(&encrypted_data, key.as_bytes()).await?;
 
-        fs::write(&decrypt_file_path, decrypted_data).map_err(|_| CryptError::WriteError)?;
+        fs::write(&decrypt_file_path, &decrypted_data).map_err(|_| CryptError::WriteError)?;
 
         println!("Decryption completed and file written to {:?}", decrypt_file_path);
-        Ok(())
+        Ok(decrypted_data)
     }
 
-    pub async fn decrypt_msg(encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, hmac_key: &[u8]) -> Result<String, CryptError> {
-        let encrypted_data = Decrypt::verify_hmac(hmac_key, encrypted_data_with_hmac, 32).unwrap();
+    pub async fn decrypt_msg(encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, hmac_key: &[u8], safe: bool) -> Result<String, CryptError> {
+        let encrypted_data = Decrypt::verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
         let decrypted_data = Decrypt::decrypt_with_aes(&encrypted_data, key.as_bytes()).await?;
-        String::from_utf8(decrypted_data).map_err(|_| CryptError::DecapsulationError)
+        let decrypted_str = String::from_utf8(decrypted_data)
+            .map_err(|_| CryptError::Utf8Error)?;
+        if safe {
+            let mut message_file = fs::File::create("./message.txt");
+            write!(message_file.unwrap(), "{}", &decrypted_str).unwrap();
+        }
+        Ok(decrypted_str)
     }
+
 
     pub async fn decrypt(
         secret_key: PathBuf,
@@ -141,19 +135,20 @@ impl Decrypt {
         match (encrypted_file_path, encrypted_data_with_hmac) {
             (Some(path), None) => {
                 println!("Decrypting file...");
-                Decrypt::decrypt_file(path, &shared_secret, hmac_key).await?
+                Decrypt::decrypt_file(path, &shared_secret, hmac_key).await?;
+                Ok(())
             },
             (None, Some(data)) => {
                 println!("Decrypting message...");
-                Decrypt::decrypt_msg(data, &shared_secret, hmac_key).await?;
+                let _ = Decrypt::decrypt_msg(data, &shared_secret, hmac_key, true).await?;
+                Ok(())
             },
             _ => {
                 println!("Invalid parameters for decryption");
-                return Err(CryptError::InvalidParameters);
+                Err(CryptError::InvalidParameters)
             },
         }
-
-        Ok(())
     }
+
 
 }

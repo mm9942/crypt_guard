@@ -15,4 +15,6 @@ pqcrypto = { version = "0.17.0", features = ["serialization"] }
 pqcrypto-kyber = { version = "0.8.0", features = ["serialization"] }
 pqcrypto-traits = "0.3.5"
 sha2 = "0.10.8"
+tempdir = "0.3.7"
+tempfile = "3.9.0"
 tokio = { version = "1.35.1", features = ["full"] }

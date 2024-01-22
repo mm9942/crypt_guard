@@ -59,14 +59,14 @@ impl Encrypt {
         Ok(public_key)
     }
 
-    pub async fn encrypt_file(file_path: PathBuf, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<PathBuf, CryptError> {
+    pub async fn encrypt_file(file_path: PathBuf, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let data = fs::read(&file_path).map_err(|_| CryptError::IOError)?;
         let encrypted_data = Encrypt::encrypt_with_aes_hmac(&data, shared_secret.as_bytes(), hmac_key).await?;
         let mut encrypted_file_path = file_path.clone();
         let unique_encrypted_file_path = Keychain::generate_unique_filename(encrypted_file_path.as_os_str().to_str().expect("REASON"), "enc");
         let enc_file_path = PathBuf::from(unique_encrypted_file_path);
-        fs::write(&enc_file_path, encrypted_data).map_err(|_| CryptError::WriteError)?;
-        Ok(enc_file_path) // Return the path of the encrypted file
+        fs::write(&enc_file_path, &encrypted_data).map_err(|_| CryptError::WriteError)?;
+        Ok(encrypted_data) // Return the path of the encrypted file
     }
 
     pub async fn encrypt_msg(message: &str, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
@@ -77,9 +77,9 @@ impl Encrypt {
     pub async fn encrypt(
         public_key_path: PathBuf,
         message: Option<&str>,
-        encrypted_file_path: Option<PathBuf>,
+        encrypted_file_path: Option<&PathBuf>,
         hmac_key: &[u8],
-    ) -> Result<(), CryptError> {
+    ) -> Result<Vec<u8>, CryptError> {
         let mut keychain = Keychain::new().unwrap();
         
         // Load the public key from the given path
@@ -96,8 +96,6 @@ impl Encrypt {
             ciphertext: Some(ciphertext),
         };
 
-        let filename = "cipher";
-
         // Save the ciphertext
         keychain.save_ciphertext("./keychain", "cipher").await?;
         let ciphertext_hex = hex::encode(&keychain.get_ciphertext().await.unwrap().as_bytes());
@@ -106,17 +104,14 @@ impl Encrypt {
         // Encrypt the message or file
         match (message, encrypted_file_path) {
             (Some(msg), None) => {
-                Encrypt::encrypt_msg(msg, &shared_secret, hmac_key).await?;
+                Encrypt::encrypt_msg(msg, &shared_secret, hmac_key).await
             },
             (None, Some(file_path)) => {
-                Encrypt::encrypt_file(file_path, &shared_secret, hmac_key).await?;
+                Encrypt::encrypt_file(file_path.clone(), &shared_secret, hmac_key).await
             },
             _ => return Err(CryptError::InvalidParameters)
         }
-
-        Ok(())
     }
-
 }
 
 impl From<io::Error> for CryptError {

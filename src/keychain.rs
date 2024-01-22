@@ -26,6 +26,7 @@ pub enum CryptError {
     MissingData,
     InvalidParameters,
     PathError,
+    Utf8Error,
 }
 
 impl fmt::Display for CryptError {
@@ -48,6 +49,7 @@ impl fmt::Display for CryptError {
            CryptError::MissingData => write!(f, "Missing data"),
            CryptError::InvalidParameters => write!(f, "You provided Invalid parameters"),
            CryptError::PathError => write!(f, "The provided path does not exist!"),
+           CryptError::Utf8Error => write!(f, "UTF-8 conversion error"),
        }
    }
 }
@@ -124,51 +126,51 @@ impl Keychain {
     }
 
     pub async fn save(&self, base_path: &str, title: &str) -> Result<(), CryptError> {
-    let dir_path = format!("{}/{}", base_path, title);
-    let dir = std::path::Path::new(&dir_path);
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).map_err(|_| CryptError::WriteError)?;
+        let dir_path = format!("{}/{}", base_path, title);
+        let dir = std::path::Path::new(&dir_path);
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir).map_err(|_| CryptError::WriteError)?;
+        }
+
+        let public_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "pub");
+        let secret_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "sec");
+        let shared_secret_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "ss");
+        let ciphertext_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "ct");
+
+        fs::write(
+            &public_key_path, 
+            format!(
+                "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
+                hex::encode(self.public_key.as_ref().expect("Public key is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        fs::write(
+            &secret_key_path, 
+            format!(
+                "-----BEGIN SECRET KEY-----\n{}\n-----END SECRET KEY-----",
+                hex::encode(self.secret_key.as_ref().expect("Secret key is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        fs::write(
+            &shared_secret_path, 
+            format!(
+                "-----BEGIN SHARED SECRET-----\n{}\n-----END SHARED SECRET-----",
+                hex::encode(self.shared_secret.as_ref().expect("Shared secret is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        fs::write(
+            &ciphertext_path, 
+            format!(
+                "-----BEGIN CIPHERTEXT-----\n{}\n-----END CIPHERTEXT-----",
+                hex::encode(self.ciphertext.as_ref().expect("Ciphertext is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        Ok(())
     }
-
-    let public_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "pub");
-    let secret_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "sec");
-    let shared_secret_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "ss");
-    let ciphertext_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "ct");
-
-    fs::write(
-        &public_key_path, 
-        format!(
-            "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
-            hex::encode(self.public_key.as_ref().expect("Public key is missing").as_bytes())
-        )
-    ).map_err(|_| CryptError::WriteError)?;
-
-    fs::write(
-        &secret_key_path, 
-        format!(
-            "-----BEGIN SECRET KEY-----\n{}\n-----END SECRET KEY-----",
-            hex::encode(self.secret_key.as_ref().expect("Secret key is missing").as_bytes())
-        )
-    ).map_err(|_| CryptError::WriteError)?;
-
-    fs::write(
-        &shared_secret_path, 
-        format!(
-            "-----BEGIN SHARED SECRET-----\n{}\n-----END SHARED SECRET-----",
-            hex::encode(self.shared_secret.as_ref().expect("Shared secret is missing").as_bytes())
-        )
-    ).map_err(|_| CryptError::WriteError)?;
-
-    fs::write(
-        &ciphertext_path, 
-        format!(
-            "-----BEGIN CIPHERTEXT-----\n{}\n-----END CIPHERTEXT-----",
-            hex::encode(self.ciphertext.as_ref().expect("Ciphertext is missing").as_bytes())
-        )
-    ).map_err(|_| CryptError::WriteError)?;
-
-    Ok(())
-}
 
 
     pub async fn save_public_key(&self, base_path: &str, title: &str) -> Result<(), CryptError> {

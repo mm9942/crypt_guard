@@ -9,6 +9,7 @@ pub fn add(left: usize, right: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    extern crate tempfile;
     use super::*;
     use crate::keychain::*;
     use crate::encrypt::*;
@@ -19,11 +20,12 @@ mod tests {
     use pqcrypto::kem::kyber1024::decapsulate;
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
-
+    use std::io::Write;
+    use tempfile::tempdir;
+    
     #[tokio::test]
     async fn keychain_new_works() {
         let keychain = Keychain::new().unwrap();
-        let _ = keychain.save("./keychain", "key");
 
         assert!(keychain.public_key.is_some());
         assert!(keychain.secret_key.is_some());
@@ -38,9 +40,9 @@ mod tests {
 
     #[tokio::test]
     async fn generate_unique_filename_works() {
-        let base_path = PathBuf::from("test_file");
+        let base_path = "test_file";
         let extension = "txt";
-        let unique_path = Keychain::generate_unique_filename(base_path.as_os_str().to_str().unwrap(), extension);
+        let unique_path = Keychain::generate_unique_filename(base_path, extension);
 
         // Create a file at the unique path for the test
         fs::write(&unique_path, "Test content").unwrap();
@@ -53,61 +55,125 @@ mod tests {
         fs::remove_file(unique_path).unwrap();
     }
 
+
     #[tokio::test]
-    async fn encrypt_decrypt_msg_works() {
-        let keychain = Keychain::new().unwrap();
+    async fn generate_original_filename_works() {
+        let encrypt_filename1 = "./test_file.txt_1.enc";
+        let encrypt_filename2 = "./test_file.txt.enc";
 
-        let pubkey = PathBuf::from("/Users/mm29942/EncryptMod/keychain/key/key.pub");
-        let secret_key = PathBuf::from("/Users/mm29942/EncryptMod/keychain/key/key.sec");
-        let ciphertext = PathBuf::from("/Users/mm29942/EncryptMod/keychain/cipher/cipher.ct");
-
-        let original_message = "Hello, world!";
-
-        // Encrypt the message
-        let encrypted_message = Encrypt::encrypt_msg(original_message, keychain.shared_secret.as_ref().unwrap(), b"secret").await.unwrap();
-
-        // Decrypt the message
-        let decrypted_message = Decrypt::decrypt_msg(&encrypted_message, keychain.shared_secret.as_ref().unwrap(), b"secret").await.unwrap();
-
-        // Compare the original and decrypted message
-        assert_eq!(original_message, decrypted_message);
+        let original1 = Decrypt::generate_original_filename(encrypt_filename1).await;
+        let original2 = Decrypt::generate_original_filename(encrypt_filename2).await;
+        assert_eq!("./test_file.txt", original1);
+        assert_eq!("./test_file.txt", original2);
+    }
 
 
-        fs::remove_file(&ciphertext).unwrap();
+    #[tokio::test]
+    async fn generate_and_verify_hmac() {
+        let key = b"Hello, how are you?";
+        let data = b"Ai#31415926535*";
+
+        // Generate HMAC
+        let hmac = Encrypt::generate_hmac(key, data);
+
+        // Prepare data for verification (append hmac to original data)
+        let data_with_hmac = [data.as_ref(), hmac.as_ref()].concat();
+
+        // Verify HMAC
+        let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
+        let verification_result = Decrypt::verify_hmac(key, &data_with_hmac, hmac_len);
+
+        // Assertions
+        assert!(verification_result.is_ok(), "HMAC verification failed");
+        let verified_data = verification_result.unwrap();
+        assert_eq!(verified_data, data, "Verified data does not match original data");
     }
 
     #[tokio::test]
-    async fn encrypt_decrypt_file_works() {
+    async fn test_encrypt_decrypt_file() {
         let keychain = Keychain::new().unwrap();
 
-        let pubkey = PathBuf::from("/Users/mm29942/EncryptMod/keychain/key/key.pub");
-        let secret_key = PathBuf::from("/Users/mm29942/EncryptMod/keychain/key/key.sec");
-        let ciphertext = PathBuf::from("/Users/mm29942/EncryptMod/keychain/cipher/cipher.ct");
+        // Setup - create a sample message
+        let message = "This is a test message.";
+        let message_bytes = message.as_bytes();
 
-        // Ensure the test file exists
-        let original_file_path = PathBuf::from("test_file.txt");
-        let encrypted_file_path = PathBuf::from("./test_file.txt.enc");
-        let original_file_contents = fs::read_to_string(&original_file_path).unwrap();
+        // Create temporary directory for test files
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_message.txt");
+        let encrypted_file_path = dir.path().join("test_message_encrypted.txt");
+        let decrypted_file_path = dir.path().join("test_message_decrypted.txt");
 
-
-        fs::write(&original_file_path, "Test file content").unwrap();
-        let original_file_contents = fs::read_to_string(&original_file_path).unwrap();
+        fs::write(&file_path, message_bytes).expect("Failed to write test file");
 
         // Encrypt the file
-        let _ = Encrypt::encrypt(pubkey, None, Some(original_file_path.clone()), b"secret").await;
-        
+        let encrypted_data = Encrypt::encrypt_file(
+            file_path.clone(), 
+            keychain.shared_secret.as_ref().unwrap(), 
+            b"hmackey"
+        ).await.expect("Encryption failed");
+
+        // Verify that encrypted data is different
+        assert_ne!(message_bytes, encrypted_data);
+
+        // Write encrypted data to file
+        fs::write(&encrypted_file_path, &encrypted_data).expect("Failed to write encrypted file");
+
         // Decrypt the file
-        let _ = Decrypt::decrypt(secret_key, ciphertext.clone(), Some(&encrypted_file_path), None, b"secret").await;
+        let decrypted_data = Decrypt::decrypt_file(
+            &encrypted_file_path, 
+            keychain.shared_secret.as_ref().unwrap(), 
+            b"hmackey"
+        ).await.expect("Decryption failed");
 
-        // Compare the original and decrypted file contents
-        let decrypted_file_contents = fs::read_to_string(&original_file_path).unwrap();
-        assert_eq!(original_file_contents, decrypted_file_contents);
+        // Write decrypted data to file
+        fs::write(&decrypted_file_path, &decrypted_data).expect("Failed to write decrypted file");
 
-        // Cleanup
-        fs::remove_file(&original_file_path).unwrap();
-        fs::remove_file(&encrypted_file_path).unwrap();
+        // Verify that decrypted data matches original message
+        assert_eq!(message_bytes, decrypted_data);
 
-        fs::remove_file(&ciphertext).unwrap();
+        // Clean up - remove temporary files and directory
+        dir.close().unwrap();
     }
+
+    #[tokio::test]
+    async fn test_encrypt_decrypt_message() {
+        let message = "This is a secret message!";
+        let hmac_key = b"encryption_test_key";
+
+        // Initialize Keychain
+        let keychain = Keychain::new().unwrap();
+
+        // Encrypt the message
+        let encrypted_message = Encrypt::encrypt_msg(message, keychain.shared_secret.as_ref().unwrap(), hmac_key)
+            .await
+            .expect("Failed to encrypt message");
+
+        // Decrypt the message
+        let decrypted_message_result = Decrypt::decrypt_msg(&encrypted_message, keychain.shared_secret.as_ref().unwrap(), hmac_key, false)
+            .await;
+
+        // Assert that the decrypted message matches the original message
+        assert_eq!(decrypted_message_result.unwrap(), message, "Decrypted message does not match the original message");
+    }
+
+    #[tokio::test]
+    async fn test_encrypt_decrypt() {
+        let pubkey = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.pub");
+        let secret_key = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.sec");
+        let ciphertext = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/cipher/cipher.ct");
+        
+        let original_file_path = PathBuf::from("./overview.rs");
+        let encrypted_file_path = PathBuf::from("./overview.rs.enc");
+        let original_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read original file");
+
+        let _ = Encrypt::encrypt(pubkey, None, Some(&original_file_path.clone()), b"secret").await;
+
+        let _ = Decrypt::decrypt(secret_key, ciphertext, Some(&encrypted_file_path), None, b"secret").await;
+
+        let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read original file");
+
+        assert_eq!(decrypted_file_contents, original_file_contents);
+    }
+
 
 }
