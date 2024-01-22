@@ -1,0 +1,18 @@
+[package]
+name = "EncryptMod"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes = "0.8.3"
+clap = { version = "4.4.18", features = ["cargo", "derive"] }
+env = "0.0.0"
+hex = "0.4.3"
+hmac = "0.12.1"
+pqcrypto = { version = "0.17.0", features = ["serialization"] }
+pqcrypto-kyber = { version = "0.8.0", features = ["serialization"] }
+pqcrypto-traits = "0.3.5"
+sha2 = "0.10.8"
+tokio = { version = "1.35.1", features = ["full"] }
