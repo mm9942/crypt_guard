@@ -14,13 +14,16 @@ mod tests {
     use crate::keychain::*;
     use crate::encrypt::*;
     use crate::decrypt::*;
-    use std::path::{PathBuf, Path};
-    use std::fs;
-    use std::env::current_dir;
+    use std::{
+        path::{PathBuf, Path},
+        fs,
+        env::current_dir,
+        io::Write,
+        ffi::OsStr
+    };
     use pqcrypto::kem::kyber1024::decapsulate;
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
-    use std::io::Write;
     use tempfile::tempdir;
     
     #[tokio::test]
@@ -161,19 +164,33 @@ mod tests {
         let pubkey = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.pub");
         let secret_key = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.sec");
         let ciphertext = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/cipher/cipher.ct");
-        
-        let original_file_path = PathBuf::from("./overview.rs");
-        let encrypted_file_path = PathBuf::from("./overview.rs.enc");
-        let original_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read original file");
 
-        let _ = Encrypt::encrypt(pubkey, None, Some(&original_file_path.clone()), b"secret").await;
+        // Create temporary directory for test files
+        let dir = tempdir().unwrap();
+        let original_file_path = dir.path().join("test.txt");
+        let encrypted_file_path = dir.path().join("test.txt.enc");
 
+        // Create a sample file with content to encrypt
+        let original_file_contents = "this is a test file";
+        fs::write(&original_file_path, original_file_contents).expect("Failed to write original file");
+
+        // Encrypt the file
+        let _ = Encrypt::encrypt(pubkey, None, Some(&original_file_path), b"secret").await;
+
+        // Decrypt the file
         let _ = Decrypt::decrypt(secret_key, ciphertext, Some(&encrypted_file_path), None, b"secret").await;
 
-        let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read original file");
+        // Read decrypted file contents
+        let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read decrypted file");
 
+        // Verify that decrypted content matches the original content
         assert_eq!(decrypted_file_contents, original_file_contents);
+
+        // Clean up - remove temporary files and directory
+        dir.close().unwrap();
+        fs::remove_file("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/cipher/cipher.ct").unwrap();
     }
+
 
 
 }

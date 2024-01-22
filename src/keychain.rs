@@ -115,6 +115,32 @@ impl Keychain {
         })
     }
 
+    pub fn find_highest_numbered_file(dir_path: &Path, base_filename: &str, extension: &str) -> Option<PathBuf> {
+        let mut highest_numbered_file: Option<(i32, PathBuf)> = None;
+
+        if dir_path.is_dir() {
+            for entry in fs::read_dir(dir_path).unwrap() {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.is_file() && path.extension() == Some(OsStr::new(extension)) {
+                        if let Some(stem) = path.file_stem().and_then(OsStr::to_str) {
+                            if stem.starts_with(base_filename) {
+                                let number_part = &stem[base_filename.len()..];
+                                if let Ok(number) = number_part.parse::<i32>() {
+                                    if highest_numbered_file.is_none() || highest_numbered_file.as_ref().unwrap().0 < number {
+                                        highest_numbered_file = Some((number, path));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        highest_numbered_file.map(|(_, path)| path)
+    }
+
     pub fn show(&self) -> Result<(), CryptError> {
         if let (Some(ref pk), Some(ref sk), Some(ref ss), Some(ref ct)) = (self.public_key.as_ref(), self.secret_key.as_ref(), self.shared_secret.as_ref(), self.ciphertext.as_ref()) {
             let ss2 = decapsulate(ct, sk);
