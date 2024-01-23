@@ -62,7 +62,7 @@ impl Decrypt {
 
         if let Err(_) = mac.verify_slice(hmac) {
             eprintln!("HMAC verification failed!");
-            eprintln!("Data: {:?}", data);
+            //eprintln!("Data: {:?}", data);
             eprintln!("HMAC: {:?}", hmac);
             return Err("HMAC verification failed");
         }
@@ -108,9 +108,10 @@ impl Decrypt {
         let decrypted_str = String::from_utf8(decrypted_data)
             .map_err(|_| CryptError::Utf8Error)?;
         if safe {
-            let mut message_file = fs::File::create("./message.txt");
+            let message_file = fs::File::create("./message.txt");
             write!(message_file.unwrap(), "{}", &decrypted_str).unwrap();
         }
+        println!("{}", &decrypted_str);
         Ok(decrypted_str)
     }
 
@@ -119,7 +120,7 @@ impl Decrypt {
         secret_key: PathBuf,
         ciphertext: PathBuf,
         encrypted_file_path: Option<&PathBuf>,
-        encrypted_data_with_hmac: Option<&[u8]>,
+        encrypted_message: Option<&[u8]>,
         hmac_key: &[u8],
     ) -> Result<(), CryptError> {
         let mut keychain = Keychain::new().unwrap();
@@ -132,14 +133,14 @@ impl Decrypt {
         let shared_secret = decapsulate(&cipher, &secret);
 
         // Decrypt the file or message
-        match (encrypted_file_path, encrypted_data_with_hmac) {
+        match (encrypted_file_path, encrypted_message) {
             (Some(path), None) => {
                 println!("Decrypting file...");
                 Decrypt::decrypt_file(path, &shared_secret, hmac_key).await?;
                 Ok(())
             },
             (None, Some(data)) => {
-                println!("Decrypting message...");
+                println!("Decrypting message...\n");
                 let _ = Decrypt::decrypt_msg(data, &shared_secret, hmac_key, true).await?;
                 Ok(())
             },
