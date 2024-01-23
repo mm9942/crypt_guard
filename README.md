@@ -1,55 +1,119 @@
 # CryptGuard programming library
 
 ## Introduction
-CryptGuardLib is a Rust library providing robust encryption and decryption functionalities. Utilizing advanced cryptographic algorithms, including the post-quantum Kyber1024, it's designed to secure data against quantum-computing threats. This library is ideal for developers looking to integrate strong cryptographic features into their Rust applications.
-
-## Prerequisites
-To use CryptGuardLib, ensure your development environment includes:
-- Rust (latest stable version)
-- Cargo for Rust package management
-
-## Installation
-Add CryptGuardLib to your Rust project by including it in your `Cargo.toml` file:
-```toml
-[dependencies]
-crypt_guard = { git = "https://github.com/mm9942/CryptGuardLib.git" }
-```
+CryptGuard is a robust Rust library for encryption and decryption, integrating traditional and post-quantum cryptographic methods. It's designed for developers who need sophisticated cryptographic capabilities in their applications, particularly with the advent of quantum computing.
 
 ## Usage
-CryptGuardLib provides modules for key management (`keychain`), encryption (`encrypt`), and decryption (`decrypt`). Here's a basic usage example:
 
+### Encrypting Data
+Encrypt data using `encrypt`, `encrypt_msg`, or `encrypt_file` functions from the `Encrypt` struct.
+
+#### Encrypt a Message
 ```rust
-use crypt_guard::{encrypt, decrypt, keychain};
+use crypt_guard::encrypt::Encrypt;
+use crypt_guard::keychain::Keychain;
 
-// Example: Encrypting and Decrypting a message
-let keychain = keychain::Keychain::new().unwrap();
-let encrypted_message = encrypt::Encrypt::encrypt_msg("Your message", keychain.shared_secret.as_ref().unwrap(), your_hmac_key)
-    .await
-    .expect("Encryption failed");
-let decrypted_message = decrypt::Decrypt::decrypt_msg(&encrypted_message, keychain.shared_secret.as_ref().unwrap(), your_hmac_key, false)
-    .await
-    .expect("Decryption failed");
+#[tokio::main]
+async fn main() {
+    let encrypt = Encrypt::new();
+    let keychain = Keychain::new().unwrap();
+    let message = "This is a secret message!";
+    let hmac_key = b"encryption_test_key";
+
+    let encrypted_message = encrypt.encrypt_msg(message, keychain.shared_secret.as_ref().unwrap(), hmac_key)
+        .await
+        .expect("Failed to encrypt message");
+}
 ```
 
-## Features
-- **Keychain Management**: Generate and manage cryptographic keys.
-- **Encryption**: Encrypt data using state-of-the-art cryptographic algorithms.
-- **Decryption**: Securely decrypt data back to its original form.
+#### Encrypt a File
+```rust
+use crypt_guard::encrypt::Encrypt;
+use crypt_guard::keychain::Keychain;
+use std::path::PathBuf;
 
-## Testing
-CryptGuardLib includes a suite of tests to ensure functionality. Run tests with:
-```bash
-cargo test
+#[tokio::main]
+async fn main() {
+    let encrypt = Encrypt::new();
+    let keychain = Keychain::new().unwrap();
+    let file_path = PathBuf::from("path/to/your/file.txt");
+    let hmac_key = b"encryption_test_key";
+
+    let _ = encrypt.encrypt_file(file_path, keychain.shared_secret.as_ref().unwrap(), hmac_key)
+        .await
+        .expect("Failed to encrypt file");
+}
+```
+
+### Decrypting Data
+Decrypt data using `decrypt`, `decrypt_msg`, or `decrypt_file` functions from the `Decrypt` struct.
+
+#### Decrypt a Message
+```rust
+use crypt_guard::decrypt::Decrypt;
+use crypt_guard::keychain::Keychain;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() {
+    let decrypt = Decrypt::new();
+    let keychain = Keychain::new().unwrap();
+    let encrypted_data_with_hmac = /* your encrypted data */;
+    let hmac_key = b"encryption_test_key";
+
+    let decrypted_message = decrypt.decrypt_msg(encrypted_data_with_hmac, keychain.shared_secret.as_ref().unwrap(), hmac_key, false)
+        .await
+        .expect("Failed to decrypt message");
+}
+```
+
+#### Decrypt a File
+```rust
+use crypt_guard::decrypt::Decrypt;
+use crypt_guard::keychain::Keychain;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() {
+    let decrypt = Decrypt::new();
+    let keychain = Keychain::new().unwrap();
+    let encrypted_file_path = PathBuf::from("path/to/your/encrypted/file.txt.enc");
+    let hmac_key = b"encryption_test_key";
+
+    let _ = decrypt.decrypt_file(&encrypted_file_path, keychain.shared_secret.as_ref().unwrap(), hmac_key)
+        .await
+        .expect("Failed to decrypt file");
+}
+```
+
+### Keychain Usage
+The `Keychain` struct provides functionalities for key management, including loading and saving public keys, secret keys, shared secrets, and ciphertexts.
+
+#### Generating New Keychain
+```rust
+use crypt_guard::keychain::Keychain;
+
+#[tokio::main]
+async fn main() {
+    let keychain = Keychain::new().unwrap();
+}
 ```
 
 ## Dependencies
-CryptGuardLib uses the following dependencies:
-- `aes`: AES encryption.
-- `clap`: Command-line argument parsing.
-- `pqcrypto-kyber`: Post-quantum Kyber1024 algorithm.
-- `tokio`: Asynchronous programming support.
+This project depends on several external crates, which need to be included in your `Cargo.toml` file:
 
-Ensure these dependencies are included in your `Cargo.toml` when using CryptGuardLib.
-
-## License
-CryptGuardLib is licensed under the GNU GENERAL PUBLIC LICENSE Version 3. The full license text is available in the `LICENSE` file within the repository.
+```toml
+[dependencies]
+aes = "0.8.3"
+clap = { version = "4.4.18", features = ["cargo", "derive"] }
+env = "0.0.0"
+hex = "0.4.3"
+hmac = "0.12.1"
+pqcrypto = { version = "0.17.0", features = ["serialization"] }
+pqcrypto-kyber = { version = "0.8.0", features = ["serialization"] }
+pqcrypto-traits = "0.3.5"
+sha2 = "0.10.8"
+tempfile = "3.9.0"
+tokio = { version = "1.35.1", features = ["full"] }
+```
+The dependencies include cryptographic libraries like `aes`, `pqcrypto`, and `hmac` which are essential for the encryption and decryption functionalities provided by CryptGuard.

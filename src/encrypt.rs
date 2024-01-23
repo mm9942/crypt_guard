@@ -10,25 +10,31 @@ use pqcrypto_kyber::kyber1024::{self, *};
 use pqcrypto_traits::kem::{PublicKey as PublicKeyKem, SecretKey as SecKeyKem, SharedSecret as SharedSecretKem, Ciphertext as CiphertextKem};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
-use std::io;
-use std::{fs, path::{PathBuf, Path}};
-use std::env::current_dir;
+use std::{
+    fs, 
+    path::{PathBuf, Path},
+    io,
+    env::current_dir
+};
 
 pub struct Encrypt;
 
 impl Encrypt {
-    pub fn generate_hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
+    pub fn new() -> Self {
+        Self
+    }
+    pub fn generate_hmac(&self, key: &[u8], data: &[u8]) -> Vec<u8> {
         let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(key)
             .expect("HMAC can take key of any size");
         mac.update(data);
         mac.finalize().into_bytes().to_vec()
     }
 
-    pub fn append_hmac(encrypted_data: Vec<u8>, hmac: Vec<u8>) -> Vec<u8> {
+    pub fn append_hmac(&self, encrypted_data: Vec<u8>, hmac: Vec<u8>) -> Vec<u8> {
         [encrypted_data, hmac].concat()
     }
 
-    pub async fn encrypt_with_aes_hmac(data: &[u8], key: &[u8], hmac_secret: &[u8]) -> Result<Vec<u8>, CryptError> {
+    pub async fn encrypt_with_aes_hmac(&self, data: &[u8], key: &[u8], hmac_secret: &[u8]) -> Result<Vec<u8>, CryptError> {
         let block_size = 16;
         let mut padded_data = data.to_vec();
 
@@ -46,22 +52,22 @@ impl Encrypt {
             encrypted_chunk.copy_from_slice(&block);
         }
         
-        let hmac = Encrypt::generate_hmac(hmac_secret, &encrypted_data);
-        let encrypted_and_signed_data = Encrypt::append_hmac(encrypted_data, hmac);
+        let hmac = self.generate_hmac(hmac_secret, &encrypted_data);
+        let encrypted_and_signed_data = self.append_hmac(encrypted_data, hmac);
         
         Ok(encrypted_and_signed_data)
     }
 
-    pub async fn load_pub_key(pub_key_path: PathBuf) -> Result<PublicKey, CryptError> {
+    pub async fn load_pub_key(&self, pub_key_path: PathBuf) -> Result<PublicKey, CryptError> {
         let public_key_bytes = File::load(pub_key_path, KeyTypes::PublicKey).await?;
         let public_key = kyber1024::PublicKey::from_bytes(&public_key_bytes)
             .map_err(|_| CryptError::EncapsulationError)?;
         Ok(public_key)
     }
 
-    pub async fn encrypt_file(file_path: PathBuf, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
+    pub async fn encrypt_file(&self, file_path: PathBuf, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let data = fs::read(&file_path).map_err(|_| CryptError::IOError)?;
-        let encrypted_data = Encrypt::encrypt_with_aes_hmac(&data, shared_secret.as_bytes(), hmac_key).await?;
+        let encrypted_data = self.encrypt_with_aes_hmac(&data, shared_secret.as_bytes(), hmac_key).await?;
         let mut encrypted_file_path = file_path.clone();
         let unique_encrypted_file_path = Keychain::generate_unique_filename(encrypted_file_path.as_os_str().to_str().expect("REASON"), "enc");
         let enc_file_path = PathBuf::from(unique_encrypted_file_path);
@@ -69,12 +75,12 @@ impl Encrypt {
         Ok(encrypted_data) // Return the path of the encrypted file
     }
 
-    pub async fn encrypt_msg(message: &str, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
+    pub async fn encrypt_msg(&self, message: &str, shared_secret: &dyn SharedSecretKem, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let data = message.as_bytes();
-        Encrypt::encrypt_with_aes_hmac(data, shared_secret.as_bytes(), hmac_key).await
+        self.encrypt_with_aes_hmac(data, shared_secret.as_bytes(), hmac_key).await
     }
 
-    pub async fn save_encrypted_message(message: &[u8], path: PathBuf) -> Result<(), CryptError> {
+    pub async fn save_encrypted_message(&self, message: &[u8], path: PathBuf) -> Result<(), CryptError> {
         let hex_message = format!(
         "-----BEGIN ENCRYPTED MESSAGE-----\n{}\n-----END ENCRYPTED MESSAGE-----",
             hex::encode(&message)
@@ -86,6 +92,7 @@ impl Encrypt {
     }
 
     pub async fn encrypt(
+        &self, 
         public_key_path: PathBuf,
         encrypted_file_path: Option<&PathBuf>,
         message: Option<&str>,
@@ -115,10 +122,10 @@ impl Encrypt {
         // Encrypt the message or file
         match (message, encrypted_file_path) {
             (Some(msg), None) => {
-                Encrypt::encrypt_msg(msg, &shared_secret, hmac_key).await
+                self.encrypt_msg(msg, &shared_secret, hmac_key).await
             },
             (None, Some(file_path)) => {
-                Encrypt::encrypt_file(file_path.clone(), &shared_secret, hmac_key).await
+                self.encrypt_file(file_path.clone(), &shared_secret, hmac_key).await
             },
             _ => return Err(CryptError::InvalidParameters)
         }
