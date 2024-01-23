@@ -70,6 +70,24 @@ impl Decrypt {
         Ok(data.to_vec())
     }
 
+
+    pub fn extract_encrypted_message(message: &str) -> Result<Vec<u8>, CryptError> {
+        let begin_tag = "-----BEGIN ENCRYPTED MESSAGE-----";
+        let end_tag = "-----END ENCRYPTED MESSAGE-----";
+
+        if let (Some(start), Some(end)) = (message.find(begin_tag), message.find(end_tag)) {
+            if start < end {
+                let encrypted_message = &message[start + begin_tag.len()..end].trim();
+                Ok(hex::decode(encrypted_message).unwrap())
+            } else {
+                Err(CryptError::InvalidMessageFormat)
+            }
+        } else {
+            Err(CryptError::MissingData)
+        }
+    }
+
+
     pub async fn decrypt_with_aes(data: &[u8], key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let mut decrypted_data = vec![0u8; data.len()];
         let cipher = Aes256::new(GenericArray::from_slice(key));

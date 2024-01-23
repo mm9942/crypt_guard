@@ -74,10 +74,21 @@ impl Encrypt {
         Encrypt::encrypt_with_aes_hmac(data, shared_secret.as_bytes(), hmac_key).await
     }
 
+    pub async fn save_encrypted_message(message: &[u8], path: PathBuf) -> Result<(), CryptError> {
+        let hex_message = format!(
+        "-----BEGIN ENCRYPTED MESSAGE-----\n{}\n-----END ENCRYPTED MESSAGE-----",
+            hex::encode(&message)
+        );
+        let _ = fs::write("./message.enc", &hex_message)
+            .map_err(|_| CryptError::WriteError);
+
+        Ok(())
+    }
+
     pub async fn encrypt(
         public_key_path: PathBuf,
-        message: Option<&str>,
         encrypted_file_path: Option<&PathBuf>,
+        message: Option<&str>,
         hmac_key: &[u8],
     ) -> Result<Vec<u8>, CryptError> {
         let mut keychain = Keychain::new().unwrap();
@@ -99,7 +110,7 @@ impl Encrypt {
         // Save the ciphertext
         keychain.save_ciphertext("./keychain", "cipher").await?;
         let ciphertext_hex = hex::encode(&keychain.get_ciphertext().await.unwrap().as_bytes());
-        println!("please note: {}", ciphertext_hex);
+        //println!("please note: {}", ciphertext_hex);
 
         // Encrypt the message or file
         match (message, encrypted_file_path) {

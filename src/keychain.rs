@@ -1,4 +1,3 @@
-
 use pqcrypto_kyber::kyber1024::*;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
@@ -10,6 +9,8 @@ use std::{error::Error, ffi::OsStr, fmt, fs, path::Path, path::PathBuf, result::
 #[derive(Debug)]
 pub enum CryptError {
     IOError,
+    MessageExtractionError,
+    InvalidMessageFormat,
     HexError(hex::FromHexError),
     EncapsulationError,
     DecapsulationError,
@@ -33,6 +34,8 @@ impl fmt::Display for CryptError {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
        match self {
            CryptError::IOError => write!(f, "IO error occurred"),
+           CryptError::MessageExtractionError => write!(f, "Error extracting message"),
+           CryptError::InvalidMessageFormat => write!(f, "Invalid message format"),
            CryptError::HexError(err) => write!(f, "Hex error: {}", err),
            CryptError::EncapsulationError => write!(f, "Encapsulation error"),
            CryptError::DecapsulationError => write!(f, "Decapsulation error"),
@@ -198,6 +201,34 @@ impl Keychain {
         Ok(())
     }
 
+    pub async fn save_keys(&self, base_path: &str, title: &str) -> Result<(), CryptError> {
+        let dir_path = format!("{}/{}", base_path, title);
+        let dir = std::path::Path::new(&dir_path);
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir).map_err(|_| CryptError::WriteError)?;
+        }
+
+        let public_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "pub");
+        let secret_key_path = Keychain::generate_unique_filename(&format!("{}/{}", dir_path, title), "sec");
+
+        fs::write(
+            &public_key_path, 
+            format!(
+                "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
+                hex::encode(self.public_key.as_ref().expect("Public key is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        fs::write(
+            &secret_key_path, 
+            format!(
+                "-----BEGIN SECRET KEY-----\n{}\n-----END SECRET KEY-----",
+                hex::encode(self.secret_key.as_ref().expect("Secret key is missing").as_bytes())
+            )
+        ).map_err(|_| CryptError::WriteError)?;
+
+        Ok(())
+    }
 
     pub async fn save_public_key(&self, base_path: &str, title: &str) -> Result<(), CryptError> {
         let dir_path = format!("{}/{}", base_path, title);
@@ -288,7 +319,7 @@ impl Keychain {
         let public_key_bytes = File::load(path, KeyTypes::PublicKey).await?;
         let public_key = PublicKey::from_bytes(&public_key_bytes).unwrap();
 
-        println!("Successfully loaded public key.");
+        println!("Successfully loaded public key.\n");
         self.public_key = Some(public_key);
         Ok(public_key)
     }
@@ -297,7 +328,7 @@ impl Keychain {
         let secret_key_bytes = File::load(path, KeyTypes::SecretKey).await?;
         let secret_key: kyber1024::SecretKey = SecretKey::from_bytes(&secret_key_bytes).unwrap();
 
-        println!("Successfully loaded secret key.");
+        println!("Successfully loaded secret key.\n");
         self.secret_key = Some(secret_key);
         Ok(secret_key)
     }
@@ -306,7 +337,7 @@ impl Keychain {
         let cipher_bytes = File::load(path, KeyTypes::Ciphertext).await?;
         let cipher: kyber1024::Ciphertext = Ciphertext::from_bytes(&cipher_bytes).unwrap();
 
-        println!("Successfully loaded ciphertext.");
+        println!("Successfully loaded ciphertext.\n");
         self.ciphertext = Some(cipher);
         Ok(cipher)
     }
@@ -315,7 +346,7 @@ impl Keychain {
         let shared_secret_bytes = File::load(path, KeyTypes::SharedSecret).await?;
         let shared_secret: kyber1024::SharedSecret = SharedSecret::from_bytes(&shared_secret_bytes).unwrap();
 
-        println!("Successfully loaded shared secret.");
+        println!("Successfully loaded shared secret.\n");
         self.shared_secret = Some(shared_secret);
         Ok(shared_secret)
     }

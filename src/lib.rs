@@ -175,7 +175,7 @@ mod tests {
         fs::write(&original_file_path, original_file_contents).expect("Failed to write original file");
 
         // Encrypt the file
-        let _ = Encrypt::encrypt(pubkey, None, Some(&original_file_path), b"secret").await;
+        let _ = Encrypt::encrypt(pubkey, Some(&original_file_path), None, b"secret").await;
 
         // Decrypt the file
         let _ = Decrypt::decrypt(secret_key, ciphertext, Some(&encrypted_file_path), None, b"secret").await;
