@@ -1,18 +1,34 @@
 pub mod keychain;
 pub mod decrypt;
 pub mod encrypt;
+pub mod file_remover;
+pub mod sign;
 
-pub use crate::keychain::*;
-pub use crate::encrypt::*;
-pub use crate::decrypt::*;
+use crate::{
+    keychain::*,
+    encrypt::*,
+    decrypt::*,
+    file_remover::*,
+    sign::{Sign, *},
+};
+
+enum ActionType {
+    FileAction,
+    MessageAction,
+}
 
 #[cfg(test)]
 mod tests {
     extern crate tempfile;
     use super::*;
-    use crate::keychain::*;
-    use crate::encrypt::*;
-    use crate::decrypt::*;
+    use crate::{
+        keychain::*,
+        encrypt::*,
+        decrypt::*,
+        file_remover::*,
+        sign::{Sign, *},
+        ActionType,
+    };
     use std::{
         path::{PathBuf, Path},
         fs,
@@ -24,6 +40,8 @@ mod tests {
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
     use tempfile::tempdir;
+    use pqcrypto_traits::sign::{SignedMessage as SignedMessageSign, SecretKey as SecretKeySign, PublicKey as PublicKeySign, DetachedSignature as DetachedSignatureSign};
+
     
     #[tokio::test]
     async fn keychain_new_works() {
@@ -167,11 +185,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_encrypt_decrypt() {
+        let keychain = Keychain::new().unwrap();
         let decrypt: Decrypt = Decrypt::new();
         let encrypt: Encrypt = Encrypt::new();
-        let pubkey = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.pub");
-        let secret_key = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/key/key.sec");
-        let ciphertext = PathBuf::from("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/cipher/cipher.ct");
+        let pubkey = PathBuf::from("./keychain/key/key.pub");
+        let secret_key = PathBuf::from("./keychain/key/key.sec");
+        let ciphertext = PathBuf::from("./keychain/cipher/cipher.ct");
 
         // Create temporary directory for test files
         let dir = tempdir().unwrap();
@@ -183,10 +202,10 @@ mod tests {
         fs::write(&original_file_path, original_file_contents).expect("Failed to write original file");
 
         // Encrypt the file
-        let _ = encrypt.encrypt(pubkey, Some(&original_file_path), None, b"secret").await;
+        let _ = encrypt.encrypt(pubkey, &original_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret").await;
 
         // Decrypt the file
-        let _ = decrypt.decrypt(secret_key, ciphertext, Some(&encrypted_file_path), None, b"secret").await;
+        let _ = decrypt.decrypt(secret_key, ciphertext, encrypted_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret").await;
 
         // Read decrypted file contents
         let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read decrypted file");
@@ -196,9 +215,99 @@ mod tests {
 
         // Clean up - remove temporary files and directory
         dir.close().unwrap();
-        fs::remove_file("/Users/mm29942/EncryptCommunication/EncryptMod/keychain/cipher/cipher.ct").unwrap();
+        fs::remove_file("./keychain/cipher/cipher.ct");
+    }
+
+   #[tokio::test]
+    async fn test_file_removal() -> Result<(), Box<dyn std::error::Error>> {
+        let keychain = Keychain::new().unwrap();
+        //keychain.save("./keychain", "key").await?;
+
+        let keychain_path = PathBuf::from("./keychain/key");
+        let duplicated_path = PathBuf::from("./keychain/key_duplicate");
+
+        // Duplicate the directory
+        fs::create_dir_all(&duplicated_path)?; // Create the target directory
+        for entry in fs::read_dir(&keychain_path)? {
+            let entry = entry?;
+            let dest_path = duplicated_path.join(entry.file_name());
+            fs::copy(entry.path(), dest_path)?;
+        }
+
+        // Use FileRemover on the duplicated directory
+        match FileRemover::new(5, duplicated_path.clone(), true) {
+            Ok(mut file_remover) => {
+                if let Err(e) = file_remover.delete() {
+                    eprintln!("Error while deleting file: {}", e);
+                } else {
+                    println!("File successfully deleted.");
+                }
+            }
+            Err(e) => eprintln!("Failed to initialize file remover: {}", e),
+        }
+
+        // Check that the duplicated folder does not exist anymore
+        assert!(!duplicated_path.exists(), "The duplicated folder still exists after deletion");
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_sign_msg() {
+        let mut sign = Sign::new().unwrap();
+        let message = b"Test message";
+        let result = sign.sign_msg(message).await;
+        println!("{:?}", result);
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_signing_detached() {
+        let mut sign = Sign::new().unwrap();
+        let message = b"Test message";
+        let result = sign.signing_detached(message).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_msg() {
+        let mut sign = Sign::new().unwrap();
+        let message = b"Test message";
+        sign.sign_msg(message).await.unwrap();
+        let result = sign.verify_msg(message).await;
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_verify_detached() {
+        let mut sign = Sign::new().unwrap();
+        let message = b"Test message";
+        let detached_signature = sign.signing_detached(message).await.unwrap();
+        let result = sign.verify_detached(message).await;
+        println!("{:?}", result);
+        assert_eq!(result, Ok(true));
     }
 
 
+    #[tokio::test]
+    async fn test_sign_file() {
+        // Initialize Signature struct
+        let mut sign = Sign::new().unwrap();
+        let _ = sign.save_keys("keychain", "sign");
+
+        // Perform the sign_file operation
+        let file_path = PathBuf::from("./README.md");
+        let sign_result = sign.sign_file(file_path.clone()).await;
+        assert!(sign_result.is_ok(), "Signing the file failed");
+
+        // Reading the file content for verification
+        let file_content = fs::read(&file_path).expect("Failed to read the file");
+        
+        // Verify the signature
+        let verify_result = sign.verify_detached(&file_content).await;
+        assert!(verify_result.is_ok(), "Signature verification failed");
+        assert_eq!(verify_result.unwrap(), true, "The file signature verification failed");
+    }
 
 }

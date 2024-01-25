@@ -16,6 +16,7 @@ use std::{
     io,
     env::current_dir
 };
+use crate::ActionType;
 
 pub struct Encrypt;
 
@@ -94,40 +95,32 @@ impl Encrypt {
     pub async fn encrypt(
         &self, 
         public_key_path: PathBuf,
-        encrypted_file_path: Option<&PathBuf>,
-        message: Option<&str>,
+        encrypt: &str,
+        action: ActionType,
         hmac_key: &[u8],
     ) -> Result<Vec<u8>, CryptError> {
-        let mut keychain = Keychain::new().unwrap();
-        
+        let mut keychain = Keychain::new()?;
+
         // Load the public key from the given path
         let public_key = keychain.load_public_key(public_key_path).await?;
 
         // Encapsulate using the public key
         let (shared_secret, ciphertext) = kyber1024::encapsulate(&public_key);
 
-        // Create a new keychain instance to save the ciphertext
-        let mut keychain = Keychain {
-            public_key: None,
-            secret_key: None,
-            shared_secret: None,
-            ciphertext: Some(ciphertext),
-        };
-
-        // Save the ciphertext
-        keychain.save_ciphertext("./keychain", "cipher").await?;
-        let ciphertext_hex = hex::encode(&keychain.get_ciphertext().await.unwrap().as_bytes());
-        //println!("please note: {}", ciphertext_hex);
-
-        // Encrypt the message or file
-        match (message, encrypted_file_path) {
-            (Some(msg), None) => {
-                self.encrypt_msg(msg, &shared_secret, hmac_key).await
+        match action {
+            ActionType::FileAction => {
+                let path = PathBuf::from(encrypt);
+                println!("Encrypting file...");
+                let encrypt = self.encrypt_file(path, &shared_secret, hmac_key).await?;
+                Ok(encrypt)
             },
-            (None, Some(file_path)) => {
-                self.encrypt_file(file_path.clone(), &shared_secret, hmac_key).await
+            ActionType::MessageAction => {
+                println!("Encrypting message...\n");
+                let encrypt = self.encrypt_msg(encrypt, &shared_secret, hmac_key).await?;
+                self.save_encrypted_message(&encrypt, PathBuf::from("./message.enc")).await?;
+                Ok(encrypt)
             },
-            _ => return Err(CryptError::InvalidParameters)
+            _ => Err(CryptError::InvalidParameters),
         }
     }
 }

@@ -5,6 +5,7 @@ use aes::cipher::{BlockCipher, BlockEncrypt, BlockDecrypt, KeyInit, generic_arra
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
 use std::{error::Error, ffi::OsStr, fmt, fs, path::Path, path::PathBuf, result::Result, env};
+use tokio::runtime;
 
 #[derive(Debug)]
 pub enum CryptError {
@@ -117,7 +118,22 @@ impl Keychain {
             ciphertext: Some(ct),
         })
     }
-
+    
+    pub fn new_keys(path: &str, name: &str) -> Result<Self, CryptError> {
+        let (pk, sk) = keypair();
+        let keys = Self {
+            public_key: Some(pk),
+            secret_key: Some(sk),
+            shared_secret: None,
+            ciphertext: None,
+        };
+        let rt = runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            keys.save_keys(path, name).await;
+        });
+        Ok(keys)
+    }
+    
     pub fn find_highest_numbered_file(dir_path: &Path, base_filename: &str, extension: &str) -> Option<PathBuf> {
         let mut highest_numbered_file: Option<(i32, PathBuf)> = None;
 

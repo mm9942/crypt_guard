@@ -13,6 +13,7 @@ use std::{
     io::{self, Write},
     env::current_dir
 };
+use crate::ActionType;
 
 pub struct Decrypt;
 
@@ -126,11 +127,11 @@ impl Decrypt {
         &self, 
         secret_key: PathBuf,
         ciphertext: PathBuf,
-        encrypted_file_path: Option<&PathBuf>,
-        encrypted_message: Option<&[u8]>,
+        decrypt: &str,
+        action: ActionType,
         hmac_key: &[u8],
     ) -> Result<(), CryptError> {
-        let mut keychain = Keychain::new().unwrap();
+        let mut keychain = Keychain::new()?;
 
         // Load the secret key and ciphertext
         let secret = keychain.load_secret_key(secret_key).await?;
@@ -139,22 +140,19 @@ impl Decrypt {
         // Decapsulate using the secret key
         let shared_secret = decapsulate(&cipher, &secret);
 
-        // Decrypt the file or message
-        match (encrypted_file_path, encrypted_message) {
-            (Some(path), None) => {
+        match action {
+            ActionType::FileAction => {
+                let path = PathBuf::from(decrypt);
                 println!("Decrypting file...");
-                self.decrypt_file(path, &shared_secret, hmac_key).await?;
+                self.decrypt_file(&path, &shared_secret, hmac_key).await?;
                 Ok(())
             },
-            (None, Some(data)) => {
+            ActionType::MessageAction => {
                 println!("Decrypting message...\n");
-                let _ = self.decrypt_msg(data, &shared_secret, hmac_key, true).await?;
+                let _ = self.decrypt_msg(decrypt.as_bytes(), &shared_secret, hmac_key, true).await?;
                 Ok(())
             },
-            _ => {
-                println!("Invalid parameters for decryption");
-                Err(CryptError::InvalidParameters)
-            },
+            _ => Err(CryptError::InvalidParameters),
         }
     }
 }
