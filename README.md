@@ -1,12 +1,27 @@
-# CryptGuard programming library
+# CryptGuard Programming Library
+
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![Documentation][doc-badge]][doc-url]
+[![GitHub Library][lib-badge]][lib-link]
+[![GitHub CLI][cli-badge]][cli-link]
+
+[crates-badge]: https://img.shields.io/badge/crates.io-v0.2-blue.svg
+[crates-url]: https://crates.io/crates/crypt_guard
+[mit-badge]: https://img.shields.io/badge/license-MIT-green.svg
+[mit-url]: https://github.com/mm9942/CryptGuardLib/blob/main/LICENSE
+[doc-badge]: https://img.shields.io/badge/docs-v0.2-yellow.svg
+[doc-url]: https://docs.rs/crypt_guard/
+[lib-badge]: https://img.shields.io/badge/github-lib-black.svg
+[lib-link]: https://github.com/mm9942/CryptGuardLib
+[cli-badge]: https://img.shields.io/badge/github-cli-white.svg
+[cli-link]: https://github.com/mm9942/CryptGuard
 
 ## Introduction
-Embark on a journey through the cryptic realms of cyberspace with CryptGuard, a fortress of cryptographic wisdom. In an era where the fabric of digital security is relentlessly tested by the looming specter of quantum supremacy, CryptGuard stands as a bulwark, melding the arcane secrets of traditional cryptography with the enigmatic art of post-quantum ciphers. It is a beacon for developers, a herald of a new epoch, who seek to imbue their creations with the power to withstand the tempests of tomorrow's uncertainties. Let CryptGuard be the sentinel in the silent war of ones and zeroes, a vigilant guardian weaving the unbreakable shield of privacy.
+CryptGuard is a comprehensive cryptographic library, offering robust encryption and decryption capabilities. It integrates traditional cryptography with post-quantum algorithms, ensuring resilience against quantum computing threats. Designed for developers, CryptGuard empowers applications to withstand future digital security challenges. Embrace CryptGuard as your trusted ally in safeguarding privacy in the digital realm.
 
 ## Prerequisites
-Before integrating CryptGuard into your project, ensure your system includes:
-- Rust and Cargo (latest stable version)
-- Tokio runtime environment
+Ensure your system has the latest stable versions of Rust, Cargo, and the Tokio runtime environment.
 
 ## Usage
 
@@ -77,7 +92,7 @@ async fn main() {
 ```
 
 ### Keychain Usage
-The `Keychain` struct in CryptGuard facilitates key management. It supports loading and saving public keys, secret keys, shared secrets, and ciphertexts. For example:
+The `Keychain` struct in CryptGuard facilitates key management. It supports loading and saving public keys, secret keys, shared secrets, and ciphertexts.
 
 ```rust
 use crypt_guard::keychain::Keychain;
@@ -85,12 +100,11 @@ use crypt_guard::keychain::Keychain;
 fn main() {
     let keychain = Keychain::new().unwrap();
     // Load or generate keys as required
-    // ...
 }
 ```
 
 ### Signing a Message
-To sign a message, you can use the `Sign` struct from the `sign` module. Here's how you can sign a message:
+To sign a message, use the `Sign` struct from the `sign` module.
 
 ```rust
 use crypt_guard::sign::Sign;
@@ -108,10 +122,8 @@ async fn main() {
 }
 ```
 
-In this example, `Sign::new()` initializes the `Sign` struct, and `sign.sign_msg(message)` is used to sign the provided message.
-
 ### Signing a File
-For signing a file, you can use the `sign_file` method from the `Sign` struct. This method signs the content of the file and saves the signature. Here's an example:
+For signing a file, use the `sign_file` method from the `Sign` struct.
 
 ```rust
 use crypt_guard::sign::Sign;
@@ -130,37 +142,76 @@ async fn main() {
 }
 ```
 
-In this example, `sign.sign_file(file_path)` is used to sign the content of the specified file.
+### New Feature: xchacha20
+The `xchacha20` feature in CryptGuard introduces the XChaCha20 encryption algorithm, providing an additional layer of security for your cryptographic needs. This feature is optional and can be enabled in your `Cargo.toml`.
 
-### Additional Features
-The `Sign` struct also provides functionalities like `verify_msg` and `verify_detached` for verifying signed messages and detached signatures, respectively.
+#### Encrypting Data with XChaCha20
+```rust
+#[
 
-Remember to handle the results and errors appropriately in a production environment, and ensure that the paths and keys used in these examples match your specific use case.
+cfg(feature = "xchacha20")]
+use crypt_guard::encrypt::Encrypt;
+use crypt_guard::keychain::Keychain;
+use crypt_guard::Encrypt::generate_nonce;
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "xchacha20")]
+    {
+        let encrypt = Encrypt::new();
+        let keychain = Keychain::new().unwrap();
+        let message = "This is a secret message!";
+        let nonce = generate_nonce();
+        let hmac_key = b"encryption_test_key";
+
+        let encrypted_message = encrypt.encrypt_msg_xchacha20(message, keychain.shared_secret.as_ref().unwrap(), &nonce, hmac_key)
+            .await
+            .expect("Failed to encrypt message with XChaCha20");
+    }
+}
+```
+
+#### Decrypting Data with XChaCha20
+```rust
+#[cfg(feature = "xchacha20")]
+use crypt_guard::decrypt::Decrypt;
+use crypt_guard::keychain::Keychain;
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "xchacha20")]
+    {
+        let decrypt = Decrypt::new();
+        let keychain = Keychain::new().unwrap();
+        let nonce = ...; // Load your nonce here
+        let hmac_key = b"encryption_test_key";
+        let encrypted_data = ...; // Load your encrypted data here
+
+        let decrypted_message = decrypt.decrypt_msg_xchacha20(encrypted_data, keychain.shared_secret.as_ref().unwrap(), &nonce, hmac_key, false)
+            .await
+            .expect("Failed to decrypt message with XChaCha20");
+    }
+}
+```
 
 ## Dependencies
 CryptGuard depends on several external crates, specified in `Cargo.toml`:
 
-- `aes`: Latest stable version for AES encryption.
-- `tokio`: Latest stable version with the `full` feature for asynchronous programming.
-- `colored`: Latest stable version for colorful terminal output.
-- `hex`: Latest stable version for encoding/decoding data in hex format.
-- `hmac`: Latest stable version for HMAC functionality.
-- `indicatif`: Latest stable version for progress bar in terminal applications.
-- `pqcrypto`: Latest stable version, with serialization features, for post-quantum cryptography algorithms.
-- `pqcrypto-falcon`: Latest stable version, with serialization features, for Falcon post-quantum signature scheme.
-- `pqcrypto-kyber`: Latest stable version, with serialization features, for Kyber post-quantum key encapsulation mechanism.
-- `pqcrypto-traits`: Latest stable version for common traits in post-quantum cryptography.
-- `rand`: Latest stable version for generating random numbers.
-- `sha2`: Latest stable version for SHA-2 cryptographic hash functions.
-- `tempfile`: Latest stable version for creating temporary files and directories.
-
-## Resources
-- CryptGuard on Crates.io: [https://crates.io/crates/crypt_guard](https://crates.io/crates/crypt_guard)
-- CryptGuard Documentation: [https://docs.rs/crypt_guard/](https://docs.rs/crypt_guard/)
-- CryptGuard CLI Application: [https://github.com/mm9942/CryptGuard](https://github.com/mm9942/CryptGuard)
-- CryptGuard Library Source
-
-: [https://github.com/mm9942/CryptGuardLib](https://github.com/mm9942/CryptGuardLib)
+- `aes`: 0.8.3
+- `tokio`: 1.35.1 (with `full` feature)
+- `colored`: 2.1.0
+- `env`: 0.0.0
+- `hex`: 0.4.3
+- `hmac`: 0.12.1
+- `indicatif`: 0.17.7
+- `pqcrypto-falcon`: 0.3.0
+- `pqcrypto-kyber`: 0.8.0
+- `pqcrypto-traits`: 0.3.5
+- `rand`: 0.8.5
+- `sha2`: 0.10.8
+- `tempfile`: 3.9.0
+- `chacha20`: 0.9.1 (optional, enabled with `xchacha20` feature)
+- `cipher`: 0.4.4 (optional, enabled with `xchacha20` feature)
 
 ## License
-CryptGuard is licensed under the MIT LICENSE. The full license text can be found in the `LICENSE` file in the repository.
+CryptGuard is licensed under the MIT LICENSE. The full license text is available in the `LICENSE` file in the repository.
