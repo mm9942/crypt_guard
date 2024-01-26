@@ -5,7 +5,7 @@ edition = "2021"
 description = "CryptGuardLib is a comprehensive Rust library designed for strong encryption and decryption, incorporating post-quantum cryptography to safeguard against quantum threats. It's geared towards developers who need to embed advanced cryptographic capabilities in their Rust applications."
 license = "MIT"
 repository = "https://github.com/mm9942/CryptGuardLib"
-author = "mm29942 <mm29942@pm.me"
+author = "mm29942 <mm29942@pm.me>"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
