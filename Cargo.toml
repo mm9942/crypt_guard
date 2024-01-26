@@ -1,25 +1,31 @@
 [package]
 name = "crypt_guard"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 description = "CryptGuardLib is a comprehensive Rust library designed for strong encryption and decryption, incorporating post-quantum cryptography to safeguard against quantum threats. It's geared towards developers who need to embed advanced cryptographic capabilities in their Rust applications."
 license = "MIT"
+repository = "https://github.com/mm9942/CryptGuardLib"
+author = "mm29942 <mm29942@pm.me"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes = "0.8.3"
+aes = { version = "0.8.3", optional = true }
 colored = "2.1.0"
-# async-trait = "0.1.77"
 env = "0.0.0"
 hex = "0.4.3"
 hmac = "0.12.1"
 indicatif = "0.17.7"
-pqcrypto = { version = "0.17.0", features = ["serialization"] }
-pqcrypto-falcon = { version = "0.3.0", features = ["serialization"] }
-pqcrypto-kyber = { version = "0.8.0", features = ["serialization"] }
+pqcrypto-falcon =  "0.3.0"
+pqcrypto-kyber =  "0.8.0"
 pqcrypto-traits = "0.3.5"
 rand = "0.8.5"
 sha2 = "0.10.8"
 tempfile = "3.9.0"
 tokio = { version = "1.35.1", features = ["full"] }
+chacha20  = { version = "0.9.1", optional = true }
+cipher = { version = "0.4.4", optional = true }
+
+[features]
+xchacha20 = ["dep:chacha20", "dep:cipher"]
+default = ["dep:aes"]
