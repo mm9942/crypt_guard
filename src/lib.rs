@@ -4,15 +4,15 @@ pub mod encrypt;
 pub mod file_remover;
 pub mod sign;
 
-use crate::{
+pub use crate::{
     keychain::*,
     encrypt::*,
     decrypt::*,
     file_remover::*,
-    sign::{Sign, *},
+    sign::*,
 };
 
-enum ActionType {
+pub enum ActionType {
     FileAction,
     MessageAction,
 }
@@ -22,9 +22,9 @@ mod tests {
     extern crate tempfile;
     use super::*;
     use crate::{
-        keychain::*,
+        keychain::{*, Keychain},
         encrypt::*,
-        decrypt::*,
+        decrypt::{*, self},
         file_remover::*,
         sign::{Sign, *},
         ActionType,
@@ -82,8 +82,8 @@ mod tests {
         let encrypt_filename2 = "./test_file.txt.enc";
         let decrypt: Decrypt = Decrypt::new();
         let encrypt: Encrypt = Encrypt::new();
-        let original1 = decrypt.generate_original_filename(encrypt_filename1).await;
-        let original2 = decrypt.generate_original_filename(encrypt_filename2).await;
+        let original1 = Decrypt::generate_original_filename(encrypt_filename1).await;
+        let original2 = Decrypt::generate_original_filename(encrypt_filename2).await;
         assert_eq!("./test_file.txt", original1);
         assert_eq!("./test_file.txt", original2);
     }
@@ -97,14 +97,14 @@ mod tests {
         let data = b"Ax23526";
 
         // Generate HMAC
-        let hmac = encrypt.generate_hmac(key, data);
+        let hmac = Encrypt::generate_hmac(key, data);
 
         // Prepare data for verification (append hmac to original data)
         let data_with_hmac = [data.as_ref(), hmac.as_ref()].concat();
 
         // Verify HMAC
         let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
-        let verification_result = decrypt.verify_hmac(key, &data_with_hmac, hmac_len);
+        let verification_result = decrypt::Decrypt::verify_hmac(key, &data_with_hmac, hmac_len);
 
         // Assertions
         assert!(verification_result.is_ok(), "HMAC verification failed");
@@ -226,6 +226,10 @@ mod tests {
         let keychain_path = PathBuf::from("./keychain/key");
         let duplicated_path = PathBuf::from("./keychain/key_duplicate");
 
+        if !keychain_path.is_dir() {
+            keychain.save("./keychain", "key").await?;
+        }
+
         // Duplicate the directory
         fs::create_dir_all(&duplicated_path)?; // Create the target directory
         for entry in fs::read_dir(&keychain_path)? {
@@ -251,6 +255,7 @@ mod tests {
 
         Ok(())
     }
+
     #[tokio::test]
     async fn test_sign_msg() {
         let mut sign = Sign::new().unwrap();
@@ -359,7 +364,7 @@ mod tests {
 
         // Verify HMAC
         let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
-        match decrypt.verify_hmac(&hmac_key, &encrypted_data, hmac_len) {
+        match decrypt::Decrypt::verify_hmac(&hmac_key, &encrypted_data, hmac_len) {
             Ok(data_with_hmac) => {
                 // Decrypt the data
                 let decrypted_data = decrypt.decrypt_data_xchacha20(&data_with_hmac, &nonce, &key)

@@ -36,14 +36,14 @@ impl Encrypt {
     pub fn new() -> Self {
         Self
     }
-    pub fn generate_hmac(&self, key: &[u8], data: &[u8]) -> Vec<u8> {
+    pub fn generate_hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
         let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(key)
             .expect("HMAC can take key of any size");
         mac.update(data);
         mac.finalize().into_bytes().to_vec()
     }
 
-    pub fn append_hmac(&self, encrypted_data: Vec<u8>, hmac: Vec<u8>) -> Vec<u8> {
+    pub fn append_hmac(encrypted_data: Vec<u8>, hmac: Vec<u8>) -> Vec<u8> {
         [encrypted_data, hmac].concat()
     }
 
@@ -130,8 +130,8 @@ impl Encrypt {
             encrypted_chunk.copy_from_slice(&block);
         }
         
-        let hmac = self.generate_hmac(hmac_secret, &encrypted_data);
-        let encrypted_and_signed_data = self.append_hmac(encrypted_data, hmac);
+        let hmac = Self::generate_hmac(hmac_secret, &encrypted_data);
+        let encrypted_and_signed_data = Self::append_hmac(encrypted_data, hmac);
         
         Ok(encrypted_and_signed_data)
     }
@@ -168,8 +168,8 @@ impl Encrypt {
         let mut encrypted_data = data.to_vec();
         cipher.apply_keystream(&mut encrypted_data);
 
-        let hmac = self.generate_hmac(hmac_secret, &encrypted_data);
-        let encrypted_and_signed_data = self.append_hmac(encrypted_data, (*hmac).to_vec());
+        let hmac = Self::generate_hmac(hmac_secret, &encrypted_data);
+        let encrypted_and_signed_data = Self::append_hmac(encrypted_data, (*hmac).to_vec());
 
         Ok(encrypted_and_signed_data)
     }
