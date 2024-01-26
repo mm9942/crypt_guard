@@ -36,7 +36,7 @@ mod tests {
         io::Write,
         ffi::OsStr
     };
-    use pqcrypto::kem::kyber1024::decapsulate;
+    use pqcrypto_kyber::kyber1024::*;
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
     use tempfile::tempdir;
@@ -202,10 +202,10 @@ mod tests {
         fs::write(&original_file_path, original_file_contents).expect("Failed to write original file");
 
         // Encrypt the file
-        let _ = encrypt.encrypt(pubkey, &original_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret").await;
+        let _ = encrypt.encrypt(pubkey, &original_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret", None).await;
 
         // Decrypt the file
-        let _ = decrypt.decrypt(secret_key, ciphertext, encrypted_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret").await;
+        let _ = decrypt.decrypt(secret_key, ciphertext, encrypted_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret", None).await;
 
         // Read decrypted file contents
         let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read decrypted file");
@@ -310,4 +310,169 @@ mod tests {
         assert_eq!(verify_result.unwrap(), true, "The file signature verification failed");
     }
 
+    #[tokio::test]
+    #[cfg(feature = "xchacha20")]
+    async fn test_encrypt_decrypt_message_xchacha() {
+        let keychain = Keychain::new().expect("Failed to create keychain");
+        let encrypt = Encrypt::new();
+        let decrypt = Decrypt::new();
+
+        // Use the shared secret from Keychain
+        let shared_secret = keychain.get_shared_secret().await.expect("Failed to get shared secret");
+        let nonce = generate_nonce(); // Generate a nonce for xchacha20
+
+        let message = "This is a secret message!";
+
+        // Encrypt the message
+        let encrypted_message = encrypt.encrypt_msg_xchacha20(message, &shared_secret, &nonce, "encryption_test_key".as_bytes())
+            .await
+            .expect("Failed to encrypt message");
+
+        // Decrypt the message
+        let decrypted_message = decrypt.decrypt_msg_xchacha20(&encrypted_message, &shared_secret, &nonce, "encryption_test_key".as_bytes(), false)
+            .await
+            .expect("Failed to decrypt message");
+
+        // Verify that the decrypted message matches the original message
+        assert_eq!(message, decrypted_message);
+    }
+
+
+    #[tokio::test]
+    #[cfg(feature = "xchacha20")]
+    async fn test_encrypt_decrypt_data_xchacha20() {
+        let keychain = Keychain::new().expect("Failed to create keychain");
+        let encrypt = Encrypt::new();
+        let decrypt = Decrypt::new();
+        let key = keychain.get_shared_secret().await.expect("Failed to get shared secret").as_bytes().to_owned(); // Example key
+        let hmac_key = "encryption_test_key".as_bytes();
+        let data = b"Example plaintext data";
+        let nonce = generate_nonce(); // Generate a nonce
+
+        println!("Original Data: {:?}", data);
+
+        // Encrypt the data
+        let encrypted_data = encrypt.encrypt_data_xchacha20(data.as_ref(), &key, &nonce, &hmac_key)
+            .await
+            .expect("Encryption failed");
+        println!("Encrypted Data: {:?}", encrypted_data);
+
+        // Verify HMAC
+        let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
+        match decrypt.verify_hmac(&hmac_key, &encrypted_data, hmac_len) {
+            Ok(data_with_hmac) => {
+                // Decrypt the data
+                let decrypted_data = decrypt.decrypt_data_xchacha20(&data_with_hmac, &nonce, &key)
+                    .await
+                    .expect("Decryption failed");
+                println!("Decrypted Data: {:?}", decrypted_data);
+
+                // Assert that the decrypted data matches the original data
+                assert_eq!(data, &decrypted_data[..]);
+            },
+            Err(e) => panic!("HMAC verification failed: {}", e),
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "xchacha20")]
+    async fn test_encrypt_decrypt_file_xchacha20() {
+        let decrypt: Decrypt = Decrypt::new();
+        let encrypt: Encrypt = Encrypt::new();
+        let keychain = Keychain::new().unwrap();
+        let nonce = generate_nonce(); // Generate a nonce
+
+        // Setup - create a sample message
+        let message = "This is a test message.";
+        let message_bytes = message.as_bytes();
+
+        // Create temporary directory for test files
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_message.txt");
+        let encrypted_file_path = dir.path().join("test_message_encrypted.txt");
+        let decrypted_file_path = dir.path().join("test_message_decrypted.txt");
+
+        fs::write(&file_path, message_bytes).expect("Failed to write test file");
+
+        // Encrypt the file
+        let encrypted_data = encrypt.encrypt_file_xchacha20(file_path.clone(), &keychain.get_shared_secret().await.unwrap(), &nonce, b"hmackeyaergfdgrfgswgs<edgsf")
+            .await
+            .expect("Encryption failed");
+
+        assert_ne!(message_bytes, encrypted_data);
+
+        fs::write(&encrypted_file_path, &encrypted_data).expect("Failed to write encrypted file");
+
+        // Decrypt the file
+        let decrypted_data = decrypt.decrypt_file_xchacha20(&encrypted_file_path, &keychain.get_shared_secret().await.unwrap(), &nonce, b"hmackeyaergfdgrfgswgs<edgsf")
+            .await
+            .expect("Decryption failed");
+
+        // Verify that decrypted data matches original content
+        assert_eq!(message.as_bytes().to_vec(), decrypted_data, "Decrypted data does not match original content");
+    }
+
+        #[tokio::test]
+    #[cfg(feature = "xchacha20")]
+    async fn test_encrypt_decrypt_msg_xchacha20() {
+        let decrypt: Decrypt = Decrypt::new();
+        let encrypt: Encrypt = Encrypt::new();
+        let keychain = Keychain::new().unwrap();
+        let nonce = generate_nonce(); // Generate a nonce
+
+        // Setup - create a sample message
+        let message = "This is a test message.";
+
+        // Encrypt the file
+        let encrypted_data = encrypt.encrypt_msg_xchacha20(message.as_ref(), &keychain.get_shared_secret().await.unwrap(), &nonce, b"hmackeyaergfdgrfgswgs<edgsf")
+            .await
+            .expect("Encryption failed");
+
+        assert_ne!(message.as_bytes(), encrypted_data);
+
+        // Decrypt the file
+        let decrypted_data = decrypt.decrypt_msg_xchacha20(&encrypted_data, &keychain.get_shared_secret().await.unwrap(), &nonce, b"hmackeyaergfdgrfgswgs<edgsf", false)
+            .await
+            .expect("Decryption failed");
+
+        // Verify that decrypted data matches original content
+        assert_eq!(message, decrypted_data, "Decrypted data does not match original content");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "xchacha20")]
+    async fn test_encrypt_decrypt_xchacha20() {
+        let nonce = generate_nonce(); // Generate a nonce
+        let keychain = Keychain::new().unwrap();
+        let decrypt: Decrypt = Decrypt::new();
+        let encrypt: Encrypt = Encrypt::new();
+        let pubkey = PathBuf::from("./keychain/key/key.pub");
+        let secret_key = PathBuf::from("./keychain/key/key.sec");
+        let ciphertext = PathBuf::from("./keychain/cipher/cipher.ct");
+
+        // Create temporary directory for test files
+        let dir = tempdir().unwrap();
+        let original_file_path = dir.path().join("test.txt");
+        let encrypted_file_path = dir.path().join("test.txt.enc");
+
+        // Create a sample file with content to encrypt
+        let original_file_contents = "this is a test file";
+        fs::write(&original_file_path, original_file_contents).expect("Failed to write original file");
+
+        // Encrypt the file
+        let _ = encrypt.encrypt(pubkey, &original_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret", Some(&nonce)).await;
+
+        // Decrypt the file
+        let _ = decrypt.decrypt(secret_key, ciphertext, encrypted_file_path.as_os_str().to_str().unwrap(), ActionType::FileAction, b"secret", Some(&nonce)).await;
+
+        // Read decrypted file contents
+        let decrypted_file_contents = fs::read_to_string(&original_file_path).expect("Failed to read decrypted file");
+
+        // Verify that decrypted content matches the original content
+        assert_eq!(decrypted_file_contents, original_file_contents);
+
+        // Clean up - remove temporary files and directory
+        dir.close().unwrap();
+        fs::remove_file("./keychain/cipher/cipher.ct");
+    }
 }
