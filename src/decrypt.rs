@@ -1,21 +1,35 @@
 use crate::keychain::*;
 use pqcrypto_kyber::kyber1024::*;
 use pqcrypto_traits::kem::{SharedSecret};
-use aes::Aes256;
-use aes::cipher::{
-    BlockDecrypt, KeyInit, generic_array::GenericArray
-};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use std::{
-    fs, 
+    fs::{self, File}, 
     path::{PathBuf, Path},
-    io::{self, Write},
+    io::{self, Read, Write},
     env::current_dir
 };
 use crate::ActionType;
 
 pub struct Decrypt;
+
+#[cfg(feature = "xchacha20")]
+use chacha20::{
+    XChaCha20, 
+    cipher::{KeyIvInit, StreamCipher, StreamCipherSeek}
+};
+use std::iter::repeat;
+
+#[cfg(feature = "default")]
+use aes::{
+    cipher::{
+        self,
+        BlockDecrypt, 
+        generic_array::GenericArray,
+        KeyInit
+    },
+    Aes256
+};
 
 impl Decrypt {
     pub fn new() -> Self {
@@ -76,8 +90,55 @@ impl Decrypt {
         }
     }
 
+    pub async fn decrypt(
+        &self, 
+        secret_key: PathBuf,
+        ciphertext: PathBuf,
+        decrypt: &str,
+        action: ActionType,
+        hmac_key: &[u8],
+        nonce: Option<&[u8; 24]>,
+    ) -> Result<(), CryptError> {
+        let mut keychain = Keychain::new()?;
 
-    pub async fn decrypt_with_aes(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>, CryptError> {
+        // Load the secret key and ciphertext
+        let secret = keychain.load_secret_key(secret_key).await?;
+        let cipher = keychain.load_ciphertext(ciphertext).await?;
+
+        // Decapsulate using the secret key
+        let shared_secret = decapsulate(&cipher, &secret);
+
+        match action {
+            ActionType::FileAction => {
+                let path = PathBuf::from(decrypt);
+                println!("Decrypting file...");
+
+                #[cfg(feature = "default")]
+                let _ = self.decrypt_file(&path, &shared_secret, hmac_key).await?;
+                #[cfg(feature = "xchacha20")]
+                let _ = self.decrypt_file_xchacha20(&path, &shared_secret, nonce.unwrap(), hmac_key).await?;
+
+                Ok(())
+            },
+            ActionType::MessageAction => {
+                println!("Decrypting message...\n");
+
+                #[cfg(feature = "default")]
+                let _ = self.decrypt_msg(decrypt.as_bytes(), &shared_secret, hmac_key, true).await?;
+                #[cfg(feature = "xchacha20")]
+                let _ = self.decrypt_msg_xchacha20(decrypt.as_bytes(), &shared_secret, nonce.unwrap(), hmac_key, true).await?;
+
+                Ok(())
+            },
+            _ => Err(CryptError::InvalidParameters),
+        }
+    }
+}
+
+
+#[cfg(feature = "default")]
+impl Decrypt {
+    pub async fn decrypt_data(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let mut decrypted_data = vec![0u8; data.len()];
         let cipher = Aes256::new(GenericArray::from_slice(key));
         for (chunk, decrypted_chunk) in data.chunks(16).zip(decrypted_data.chunks_mut(16)) {
@@ -99,9 +160,9 @@ impl Decrypt {
         let decrypt_file_path = self.generate_original_filename(decrypted_file_path).await;
         println!("Decrypted file path: {:?}", decrypt_file_path);
 
-        let data_with_hmac = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
-        let encrypted_data = self.verify_hmac(hmac_key, &data_with_hmac, 64).unwrap();
-        let decrypted_data = self.decrypt_with_aes(&encrypted_data, key.as_bytes()).await?;
+        let data = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
+        let encrypted_data = self.verify_hmac(hmac_key, &data, 64).unwrap();
+        let decrypted_data = self.decrypt_data(&encrypted_data, key.as_bytes()).await?;
 
         fs::write(&decrypt_file_path, &decrypted_data).map_err(|_| CryptError::WriteError)?;
 
@@ -111,7 +172,7 @@ impl Decrypt {
 
     pub async fn decrypt_msg(&self, encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, hmac_key: &[u8], safe: bool) -> Result<String, CryptError> {
         let encrypted_data = self.verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
-        let decrypted_data = self.decrypt_with_aes(&encrypted_data, key.as_bytes()).await?;
+        let decrypted_data = self.decrypt_data(&encrypted_data, key.as_bytes()).await?;
         let decrypted_str = String::from_utf8(decrypted_data)
             .map_err(|_| CryptError::Utf8Error)?;
         if safe {
@@ -121,38 +182,51 @@ impl Decrypt {
         println!("{}", &decrypted_str);
         Ok(decrypted_str)
     }
+}
 
+#[cfg(feature = "xchacha20")]
+impl Decrypt {
+    pub async fn decrypt_data_xchacha20(&self, encrypted_data: &[u8], nonce: &[u8; 24], key: &[u8]) -> Result<Vec<u8>, CryptError> {
+        let mut decrypted_data = encrypted_data.to_vec();
+        let mut cipher = XChaCha20::new(GenericArray::from_slice(key), GenericArray::from_slice(nonce));
+        cipher.apply_keystream(&mut decrypted_data);
 
-    pub async fn decrypt(
-        &self, 
-        secret_key: PathBuf,
-        ciphertext: PathBuf,
-        decrypt: &str,
-        action: ActionType,
-        hmac_key: &[u8],
-    ) -> Result<(), CryptError> {
-        let mut keychain = Keychain::new()?;
-
-        // Load the secret key and ciphertext
-        let secret = keychain.load_secret_key(secret_key).await?;
-        let cipher = keychain.load_ciphertext(ciphertext).await?;
-
-        // Decapsulate using the secret key
-        let shared_secret = decapsulate(&cipher, &secret);
-
-        match action {
-            ActionType::FileAction => {
-                let path = PathBuf::from(decrypt);
-                println!("Decrypting file...");
-                self.decrypt_file(&path, &shared_secret, hmac_key).await?;
-                Ok(())
-            },
-            ActionType::MessageAction => {
-                println!("Decrypting message...\n");
-                let _ = self.decrypt_msg(decrypt.as_bytes(), &shared_secret, hmac_key, true).await?;
-                Ok(())
-            },
-            _ => Err(CryptError::InvalidParameters),
+        // Remove padding if present (if you have padding)
+        while decrypted_data.last() == Some(&0) {
+            decrypted_data.pop();
         }
+
+        Ok(decrypted_data)
+    }
+
+    pub async fn decrypt_file_xchacha20(&self, encrypted_file_path: &PathBuf, key: &dyn SharedSecret, nonce: &[u8; 24], hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
+        let decrypted_file_path = encrypted_file_path.as_os_str().to_str().ok_or(CryptError::PathError)?;
+        let decrypt_file_path = self.generate_original_filename(decrypted_file_path).await;
+        println!("Decrypted file path: {:?}", decrypt_file_path);
+
+        let data = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
+
+        let encrypted_data = self.verify_hmac(hmac_key, data.as_slice(), 64).unwrap();
+
+        // Decrypt the data
+        let decrypted_data = self.decrypt_data_xchacha20(&encrypted_data, &nonce, key.as_bytes()).await?;
+
+        fs::write(&decrypt_file_path, &decrypted_data).map_err(|_| CryptError::WriteError)?;
+
+        println!("Decryption completed and file written to {:?}", decrypt_file_path);
+        Ok(decrypted_data)
+    }
+
+    pub async fn decrypt_msg_xchacha20(&self, encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, nonce: &[u8; 24], hmac_key: &[u8], safe: bool) -> Result<String, CryptError> {
+        let encrypted_data = self.verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
+        let decrypted_data = self.decrypt_data_xchacha20(&encrypted_data, &nonce, key.as_bytes()).await?;
+        let decrypted_str = String::from_utf8(decrypted_data)
+            .map_err(|_| CryptError::Utf8Error)?;
+        if safe {
+            let message_file = fs::File::create("./message.txt");
+            write!(message_file.unwrap(), "{}", &decrypted_str).unwrap();
+        }
+        println!("{}", &decrypted_str);
+        Ok(decrypted_str)
     }
 }
