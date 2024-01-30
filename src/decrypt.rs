@@ -1,17 +1,21 @@
 use crate::keychain::*;
 use pqcrypto_kyber::kyber1024::*;
+use pqcrypto_falcon::falcon1024;
 use pqcrypto_traits::kem::{SharedSecret};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use std::{
+    str,
     fs::{self, File}, 
     path::{PathBuf, Path},
-    io::{self, Read, Write},
+    io::{self, Cursor, Read, Write},
     env::current_dir
 };
-use crate::ActionType;
-
-pub struct Decrypt;
+use crate::{ ActionType, Decrypt, Keychain, sign_falcon::{*, self}, SigningErr::{*, self} };
+use pqcrypto_traits::sign::{
+    DetachedSignature as DetachedSignatureSign, PublicKey as PublicKeySign,
+    SecretKey as SecretKeySign, SignedMessage as SignedMessageSign,
+};
 
 #[cfg(feature = "xchacha20")]
 use chacha20::{
@@ -19,6 +23,7 @@ use chacha20::{
     cipher::{KeyIvInit, StreamCipher, StreamCipherSeek}
 };
 use std::iter::repeat;
+use byteorder::{BigEndian, ReadBytesExt};
 
 #[cfg(feature = "default")]
 use aes::{
@@ -31,11 +36,18 @@ use aes::{
     Aes256
 };
 
+#[cfg(feature = "dilithium")]
+use crate::sign_dilithium::{self};
+
+fn find_subarray(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).position(|window| window == needle)
+}
+
 impl Decrypt {
     pub fn new() -> Self {
         Self
     }
-    pub async fn generate_original_filename<'a>(encrypted_path: &'a str) -> String {
+    pub async fn generate_original_filename<'a>(&self, encrypted_path: &'a str) -> String {
        // let encrypted_path = format!("./{}", encrypted_path);
         let path = std::path::Path::new(&encrypted_path);
         let dir = path.parent().unwrap_or_else(|| std::path::Path::new(""));
@@ -51,8 +63,39 @@ impl Decrypt {
         format!("{}/{}", dir.display(), file_name)
     }
 
+    pub fn extract_signature(signed_data: &[u8]) -> Result<(Vec<u8>, falcon1024::DetachedSignature), CryptError> {
+        let mut cursor = Cursor::new(signed_data);
+
+        // Read the length of the data
+        let data_length = cursor.read_u64::<BigEndian>().unwrap() as usize;
+
+        // Validate the length to avoid panics
+        if data_length > signed_data.len() {
+            return Err(CryptError::InvalidSignatureLength);
+        }
+
+        // Extract the data
+        let data = signed_data[8..(8 + data_length)].to_vec();
+        let signature = &signed_data[(8 + data_length)..];
+
+        // The remaining part is the signature
+        let signature: falcon1024::DetachedSignature = DetachedSignatureSign::from_bytes(&signature).unwrap();
+        Ok((data, signature))
+    }
+
+    pub fn verify_signature(&self, signature: falcon1024::DetachedSignature, message: &[u8], public_key: &falcon1024::PublicKey) -> Result<bool, SigningErr> {
+        // Perform the signature verification
+        match falcon1024::verify_detached_signature(&signature, message, public_key) {
+            Ok(_) => Ok(true),
+            Err(_) => Err(SigningErr::SignatureVerificationFailed),
+        }
+    }
+
+
+
+
     // Function to verify the HMAC of the data
-    pub fn verify_hmac(key: &[u8], data_with_hmac: &[u8], hmac_len: usize) -> Result<Vec<u8>, &'static str> {
+    pub fn verify_hmac(&self, key: &[u8], data_with_hmac: &[u8], hmac_len: usize) -> Result<Vec<u8>, &'static str> {
         if data_with_hmac.len() < hmac_len {
             return Err("Data is too short for HMAC verification");
         }
@@ -157,11 +200,11 @@ impl Decrypt {
 
     pub async fn decrypt_file(&self, encrypted_file_path: &PathBuf, key: &dyn SharedSecret, hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let decrypted_file_path = encrypted_file_path.as_os_str().to_str().ok_or(CryptError::PathError)?;
-        let decrypt_file_path = Self::generate_original_filename(decrypted_file_path).await;
+        let decrypt_file_path = self.generate_original_filename(decrypted_file_path).await;
         println!("Decrypted file path: {:?}", decrypt_file_path);
 
         let data = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
-        let encrypted_data = Self::verify_hmac(hmac_key, &data, 64).unwrap();
+        let encrypted_data = self.verify_hmac(hmac_key, &data, 64).unwrap();
         let decrypted_data = self.decrypt_data(&encrypted_data, key.as_bytes()).await?;
 
         fs::write(&decrypt_file_path, &decrypted_data).map_err(|_| CryptError::WriteError)?;
@@ -171,7 +214,7 @@ impl Decrypt {
     }
 
     pub async fn decrypt_msg(&self, encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, hmac_key: &[u8], safe: bool) -> Result<String, CryptError> {
-        let encrypted_data = Self::verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
+        let encrypted_data = self.verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
         let decrypted_data = self.decrypt_data(&encrypted_data, key.as_bytes()).await?;
         let decrypted_str = String::from_utf8(decrypted_data)
             .map_err(|_| CryptError::Utf8Error)?;
@@ -201,12 +244,12 @@ impl Decrypt {
 
     pub async fn decrypt_file_xchacha20(&self, encrypted_file_path: &PathBuf, key: &dyn SharedSecret, nonce: &[u8; 24], hmac_key: &[u8]) -> Result<Vec<u8>, CryptError> {
         let decrypted_file_path = encrypted_file_path.as_os_str().to_str().ok_or(CryptError::PathError)?;
-        let decrypt_file_path = Self::generate_original_filename(decrypted_file_path).await;
+        let decrypt_file_path = self.generate_original_filename(decrypted_file_path).await;
         println!("Decrypted file path: {:?}", decrypt_file_path);
 
         let data = fs::read(&encrypted_file_path).map_err(|_| CryptError::IOError)?;
 
-        let encrypted_data = Self::verify_hmac(hmac_key, data.as_slice(), 64).unwrap();
+        let encrypted_data = self.verify_hmac(hmac_key, data.as_slice(), 64).unwrap();
 
         // Decrypt the data
         let decrypted_data = self.decrypt_data_xchacha20(&encrypted_data, &nonce, key.as_bytes()).await?;
@@ -218,7 +261,7 @@ impl Decrypt {
     }
 
     pub async fn decrypt_msg_xchacha20(&self, encrypted_data_with_hmac: &[u8], key: &dyn SharedSecret, nonce: &[u8; 24], hmac_key: &[u8], safe: bool) -> Result<String, CryptError> {
-        let encrypted_data = Self::verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
+        let encrypted_data = self.verify_hmac(hmac_key, encrypted_data_with_hmac, 64).unwrap();
         let decrypted_data = self.decrypt_data_xchacha20(&encrypted_data, &nonce, key.as_bytes()).await?;
         let decrypted_str = String::from_utf8(decrypted_data)
             .map_err(|_| CryptError::Utf8Error)?;

@@ -1,18 +1,107 @@
-pub mod keychain;
-pub mod decrypt;
-pub mod encrypt;
-pub mod file_remover;
-pub mod sign;
+mod keychain;
+mod decrypt;
+mod encrypt;
+mod file_remover;
 
-pub use crate::{
+#[cfg(feature = "default")]
+mod sign_falcon;
+
+#[cfg(feature = "dilithium")]
+mod sign_dilithium;
+
+use crate::{
     keychain::*,
     encrypt::*,
     decrypt::*,
     file_remover::*,
-    sign::*,
 };
+pub use crate::sign_falcon::Sign;
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    fs,
+    path::{Path, PathBuf},
+};
+use tokio::io;
+use pqcrypto_traits::sign::{SignedMessage as SignedMessageSign, SecretKey as SecretKeySign, PublicKey as PublicKeySign, DetachedSignature as DetachedSignatureSign};
+use hex;
+use pqcrypto_kyber::kyber1024;
+use indicatif::{ProgressBar, ProgressStyle};
+#[cfg(feature="dilithium")]
+pub use crate::sign_dilithium::SignDilithium;
+#[cfg(feature="dilithium")]
+pub use pqcrypto_dilithium;
 
-pub enum ActionType {
+
+#[derive(Debug)]
+pub enum SigningErr {
+    SecretKeyMissing,
+    PublicKeyMissing,
+    SignatureVerificationFailed,
+    SigningMessageFailed,
+    IOError(io::Error),
+}
+
+impl Display for SigningErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            SigningErr::SecretKeyMissing => write!(f, "Secret key is missing"),
+            SigningErr::PublicKeyMissing => write!(f, "Public key is missing"),
+            SigningErr::SignatureVerificationFailed => write!(f, "Signature verification failed"),
+            SigningErr::SigningMessageFailed => write!(f, "Failed to sign message"),
+            SigningErr::IOError(err) => write!(f, "IOError occurred: {}", err),
+        }
+    }
+}
+
+impl PartialEq for SigningErr {
+    fn eq(&self, other: &Self) -> bool {
+        use SigningErr::*;
+        match (self, other) {
+            (SecretKeyMissing, SecretKeyMissing)
+            | (PublicKeyMissing, PublicKeyMissing)
+            | (SignatureVerificationFailed, SignatureVerificationFailed)
+            | (SigningMessageFailed, SigningMessageFailed) => true,
+            (IOError(_), IOError(_)) => false,
+            _ => false,
+        }
+    }
+}
+
+impl From<pqcrypto_traits::Error> for SigningErr {
+    fn from(_: pqcrypto_traits::Error) -> Self {
+        SigningErr::SignatureVerificationFailed
+    }
+}
+
+impl Error for SigningErr {}
+
+impl From<io::Error> for SigningErr {
+    fn from(err: io::Error) -> Self {
+        SigningErr::IOError(err)
+    }
+}
+
+pub struct Encrypt;
+pub struct Decrypt;
+pub struct Keychain {
+    pub public_key: Option<kyber1024::PublicKey>,
+    pub secret_key: Option<kyber1024::SecretKey>,
+    pub shared_secret: Option<kyber1024::SharedSecret>,
+    pub ciphertext: Option<kyber1024::Ciphertext>,
+}
+pub struct FileRemover {
+    pub overwrite_times: u32,
+    pub file_path: PathBuf,
+    pub recursive: bool,
+    pub progress_bar: ProgressBar,
+}
+pub struct File {
+    pub path: String,
+    pub data: Vec<u8>,
+}
+
+enum ActionType {
     FileAction,
     MessageAction,
 }
@@ -21,12 +110,18 @@ pub enum ActionType {
 mod tests {
     extern crate tempfile;
     use super::*;
+        
     use crate::{
-        keychain::{*, Keychain},
+        keychain::*,
         encrypt::*,
-        decrypt::{*, self},
+        decrypt::*,
         file_remover::*,
-        sign::{Sign, *},
+        SigningErr::{*, self},
+        Encrypt,
+        Decrypt,
+        Keychain,
+        FileRemover,
+        sign_falcon::*,
         ActionType,
     };
     use std::{
@@ -37,12 +132,15 @@ mod tests {
         ffi::OsStr
     };
     use pqcrypto_kyber::kyber1024::*;
+    use pqcrypto_falcon::falcon1024;
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
-    use tempfile::tempdir;
+    use tempfile::{NamedTempFile, tempdir};
     use pqcrypto_traits::sign::{SignedMessage as SignedMessageSign, SecretKey as SecretKeySign, PublicKey as PublicKeySign, DetachedSignature as DetachedSignatureSign};
-
-    
+    #[cfg(feature = "dilithium")]
+    use crate::sign_dilithium;
+    #[cfg(feature = "dilithium")]
+    use crate::sign_dilithium::SignDilithium; 
     #[tokio::test]
     async fn keychain_new_works() {
         let keychain = Keychain::new().unwrap();
@@ -82,8 +180,8 @@ mod tests {
         let encrypt_filename2 = "./test_file.txt.enc";
         let decrypt: Decrypt = Decrypt::new();
         let encrypt: Encrypt = Encrypt::new();
-        let original1 = Decrypt::generate_original_filename(encrypt_filename1).await;
-        let original2 = Decrypt::generate_original_filename(encrypt_filename2).await;
+        let original1 = decrypt.generate_original_filename(encrypt_filename1).await;
+        let original2 = decrypt.generate_original_filename(encrypt_filename2).await;
         assert_eq!("./test_file.txt", original1);
         assert_eq!("./test_file.txt", original2);
     }
@@ -104,7 +202,7 @@ mod tests {
 
         // Verify HMAC
         let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
-        let verification_result = decrypt::Decrypt::verify_hmac(key, &data_with_hmac, hmac_len);
+        let verification_result = decrypt.verify_hmac(key, &data_with_hmac, hmac_len);
 
         // Assertions
         assert!(verification_result.is_ok(), "HMAC verification failed");
@@ -223,12 +321,8 @@ mod tests {
         let keychain = Keychain::new().unwrap();
         //keychain.save("./keychain", "key").await?;
 
-        let keychain_path = PathBuf::from("./keychain/key");
-        let duplicated_path = PathBuf::from("./keychain/key_duplicate");
-
-        if !keychain_path.is_dir() {
-            keychain.save("./keychain", "key").await?;
-        }
+        let keychain_path = PathBuf::from("./keychain/sign");
+        let duplicated_path = PathBuf::from("./key_duplicate");
 
         // Duplicate the directory
         fs::create_dir_all(&duplicated_path)?; // Create the target directory
@@ -255,7 +349,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_sign_msg() {
         let mut sign = Sign::new().unwrap();
@@ -299,6 +392,83 @@ mod tests {
     async fn test_sign_file() {
         // Initialize Signature struct
         let mut sign = Sign::new().unwrap();
+        let _ = sign.save_keys("keychain", "sign").await;
+
+        // Perform the sign_file operation
+        let file_path = PathBuf::from("./README.md");
+        let sign_result = sign.sign_file(file_path.clone()).await;
+        assert!(sign_result.is_ok(), "Signing the file failed");
+
+        // Reading the file content for verification
+        let file_content = fs::read(&file_path).expect("Failed to read the file");
+        
+        // Verify the signature
+        let verify_result = sign.verify_detached(&file_content).await;
+        assert!(verify_result.is_ok(), "Signature verification failed");
+        assert_eq!(verify_result.unwrap(), true, "The file signature verification failed");
+    }
+
+    #[tokio::test]
+    async fn test_key_validation() {
+        let mut sign = Sign::new().unwrap();
+        let message = b"Test message for key validation";
+
+        // Sign a message
+        let signature = sign.signing_detached(message).await.expect("Signing failed");
+
+        // Verify the signature using the same Sign object (which should contain the correct public key)
+        let verification_result = sign.verify_detached(message).await.expect("Verification failed");
+
+        assert!(verification_result, "Signature verification failed with the original key pair");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_sign_msg_dilithium() {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Test message";
+        let result = sign.sign_msg(message).await;
+        println!("{:?}", result);
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_signing_detached_dilithium() {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Test message";
+        let result = sign.signing_detached(message).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_verify_msg_dilithium() {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Test message";
+        sign.sign_msg(message).await.unwrap();
+        let result = sign.verify_msg(message).await;
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_verify_detached_dilithium() {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Test message";
+        let detached_signature = sign.signing_detached(message).await.unwrap();
+        let result = sign.verify_detached(message).await;
+        println!("{:?}", result);
+        assert_eq!(result, Ok(true));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_sign_file_dilithium() {
+        // Initialize Signature struct
+        let mut sign = SignDilithium::new().unwrap();
         let _ = sign.save_keys("keychain", "sign");
 
         // Perform the sign_file operation
@@ -313,6 +483,61 @@ mod tests {
         let verify_result = sign.verify_detached(&file_content).await;
         assert!(verify_result.is_ok(), "Signature verification failed");
         assert_eq!(verify_result.unwrap(), true, "The file signature verification failed");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "dilithium")]
+    async fn test_key_validation_dilithium() {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Test message for key validation";
+
+        // Sign a message
+        let signature = sign.signing_detached(message).await.expect("Signing failed");
+
+        // Verify the signature using the same Sign object (which should contain the correct public key)
+        let verification_result = sign.verify_detached(message).await.expect("Verification failed");
+
+        assert!(verification_result, "Signature verification failed with the original key pair");
+    }
+
+    #[tokio::test]
+    async fn test_append_extract_verify_signature() {
+        let keychain = Keychain::new().expect("Failed to create keychain");
+        let sign = Sign::new().unwrap();
+        let encrypt = Encrypt::new();
+        let decrypt = Decrypt::new();
+        let message = "Test message";
+
+        // Retrieve the secret key from the keychain
+        let secret_key = sign.secret_key().await.unwrap();
+        let public_key = sign.public_key().await;
+
+        // Create a test message and encrypt it
+        let encrypted_message = encrypt.encrypt_msg(&message, &keychain.get_shared_secret().await.unwrap(), b"hmackey")
+            .await
+            .expect("Encryption failed");
+
+        // Append signature
+        let signature = Encrypt::generate_signature(&encrypted_message, *secret_key);
+        let signed_data = Encrypt::append_signature(&encrypted_message, signature.clone())
+            .expect("Failed to append signature");
+
+        // Extract and verify signature
+        let (extracted_data, extracted_signature) = Decrypt::extract_signature(&signed_data).unwrap();
+
+
+        // Verify signature validity
+        let is_signature_valid = decrypt.verify_signature(extracted_signature, encrypted_message.as_slice(), &public_key.unwrap()).expect("Verification failed");
+        assert!(is_signature_valid, "Signature verification failed");
+
+        let decrypted_data = decrypt.decrypt_msg(&extracted_data, keychain.shared_secret.as_ref().unwrap(), b"hmackey", false).await.unwrap();
+        assert_eq!(message, decrypted_data, "Original message does not match decrypted message!");
+
+        // Verify the extracted data is the same as the original encrypted message
+        assert_eq!(encrypted_message, extracted_data, "Original data does not match extracted data");
+
+        // Verify the extracted signature is the same as the original signature
+        assert_eq!(&signature, DetachedSignatureSign::as_bytes(&extracted_signature), "Original signature does not match extracted signature");
     }
 
     #[tokio::test]
@@ -364,7 +589,7 @@ mod tests {
 
         // Verify HMAC
         let hmac_len = 64; // Length of HMAC (depends on the hash function used, SHA512 produces 64 bytes)
-        match decrypt::Decrypt::verify_hmac(&hmac_key, &encrypted_data, hmac_len) {
+        match decrypt.verify_hmac(&hmac_key, &encrypted_data, hmac_len) {
             Ok(data_with_hmac) => {
                 // Decrypt the data
                 let decrypted_data = decrypt.decrypt_data_xchacha20(&data_with_hmac, &nonce, &key)
@@ -417,7 +642,7 @@ mod tests {
         assert_eq!(message.as_bytes().to_vec(), decrypted_data, "Decrypted data does not match original content");
     }
 
-        #[tokio::test]
+    #[tokio::test]
     #[cfg(feature = "xchacha20")]
     async fn test_encrypt_decrypt_msg_xchacha20() {
         let decrypt: Decrypt = Decrypt::new();

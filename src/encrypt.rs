@@ -1,6 +1,6 @@
 use crate::keychain::*;
 use pqcrypto_kyber::kyber1024::{self, *};
-
+use pqcrypto_falcon::falcon1024::{self, *};
 use pqcrypto_traits::kem::{PublicKey as PublicKeyKem, SecretKey as SecKeyKem, SharedSecret as SharedSecretKem, Ciphertext as CiphertextKem};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
@@ -10,8 +10,18 @@ use std::{
     io::{self, Read, Write},
     env::current_dir
 };
-use crate::ActionType;
+use crate::{
+    ActionType,
+    Encrypt,
+    Keychain, 
+    Sign,
+};
 use rand::{rngs::OsRng, RngCore};
+use pqcrypto_traits::sign::{
+    DetachedSignature as DetachedSignatureSign, PublicKey as PublicKeySign,
+    SecretKey as SecretKeySign, SignedMessage as SignedMessageSign,
+};
+use byteorder::{BigEndian, WriteBytesExt};
 
 #[cfg(feature = "xchacha20")]
 use chacha20::{
@@ -30,7 +40,6 @@ use aes::{
     Aes256
 };
 
-pub struct Encrypt;
 
 impl Encrypt {
     pub fn new() -> Self {
@@ -46,6 +55,23 @@ impl Encrypt {
     pub fn append_hmac(encrypted_data: Vec<u8>, hmac: Vec<u8>) -> Vec<u8> {
         [encrypted_data, hmac].concat()
     }
+
+    pub fn generate_signature(data: &[u8], sk: falcon1024::SecretKey) -> Vec<u8> {
+        let signature = detached_sign(&data, &sk);
+        let signed_message = DetachedSignatureSign::as_bytes(&signature);
+        signed_message.to_owned()
+    }
+
+    pub fn append_signature(data: &[u8], signature: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+        let data_length = data.len() as u64;
+        let mut data_length_bytes = vec![];
+        data_length_bytes.write_u64::<BigEndian>(data_length).unwrap();
+
+        let signed_data = [data_length_bytes, data.to_vec(), signature].concat();
+
+        Ok(signed_data)
+    }
+
 
     pub async fn save_encrypted_message(&self, message: &[u8], path: PathBuf) -> Result<(), CryptError> {
         let hex_message = format!(

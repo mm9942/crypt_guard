@@ -6,6 +6,7 @@ use sha2::Sha256;
 use hmac::{Hmac, Mac};
 use std::{error::Error, ffi::OsStr, fmt, fs, path::Path, path::PathBuf, result::Result, env};
 use tokio::runtime;
+use crate::{Keychain, File};
 
 #[derive(Debug)]
 pub enum CryptError {
@@ -29,6 +30,10 @@ pub enum CryptError {
     InvalidParameters,
     PathError,
     Utf8Error,
+    SigningFailed,
+    SignatureVerificationFailed,
+    InvalidSignatureLength,
+    InvalidSignature,
 }
 
 impl fmt::Display for CryptError {
@@ -54,6 +59,10 @@ impl fmt::Display for CryptError {
            CryptError::InvalidParameters => write!(f, "You provided Invalid parameters"),
            CryptError::PathError => write!(f, "The provided path does not exist!"),
            CryptError::Utf8Error => write!(f, "UTF-8 conversion error"),
+           CryptError::SigningFailed => write!(f, "Signing file using falcon 1024 failed!"),
+           CryptError::SignatureVerificationFailed => write!(f, "verification of signature using falcon 1024 failed!"),
+           CryptError::InvalidSignature => write!(f, "Signature not valid!"),
+           CryptError::InvalidSignatureLength => write!(f, "Data is too short for HMAC verification"),
        }
    }
 }
@@ -72,11 +81,6 @@ pub enum KeyTypes {
     SecretKey,
     SharedSecret,
     Ciphertext,
-}
-
-pub struct File {
-    pub path: String,
-    pub data: Vec<u8>,
 }
 
 impl File {
@@ -98,13 +102,6 @@ impl File {
         let content = &file_content[start + start_label.len()..end];
         hex::decode(content).map_err(CryptError::HexError)
     }
-}
-
-pub struct Keychain {
-    pub public_key: Option<kyber1024::PublicKey>,
-    pub secret_key: Option<kyber1024::SecretKey>,
-    pub shared_secret: Option<kyber1024::SharedSecret>,
-    pub ciphertext: Option<kyber1024::Ciphertext>,
 }
 
 impl Keychain {

@@ -25,13 +25,95 @@ Ensure your system has the latest stable versions of Rust, Cargo, and the Tokio 
 
 ## Usage
 
+To add usage examples for the new `dilithium` feature in the CryptGuard Rust library, we can focus on demonstrating how to utilize the `SignDilithium` struct for signing and verifying messages and files. Below are updated sections for the README.md, illustrating how to use the `dilithium` feature.
+
+### New Feature: Dilithium
+
+The `dilithium` feature in CryptGuard introduces the Dilithium algorithm, a post-quantum cryptographic signing method. This feature is optional and can be enabled in your `Cargo.toml`.
+
+#### Signing a Message with Dilithium
+To sign a message using Dilithium,
+```rust
+#[cfg(feature = "dilithium")]
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "dilithium")]
+    {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Hello, this is a test message";
+
+        // Sign the message
+        let signed_message = sign.sign_msg(message).await.expect("Failed to sign message with Dilithium");
+
+        // Print the signed message
+        println!("Signed message with Dilithium: {:?}", signed_message);
+    }
+}
+```
+
+#### Verifying a Signed Message with Dilithium
+To verify a signed message,
+```rust
+#[cfg(feature = "dilithium")]
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "dilithium")]
+    {
+        let mut sign = SignDilithium::new().unwrap();
+        let message = b"Hello, this is a test message";
+
+        // Sign the message
+        let signed_message = sign.sign_msg(message).await.expect("Failed to sign message");
+
+        // Verify the signed message
+        let verification_result = sign.verify_msg(message).await.expect("Failed to verify message");
+
+        // Check the verification result
+        assert!(verification_result, "Verification failed for the signed message with Dilithium");
+    }
+}
+```
+
+#### Signing a File with Dilithium
+For signing a file using Dilithium,
+```rust
+#[cfg(feature = "dilithium")]
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "dilithium")]
+    {
+        let mut sign = SignDilithium::new().unwrap();
+        let file_path = PathBuf::from("path/to/your/file.txt");
+
+        // Sign the file
+        let signed_file = sign.sign_file(file_path.clone()).await.expect("Failed to sign file with Dilithium");
+
+        // Print the result
+        println!("Signed file with Dilithium: {:?}", signed_file);
+    }
+}
+```
+
+These examples demonstrate the usage of the `dilithium` feature in CryptGuard for signing and verifying messages and files, showcasing the library's capabilities with post-quantum cryptography.
+
 ### Encrypting Data
 Encrypt data using `encrypt`, `encrypt_msg`, or `encrypt_file` functions from the `Encrypt` struct.
 
 #### Encrypt a Message
 ```rust
-use crypt_guard::encrypt::Encrypt;
-use crypt_guard::keychain::Keychain;
+use crypt_guard::{
+    File,
+    Encrypt,
+    Decrypt,
+    Keychain,
+    FileRemover,
+    Signing,
+    Sign,
+    ActionType,
+};
 
 #[tokio::main]
 async fn main() {
@@ -48,9 +130,6 @@ async fn main() {
 
 #### Encrypt a File
 ```rust
-use crypt_guard::encrypt::Encrypt;
-use crypt_guard::keychain::Keychain;
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
@@ -69,9 +148,6 @@ async fn main() {
 Decrypt data using `decrypt`, `decrypt_msg`, or `decrypt_file` functions from the `Decrypt` struct.
 
 ```rust
-use crypt_guard::decrypt::Decrypt;
-use crypt_guard::keychain::Keychain;
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
@@ -95,7 +171,6 @@ async fn main() {
 The `Keychain` struct in CryptGuard facilitates key management. It supports loading and saving public keys, secret keys, shared secrets, and ciphertexts.
 
 ```rust
-use crypt_guard::keychain::Keychain;
 
 fn main() {
     let keychain = Keychain::new().unwrap();
@@ -104,10 +179,9 @@ fn main() {
 ```
 
 ### Signing a Message
-To sign a message, use the `Sign` struct from the `sign` module.
+To sign a message,
 
 ```rust
-use crypt_guard::sign::Sign;
 
 #[tokio::main]
 async fn main() {
@@ -123,11 +197,9 @@ async fn main() {
 ```
 
 ### Signing a File
-For signing a file, use the `sign_file` method from the `Sign` struct.
+For signing a file,
 
 ```rust
-use crypt_guard::sign::Sign;
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() {
@@ -147,12 +219,7 @@ The `xchacha20` feature in CryptGuard introduces the XChaCha20 encryption algori
 
 #### Encrypting Data with XChaCha20
 ```rust
-#[
-
-cfg(feature = "xchacha20")]
-use crypt_guard::encrypt::Encrypt;
-use crypt_guard::keychain::Keychain;
-use crypt_guard::Encrypt::generate_nonce;
+#[cfg(feature = "xchacha20")]
 
 #[tokio::main]
 async fn main() {
@@ -174,8 +241,8 @@ async fn main() {
 #### Decrypting Data with XChaCha20
 ```rust
 #[cfg(feature = "xchacha20")]
-use crypt_guard::decrypt::Decrypt;
-use crypt_guard::keychain::Keychain;
+
+;
 
 #[tokio::main]
 async fn main() {
@@ -193,6 +260,83 @@ async fn main() {
     }
 }
 ```
+
+### Removing a Single File
+
+```rust
+
+#[tokio::main]
+async fn main() {
+    let file_path = PathBuf::from("path/to/your/file.txt");
+    let remover = FileRemover::new(5, file_path, false).unwrap();
+    remover.delete().await.unwrap();
+}
+```
+
+### Removing a Directory and Its Contents
+
+```rust
+
+#[tokio::main]
+async fn main() {
+    let dir_path = PathBuf::from("path/to/your/directory");
+    let remover = FileRemover::new(5, dir_path, true).unwrap();
+    remover.delete().await.unwrap();
+}
+```
+
+### Removing Multiple Files with Unique Filenames
+
+```rust
+
+#[tokio::main]
+async fn main() {
+    // Generate 10 files with unique names in a temporary directory
+    let dir = tempfile::TempDir::new().unwrap();
+    for i in 0..10 {
+        let file_name = format!("file{}.txt", i);
+        let file_path = dir.path().join(file_name);
+        let mut file = File::create(file_path).unwrap();
+        write!(file, "File {} contents", i).unwrap();
+    }
+
+    // Remove all files from the temporary directory
+    let remover = FileRemover::new(5, dir.path().to_path_buf(), false).unwrap();
+    remover.delete().await.unwrap();
+}
+```
+
+### Customize Overwrite Times
+
+Increase the overwrite times to enhance the security of file removal.
+
+```rust
+
+#[tokio::main]
+async fn main() {
+    let file_path = PathBuf::from("path/to/your/file.txt");
+    let remover = FileRemover::new(100, file_path, false).unwrap();
+    remover.delete().await.unwrap();
+}
+```
+
+### File Remover
+
+**New Feature: File Remover**
+
+The `file_remover` module in CryptGuard introduces a new feature for securely removing files and directories. This module includes the FileRemover struct, which provides several methods for removing files and directories, including:
+
+- `delete()`: Deletes a single file or directory recursively (if recursive is set to true).
+- `overwrite_file()`: Overwrites a file multiple times with random data to prevent data recovery.
+- `new()`: Creates a new FileRemover instance with customizable overwrite times and recursive deletion options.
+
+**File Remover Usage**
+
+The following code demonstrates how to
+
+**File Remover with Unique Filenames**
+
+The FileRemover can also be used to remove multiple files with unique filenames.
 
 ## Dependencies
 CryptGuard depends on several external crates, specified in `Cargo.toml`:
@@ -215,3 +359,6 @@ CryptGuard depends on several external crates, specified in `Cargo.toml`:
 
 ## License
 CryptGuard is licensed under the MIT LICENSE. The full license text is available in the `LICENSE` file in the repository.
+```
+
+You now have the complete README.md content with the updated examples for CryptGuard.

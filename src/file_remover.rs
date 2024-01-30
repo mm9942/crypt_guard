@@ -1,3 +1,4 @@
+use crate::FileRemover;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
@@ -47,13 +48,6 @@ impl Display for FileRemoverErr {
 }
 
 impl Error for FileRemoverErr {}
-
-pub struct FileRemover {
-    overwrite_times: u32,
-    file_path: PathBuf,
-    recursive: bool,
-    progress_bar: ProgressBar,
-}
 
 impl FileRemover {
     pub fn new(
