@@ -25,8 +25,6 @@ Ensure your system has the latest stable versions of Rust, Cargo, and the Tokio 
 
 ## Usage
 
-To add usage examples for the new `dilithium` feature in the CryptGuard Rust library, we can focus on demonstrating how to utilize the `SignDilithium` struct for signing and verifying messages and files. Below are updated sections for the README.md, illustrating how to use the `dilithium` feature.
-
 ### New Feature: Dilithium
 
 The `dilithium` feature in CryptGuard introduces the Dilithium algorithm, a post-quantum cryptographic signing method. This feature is optional and can be enabled in your `Cargo.toml`.
@@ -322,17 +320,13 @@ async fn main() {
 
 ### File Remover
 
-**New Feature: File Remover**
+**File Remover**
 
-The `file_remover` module in CryptGuard introduces a new feature for securely removing files and directories. This module includes the FileRemover struct, which provides several methods for removing files and directories, including:
+The `file_remover` module in CryptGuard introduces a new function for securely removing files and directories. This module includes the FileRemover struct, which provides several methods for removing files and directories, including:
 
 - `delete()`: Deletes a single file or directory recursively (if recursive is set to true).
 - `overwrite_file()`: Overwrites a file multiple times with random data to prevent data recovery.
 - `new()`: Creates a new FileRemover instance with customizable overwrite times and recursive deletion options.
-
-**File Remover Usage**
-
-The following code demonstrates how to
 
 **File Remover with Unique Filenames**
 

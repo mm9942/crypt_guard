@@ -1,109 +1,50 @@
-mod keychain;
-mod decrypt;
-mod encrypt;
 mod file_remover;
 
-#[cfg(feature = "default")]
-mod sign_falcon;
-
-#[cfg(feature = "dilithium")]
-mod sign_dilithium;
-
 use crate::{
-    keychain::*,
-    encrypt::*,
-    decrypt::*,
     file_remover::*,
 };
-pub use crate::sign_falcon::Sign;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     fs,
     path::{Path, PathBuf},
 };
+use pqcrypto_falcon::falcon1024::{self, *};
 use tokio::io;
 use pqcrypto_traits::sign::{SignedMessage as SignedMessageSign, SecretKey as SecretKeySign, PublicKey as PublicKeySign, DetachedSignature as DetachedSignatureSign};
 use hex;
-use pqcrypto_kyber::kyber1024;
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::{rngs::OsRng, RngCore};
+
 #[cfg(feature="dilithium")]
-pub use crate::sign_dilithium::SignDilithium;
+pub use crypt_guard_sign::SignDilithium;
 #[cfg(feature="dilithium")]
 pub use pqcrypto_dilithium;
 
 
-#[derive(Debug)]
-pub enum SigningErr {
-    SecretKeyMissing,
-    PublicKeyMissing,
-    SignatureVerificationFailed,
-    SigningMessageFailed,
-    IOError(io::Error),
-}
+#[cfg(feature="default")]
+use pqcrypto_kyber::kyber1024::{self, *};
 
-impl Display for SigningErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            SigningErr::SecretKeyMissing => write!(f, "Secret key is missing"),
-            SigningErr::PublicKeyMissing => write!(f, "Public key is missing"),
-            SigningErr::SignatureVerificationFailed => write!(f, "Signature verification failed"),
-            SigningErr::SigningMessageFailed => write!(f, "Failed to sign message"),
-            SigningErr::IOError(err) => write!(f, "IOError occurred: {}", err),
-        }
-    }
-}
+#[cfg(feature="default")]
+pub use crypt_guard_kyber::*;
+#[cfg(feature="default")]
+pub use crypt_guard_sign::{self, Sign, SigningErr};
 
-impl PartialEq for SigningErr {
-    fn eq(&self, other: &Self) -> bool {
-        use SigningErr::*;
-        match (self, other) {
-            (SecretKeyMissing, SecretKeyMissing)
-            | (PublicKeyMissing, PublicKeyMissing)
-            | (SignatureVerificationFailed, SignatureVerificationFailed)
-            | (SigningMessageFailed, SigningMessageFailed) => true,
-            (IOError(_), IOError(_)) => false,
-            _ => false,
-        }
-    }
-}
+/*#[cfg(feature="saber")]
+pub use saber::{*, self};*/
 
-impl From<pqcrypto_traits::Error> for SigningErr {
-    fn from(_: pqcrypto_traits::Error) -> Self {
-        SigningErr::SignatureVerificationFailed
-    }
-}
-
-impl Error for SigningErr {}
-
-impl From<io::Error> for SigningErr {
-    fn from(err: io::Error) -> Self {
-        SigningErr::IOError(err)
-    }
-}
-
-pub struct Encrypt;
-pub struct Decrypt;
-pub struct Keychain {
-    pub public_key: Option<kyber1024::PublicKey>,
-    pub secret_key: Option<kyber1024::SecretKey>,
-    pub shared_secret: Option<kyber1024::SharedSecret>,
-    pub ciphertext: Option<kyber1024::Ciphertext>,
-}
 pub struct FileRemover {
     pub overwrite_times: u32,
     pub file_path: PathBuf,
     pub recursive: bool,
     pub progress_bar: ProgressBar,
 }
-pub struct File {
-    pub path: String,
-    pub data: Vec<u8>,
-}
 
-enum ActionType {
-    FileAction,
-    MessageAction,
+#[cfg(feature = "xchacha20")]
+pub fn generate_nonce() -> [u8; 24] {
+    let mut nonce = [0u8; 24];
+    OsRng.fill_bytes(&mut nonce);
+    nonce
 }
 
 #[cfg(test)]
@@ -112,17 +53,8 @@ mod tests {
     use super::*;
         
     use crate::{
-        keychain::*,
-        encrypt::*,
-        decrypt::*,
         file_remover::*,
-        SigningErr::{*, self},
-        Encrypt,
-        Decrypt,
-        Keychain,
         FileRemover,
-        sign_falcon::*,
-        ActionType,
     };
     use std::{
         path::{PathBuf, Path},
@@ -131,16 +63,25 @@ mod tests {
         io::Write,
         ffi::OsStr
     };
-    use pqcrypto_kyber::kyber1024::*;
     use pqcrypto_falcon::falcon1024;
     use pqcrypto_traits::kem::{SharedSecret as SharedSecretTrait, SecretKey as SecretKeyTrait};
     use hex;
     use tempfile::{NamedTempFile, tempdir};
     use pqcrypto_traits::sign::{SignedMessage as SignedMessageSign, SecretKey as SecretKeySign, PublicKey as PublicKeySign, DetachedSignature as DetachedSignatureSign};
+    
+    #[cfg(feature = "xchacha20")]
+    use crypt_guard_kyber::{Keychain, Encrypt, Decrypt}; 
     #[cfg(feature = "dilithium")]
-    use crate::sign_dilithium;
-    #[cfg(feature = "dilithium")]
-    use crate::sign_dilithium::SignDilithium; 
+    use crypt_guard_sign::SignDilithium; 
+    #[cfg(feature="default")]
+    use pqcrypto_kyber::kyber1024::*;
+    #[cfg(feature="default")]
+    use pqcrypto_kyber::kyber1024;
+    #[cfg(feature="default")]
+    use crypt_guard_kyber::*;
+    #[cfg(feature="default")]
+    use crypt_guard_sign::{*, Sign,SigningErr};
+
     #[tokio::test]
     async fn keychain_new_works() {
         let keychain = Keychain::new().unwrap();
