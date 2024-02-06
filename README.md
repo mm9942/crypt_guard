@@ -353,6 +353,3 @@ CryptGuard depends on several external crates, specified in `Cargo.toml`:
 
 ## License
 CryptGuard is licensed under the MIT LICENSE. The full license text is available in the `LICENSE` file in the repository.
-```
-
-You now have the complete README.md content with the updated examples for CryptGuard.
