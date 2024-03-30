@@ -6,11 +6,11 @@
 [![GitHub Library][lib-badge]][lib-link]
 [![GitHub CLI][cli-badge]][cli-link]
 
-[crates-badge]: https://img.shields.io/badge/crates.io-v1.1-blue.svg
+[crates-badge]: https://img.shields.io/badge/crates.io-v1.1.1-blue.svg
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg
 [mit-url]: https://github.com/mm9942/CryptGuardLib/blob/main/LICENSE
-[doc-badge]: https://img.shields.io/badge/docs-v1.1-yellow.svg
+[doc-badge]: https://img.shields.io/badge/docs-v1.1.1-yellow.svg
 [doc-url]: https://docs.rs/crypt_guard/
 [lib-badge]: https://img.shields.io/badge/github-lib-black.svg
 [lib-link]: https://github.com/mm9942/CryptGuardLib
@@ -28,11 +28,11 @@ Our library is undergoing a syntax overhaul to enhance detail and clarity, addre
 
 ### Current Release
 
-The present version, **1.1.0**, emphasizes detailed cryptographic operations, catering to users who require a deep dive into cryptographic functionalities. This version is ideal for those who prefer an elaborate approach to cryptography and don't want to use async code, async capabilites will on a later updated reimplemented (but this time as a feature). For those who prefer an rather easy syntax, please use the last version: v1.0.3, until the next update is released.
+The present version, **1.1.x**, emphasizes detailed cryptographic operations, catering to users who require a deep dive into cryptographic functionalities. This version is ideal for those who prefer an elaborate approach to cryptography and don't want to use async code, async capabilites will on a later updated reimplemented (but this time as a feature). For those who prefer an rather easy syntax, please use the last version: v1.0.3, until the next update is released.
 
 ### Future Release
 
-A forthcoming update will introduce a more streamlined and user-friendly interface. This version aims to simplify cryptographic operations, making the library more accessible to a broader audience. Stay tuned for its release!
+A forthcoming update will introduce a more streamlined and user-friendly interface that does not require such detailed usage of the included structs. This version aims to simplify cryptographic operations, making the library more accessible to a broader audience. It is also planned to contain support for other key sizes of Kyber besides Kyber1024. The structs are planned to be used from then on in the background, allowing the logging of information about an encryption — not the keys or data themselves, but the algorithms used in relation to the datetime at which it was used. This enables later review to confirm the algorithm and key size in the decryption of the data. Stay tuned for its release!
 
 ## Important Considerations
 
@@ -152,12 +152,12 @@ let crypt_info2 = CryptographicInformation::from(
     crypt_metadata2,
     true,
     location: Some(
-    	FileMetadata::from(
-    		PathBuf::from("./example.pdf.enc"), 
-    		FileTypes::File, 
-    		FileState::Decrypted
-		)
-	),
+        FileMetadata::from(
+            PathBuf::from("./example.pdf.enc"), 
+            FileTypes::File, 
+            FileState::Decrypted
+        )
+    ),
 );
 
 let nonce_vec = ... // Use the nonce used for encryption
