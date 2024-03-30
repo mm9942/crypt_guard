@@ -28,7 +28,7 @@ Our library is undergoing a syntax overhaul to enhance detail and clarity, addre
 
 ### Current Release
 
-The present version, **1.1.0**, emphasizes detailed cryptographic operations, catering to users who require a deep dive into cryptographic functionalities. This version is ideal for those who prefer an elaborate approach to cryptography and don't want to use async code, async capabilites will on a later updated reimplemented (but this time as a feature). For those who prefer an rather easy syntax should just use version 1.0.3 until the next updates are released.
+The present version, **1.1.0**, emphasizes detailed cryptographic operations, catering to users who require a deep dive into cryptographic functionalities. This version is ideal for those who prefer an elaborate approach to cryptography and don't want to use async code, async capabilites will on a later updated reimplemented (but this time as a feature). For those who prefer an rather easy syntax, please use the last version: v1.0.3, until the next update is released.
 
 ### Future Release
 
