@@ -6,11 +6,11 @@
 [![GitHub Library][lib-badge]][lib-link]
 [![GitHub CLI][cli-badge]][cli-link]
 
-[crates-badge]: https://img.shields.io/badge/crates.io-v1.1.1-blue.svg
+[crates-badge]: https://img.shields.io/badge/crates.io-v1.1-blue.svg
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg
 [mit-url]: https://github.com/mm9942/CryptGuardLib/blob/main/LICENSE
-[doc-badge]: https://img.shields.io/badge/docs-v1.1.1-yellow.svg
+[doc-badge]: https://img.shields.io/badge/docs-v1.1-yellow.svg
 [doc-url]: https://docs.rs/crypt_guard/
 [lib-badge]: https://img.shields.io/badge/github-lib-black.svg
 [lib-link]: https://github.com/mm9942/CryptGuardLib
@@ -18,186 +18,159 @@
 [cli-link]: https://github.com/mm9942/CryptGuard
 
 ## Introduction
+
 CryptGuard is a comprehensive cryptographic library, offering robust encryption and decryption capabilities. It integrates traditional cryptography with post-quantum algorithms, ensuring resilience against quantum computing threats. Designed for developers, CryptGuard empowers applications to withstand future digital security challenges. Embrace CryptGuard as your trusted ally in safeguarding privacy in the digital realm.
+
+## Key Features and Capabilities
+
+This library supports AES-256 and XChaCha20 encryption algorithms, providing a secure means to protect data. To cater to a variety of security requirements and operational contexts, CryptGuard integrates seamlessly with Kyber512, Kyber768, and Kyber1024 for encryption, ensuring compatibility with post-quantum cryptography standards.
+
+For developers who require digital signing capabilities, CryptGuard incorporates Falcon and Dilithium algorithms, offering robust options for creating and verifying digital signatures. This feature is particularly crucial for applications that necessitate authenticity and integrity of data, ensuring that digital communications remain secure and verifiable.
+
+An additional layer of security is provided through the appending of a HMAC (Hash-Based Message Authentication Code) to encrypted data. This critical feature enables the authentication of encrypted information, ensuring that any tampering with the data can be reliably detected. This HMAC attachment underscores CryptGuard's commitment to comprehensive data integrity and security, offering developers and end-users peace of mind regarding the authenticity and safety of their data.
 
 ## Syntax Overhaul and Version Information
 
 ### Upcoming Changes
 
-Our library is undergoing a syntax overhaul to enhance detail and clarity, addressing feedback for a more intuitive user experience. The current syntax focuses on providing a comprehensive understanding of the cryptographic processes, albeit with a higher complexity level.
+Our library is undergoing a syntax overhaul to enhance detail and clarity, addressing feedback for a more intuitive user experience. The current syntax focuses on providing a comprehensive understanding of the cryptographic processes, albeit with a different complexity level.
 
 ### Current Release
 
-The present version, **1.1.x**, emphasizes detailed cryptographic operations, catering to users who require a deep dive into cryptographic functionalities. This version is ideal for those who prefer an elaborate approach to cryptography and don't want to use async code, async capabilites will on a later updated reimplemented (but this time as a feature). For those who prefer an rather easy syntax, please use the last version: v1.0.3, until the next update is released.
+The present version, **1.1.4**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer an easier syntax, they should just use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
 
 ### Future Release
 
-A forthcoming update will introduce a more streamlined and user-friendly interface that does not require such detailed usage of the included structs. This version aims to simplify cryptographic operations, making the library more accessible to a broader audience. It is also planned to contain support for other key sizes of Kyber besides Kyber1024. The structs are planned to be used from then on in the background, allowing the logging of information about an encryption — not the keys or data themselves, but the algorithms used in relation to the datetime at which it was used. This enables later review to confirm the algorithm and key size in the decryption of the data. Stay tuned for its release!
+A forthcoming update will introduce other bit sizes for Falcon and Dilithium. It will also introduce logging capabilities, not logging keys or original data, but rather information about which encryption algorithm (AES or XChaCha20) was used, whether it was a File or a Message, as well as the time it was used. Stay tuned for its release!
 
 ## Important Considerations
 
-### Data Handling in CryptographicInformation
-
-Users should note that providing an existing file path to `FileMetadata` for encryption/decryption operations will overwrite the `data` field within `CryptographicInformation` with the file's content. This ensures the use of current data but replaces any existing data in the field. Caution is advised to prevent data loss.
-
 ### Transition to the New Version
 
-For those considering the transition to the updated version upon its release, familiarizing yourself with the current documentation and examples is recommended. This preparation will facilitate a smoother adaptation to the new syntax and features.
+For those considering the transition to the updated version upon its release, familiarizing yourself with the current documentation and examples is recommended. This preparation will facilitate a smoother adaptation to the new syntax and features. The next upcoming versions will gradually change the syntax and often implement things you don't need to use in the next version anymore, but these structs and methods don't cease to exist; rather, they are now automatically implemented for easier usage. If you want to use them, don't hesitate to do so!
 
 ## Usage Examples
 
 #### Generating and Saving a Key Pair
 
-This example illustrates generating a key pair and saving it to files, leveraging the `KeyPair::new()` method for key pair generation and `FileMetadata::save()` for persisting keys.
+This example illustrates generating a key pair and saving it to files, leveraging the `KeyControKyber1024::keypair()` method for key pair generation and the `KeyControl::<KeyControKyber1024>` instance for setting and saving the keys.
 
 ```rust
-use crate::KeyControl::{FileMetadata, KeyPair};
-use crate::KeyControl::FileTypes;
+    // Generate a keypair
+    let (public_key, secret_key) = KeyControKyber1024::keypair().unwrap();
 
-let key_pair = KeyPair::new();
+    let keycontrol = KeyControl::<KeyControKyber1024>::new();
 
-// Public key saving
-let public_key_file_metadata = FileMetadata::from(
-    "path/to/save/public_key.pub".into(),
-    FileTypes::PublicKey,
-    FileState::Other,
-);
-public_key_file_metadata.save(key_pair.public_key.content().unwrap()).expect("Failed to save public key");
+    // Save Public and Secret key while defining the folder (./key).
+    keycontrol.set_public_key(public_key.clone()).unwrap();
+    keycontrol.save(KeyTypes::PublicKey, "./key".into()).unwrap();
 
-// Secret key saving
-let secret_key_file_metadata = FileMetadata::from(
-    "path/to/save/secret_key.sec".into(),
-    FileTypes::SecretKey,
-    FileState::Other,
-);
-secret_key_file_metadata.save(key_pair.secret_key.content().unwrap()).expect("Failed to save secret key");
+    keycontrol.set_secret_key(secret_key.clone()).unwrap();
+    keycontrol.save(KeyTypes::SecretKey, "./key".into()).unwrap();
 ```
 
-### Encrypting a Message using AES
+### Encryption of a File using AES
 
 ```rust
-let keyp = KeyPair::new();
+    let message = "Hey, how are you doing?";
+    let passphrase = "Test Passphrase";
 
-let file1 = FileMetadata::from(
-    PathBuf::from("key.pub"),
-    FileTypes::PublicKey,
-    FileState::Other
-);
+    // Instantiate Kyber for encryption of a message with Kyber1024 and AES
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+    
+    // Encrypt message
+    let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
 
-let file2 = FileMetadata::from(
-    PathBuf::from("key.sec"),
-    FileTypes::SecretKey,
-    FileState::Other
-);
-
-let mut pubk = keyp.public_key().unwrap();
-let mut seck = keyp.secret_key().unwrap();
-let _ = file1.save(pubk.content().unwrap());
-let _ = file2.save(seck.content().unwrap());
-
-let crypt_metadata1 = CryptographicMetadata::from(
-    Process::encryption(),
-    CryptographicMechanism::aes(),
-    KeyEncapMechanism::kyber1024(),
-    ContentType::message(),
-);
-
-let crypt_info1 = CryptographicInformation::from(
-    "This is a test message".as_bytes().to_vec(),
-    "passphrase".as_bytes().to_vec(),
-    crypt_metadata1,
-    false,
-    None,
-);
-let mut aes1 = CipherAES::new(crypt_info1);
-
-let pubkey = Key::new(KeyTypes::PublicKey, keyp.public_key().unwrap().content().unwrap().to_vec());
-let seckey = Key::new(KeyTypes::SecretKey, keyp.secret_key().unwrap().content().unwrap().to_vec());
-
-let (data, cipher) = aes1.encrypt(pubkey).unwrap();
-
+    // Save the ciphertext for decryption in folder ./key
+    key_control.set_ciphertext(cipher.clone()).unwrap();
+    key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
 ```
 
-#### Decrypting a File with XChaCha20
+### Decryption of a File using AES
 
 ```rust
-let ciphertext = FileMetadata::from(
-    PathBuf::from("key.ct"),
-    FileTypes::Ciphertext,
-    FileState::Other
-);
+    let cipher = key_control.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"));
+    let secret_key = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"));
 
-let cipher_vec = ciphertext.load().unwrap();
-let cipher = Key::new(KeyTypes::Ciphertext, cipher_vec);
+    // Instantiate Kyber for decryption of a message with Kyber1024 and AES
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+    
+    // Decrypt message
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
 
-let secret_key = FileMetadata::from(
-    PathBuf::from("key.sec"),
-    FileTypes::SecretKey,
-    FileState::Other
-);
+    // Print the decrypted text
+    println!("{:?}", String::from_utf8(decrypt_message));
+```
 
-let seckey_vec = secret_key.load().unwrap();
-let seckey = Key::new(KeyTypes::SecretKey, seckey_vec);
+#### Encryption and decryption of a message written into a file with XChaCha20
 
-let crypt_metadata2 = CryptographicMetadata::from(
-    Process::decryption(),
-    CryptographicMechanism::xchacha20(),
-    KeyEncapMechanism::kyber1024(),
-    ContentType::file(),
-);
+```rust
+    let message = "Hey, how are you doing?";
 
-let crypt_info2 = CryptographicInformation::from(
-    data,
-    "test key".as_bytes().to_vec(),
-    crypt_metadata2,
-    true,
-    location: Some(
-        FileMetadata::from(
-            PathBuf::from("./example.pdf.enc"), 
-            FileTypes::File, 
-            FileState::Decrypted
-        )
-    ),
-);
+    let tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
+    let tmp_dir = Builder::new().prefix("messages").tempdir().map_err(|e| CryptError::from(e))?;
+    
+    let enc_path = tmp_dir.path().clone().join("message.txt");
+    let dec_path = tmp_dir.path().clone().join("message.txt.enc"); 
+    
+    fs::write(&enc_path, message.as_bytes())?;
 
-let nonce_vec = ... // Use the nonce used for encryption
+    let passphrase = "Test Passphrase";
 
-let mut ChaCha1 = CipherChaCha::new(crypt_info1, Some(hex::encode(nonce_vec)));
-let decrypted = ChaCha1.decrypt(seckey, cipher).unwrap();
+    // Generate key pair
+    let (public_key, secret_key) = KeyControKyber768::keypair().expect("Failed to generate keypair");
+
+    // Instantiate Kyber for encryption of a file with Kyber768 and XChaCha20
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
+
+    // Encrypt message
+    let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
+
+    let nonce = encryptor.get_nonce();
+
+    fs::remove_file(enc_path.clone());
+
+    // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
+    
+    // Decrypt message
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
 ```
 
 #### Signing and Verifying with Falcon
 
 ```rust
-use crate::signature::{falcon, SignatureKey, SignatureMechanism, Mechanism};
+    use crate::signature::{falcon, SignatureKey, SignatureMechanism, Mechanism};
 
-// Generate a keypair using Falcon
-let falcon_keypair = falcon::keypair();
+    // Generate a keypair using Falcon
+    let falcon_keypair = falcon::keypair();
 
-// Sign a message
-let message = "This is a secret message";
-let signature = falcon::sign_msg(&falcon_keypair.secret_key, message.as_bytes()).expect("Signing failed");
+    // Sign a message
+    let message = "This is a secret message";
+    let signature = falcon::sign_msg(&falcon_keypair.secret_key, message.as_bytes()).expect("Signing failed");
 
-// Verify the signature
-let verified = falcon::verify_msg(&falcon_keypair.public_key, &signature, message.as_bytes()).expect("Verification failed");
-assert!(verified, "Signature verification failed");
+    // Verify the signature
+    let verified = falcon::verify_msg(&falcon_keypair.public_key, &signature, message.as_bytes()).expect("Verification failed");´
 ```
 
 #### Signing and Verifying with Dilithium
 
 ```rust
-use crate::signature::{dilithium, SignatureKey, SignatureMechanism, Mechanism};
+    use crate::signature::{dilithium, SignatureKey, SignatureMechanism, Mechanism};
 
-// Generate a keypair using Dilithium
-let dilithium_keypair = dilithium::keypair();
+    // Generate a keypair using Dilithium
+    let dilithium_keypair = dilithium::keypair();
 
-// Sign a message
-let message = "Another secret message";
-let signature = dilithium::sign_msg(&dilithium_keypair.secret_key, message.as_bytes()).expect("Signing failed");
+    // Sign a message
+    let message = "Another secret message";
+    let signature = dilithium::sign_msg(&dilithium_keypair.secret_key, message.as_bytes()).expect("Signing failed");
 
-// Verify the signature
-let verified = dilithium::verify_msg(&dilithium_keypair.public_key, &signature, message.as_bytes()).expect("Verification failed");
-assert!(verified, "Signature verification failed with Dilithium");
+    // Verify the signature
+    let verified = dilithium::verify_msg(&dilithium_keypair.public_key, &signature, message.as_bytes()).expect("Verification failed");´
 ```
 
 
