@@ -1,12 +1,15 @@
+/// Core functionalitys for control of Kyber keys as well as encryption and decryption
 mod Core;
 /// Cryptographic related functionalitys, enums structs and modules
 mod cryptography;
 mod KeyControl;
 pub mod error;
+
 #[cfg(test)]
 mod tests;
 
 pub use crate::{
+    Core::KDF,
     KeyControl::{
         *,
         file::*, 
@@ -20,10 +23,6 @@ pub use crate::{
     },
     cryptography::{
         *,
-        signature::{
-            sign_falcon::*,
-            sign_dilithium::*
-        },
     }
 
 };

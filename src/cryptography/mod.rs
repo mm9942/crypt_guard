@@ -9,6 +9,7 @@ mod cryptographic;
 pub use cryptographic::*;
 use std::path::PathBuf;
 use crate::{error::CryptError, FileMetadata, Key};
+use std::fmt;
 
 /// Represents the AES cipher for encryption and decryption processes.
 /// It holds cryptographic information and a shared secret for operations.
@@ -16,6 +17,12 @@ use crate::{error::CryptError, FileMetadata, Key};
 pub struct CipherAES {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
+}
+
+impl fmt::Display for CipherAES {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherAES with the following Cryptographic Informations: {}", self.infos.metadata)
+    }
 }
 
 /// Represents the ChaCha cipher for encryption and decryption processes.
@@ -27,11 +34,27 @@ pub struct CipherChaCha {
     pub sharedsecret: Vec<u8>,
 }
 
+impl fmt::Display for CipherChaCha {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherChaCha with the following Cryptographic Informations {}", self.infos.metadata)
+    }
+}
+
 /// Enumerates the cryptographic mechanisms supported, such as AES and XChaCha20.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CryptographicMechanism {
     AES,
     XChaCha20,
+}
+
+impl fmt::Display for CryptographicMechanism {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mechanism = match self {
+            CryptographicMechanism::AES => "AES",
+            CryptographicMechanism::XChaCha20 => "XChaCha20",
+        };
+        write!(f, "{}", mechanism)
+    }
 }
 
 /// Enumerates the key encapsulation mechanisms supported, such as Kyber1024.
@@ -42,6 +65,18 @@ pub enum KeyEncapMechanism {
     Kyber512,
 }
 
+
+impl fmt::Display for KeyEncapMechanism {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mechanism = match self {
+            KeyEncapMechanism::Kyber1024 => "Kyber1024",
+            KeyEncapMechanism::Kyber768 => "Kyber768",
+            KeyEncapMechanism::Kyber512 => "Kyber512",
+        };
+        write!(f, "{}", mechanism)
+    }
+}
+
 /// Enumerates the types of content that can be encrypted or decrypted, such as messages or files.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ContentType {
@@ -49,11 +84,31 @@ pub enum ContentType {
     File,
 }
 
+impl fmt::Display for ContentType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let content_type = match self {
+            ContentType::Message => "Message",
+            ContentType::File => "File",
+        };
+        write!(f, "{}", content_type)
+    }
+}
+
 /// Enumerates the cryptographic processes, such as encryption and decryption.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Process {
     Encryption,
     Decryption,
+}
+
+impl fmt::Display for Process {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let process = match self {
+            Process::Encryption => "Encryption",
+            Process::Decryption => "Decryption",
+        };
+        write!(f, "{}", process)
+    }
 }
 
 /// Holds metadata for cryptographic operations, specifying the process, encryption type,
@@ -64,6 +119,12 @@ pub struct CryptographicMetadata {
     pub encryption_type: CryptographicMechanism,
     pub key_type: KeyEncapMechanism,
     pub content_type: ContentType,
+}
+
+impl fmt::Display for CryptographicMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Process: {}\nEncryption Type: {}\nKey Type: {}\nContent Type: {}", self.process, self.encryption_type, self.key_type, self.content_type)
+    }
 }
 
 /// Contains information necessary for performing cryptographic operations, including the content

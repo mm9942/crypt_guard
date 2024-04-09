@@ -1,6 +1,4 @@
 mod sign;
-pub mod sign_falcon;
-pub mod sign_dilithium;
 pub use sign::*;
 use hmac::{Hmac, Mac};
 use sha2::{Sha512, Sha256};
