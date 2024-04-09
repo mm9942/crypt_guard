@@ -6,7 +6,7 @@ use crate::{
 	*,
 	cryptography::*, 
 	error::CryptError, 
-	signature::*,
+	hmac_sign::*,
 	FileTypes,
 	FileState,
 	FileMetadata,

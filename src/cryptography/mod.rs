@@ -1,5 +1,5 @@
- /// The `signature` module provides functionality for generating, managing, and verifying digital signatures, supporting various algorithms including post-quantum secure schemes.
-pub mod signature;
+ /// The `hmac` module provides functionality for generating, managing, and verifying digital hmacs, supporting various algorithms including post-quantum secure schemes.
+pub mod hmac_sign;
 
 /// The `cryptographic` module encapsulates core cryptographic operations, including key management, encryption, decryption, and cryptographic utility functions.
 mod cryptographic; 

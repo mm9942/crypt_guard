@@ -1,7 +1,7 @@
 use crate::{
     *, 
     error::CryptError, 
-    signature::*, 
+    hmac_sign::*, 
     Core::{
         CryptographicFunctions, 
         KeyControl, 

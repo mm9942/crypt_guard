@@ -2,7 +2,7 @@ use crate::{
     *,
     cryptography::*, 
     error::*, 
-    signature::*, 
+    hmac_sign::*, 
     Core::{
         CryptographicFunctions, 
         KeyControl, 
@@ -31,7 +31,6 @@ use std::{
 };
 use rand::{RngCore, rngs::OsRng};
 use hex;
-use crate::signature::*;
 
 
 /// Generates a 24-byte nonce using OS-level randomness.

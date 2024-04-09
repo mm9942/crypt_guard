@@ -6,7 +6,7 @@ use std::{
     path::{PathBuf, Path},
 };
 use crate::{
-    signature::*,
+    hmac_sign::*,
     KeyControKyber1024, 
     KeyControKyber512, 
     KeyControKyber768,
