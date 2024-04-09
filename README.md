@@ -4,6 +4,7 @@
 [![MIT licensed][mit-badge]][mit-url]
 [![Documentation][doc-badge]][doc-url]
 [![GitHub Library][lib-badge]][lib-link]
+[![GitHub CLI][cli-badge]][cli-link]
 
 [crates-badge]: https://img.shields.io/badge/crates.io-v1.1-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
@@ -44,7 +45,7 @@ The implementation of the logging logic is taking a bit longer as we're delibera
 
 ### Current Release
 
-The present version, **1.1.6**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
+The present version, **1.1.5**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
 
 ### Future Release
 
@@ -63,35 +64,35 @@ For those considering the transition to the updated version upon its release, fa
 #### Signing and opening with Falcon
 
 ```rust
-use crypt_guard::KDF::*;
+    use crypt_guard::KDF::*;
+    
+    // Create a new keypair
+    let (public_key, secret_key) = Falcon1024::keypair();
+    let data = b"Hello, world!".to_vec();
+    let sign = Signature::<Falcon1024, Message>::new();
+    // Sign the message
+    let signed_message = sign.signature(data.clone(), secret_key);
 
-// Create a new keypair
-let (public_key, secret_key) = Falcon1024::keypair();
-let data = b"Hello, world!".to_vec();
-let sign = Signature::<Falcon1024, Message>::new();
-// Sign the message
-let signed_message = sign.signature(data.clone(), secret_key);
-
-// Open the message
-let opened_message = sign.open(signed_message, public_key);
+    // Open the message
+    let opened_message = sign.open(signed_message, public_key);
 ```
 
 #### Signing and verifying detached with Dilithium
 
 ```rust
-use crypt_guard::KDF::*;
+    use crypt_guard::KDF::*;
 
-// Create a new keypair
-let (public_key, secret_key) = Dilithium5::keypair();
-let data = b"Hello, world!".to_vec();
+    // Create a new keypair
+    let (public_key, secret_key) = Dilithium5::keypair();
+    let data = b"Hello, world!".to_vec();
 
-let sign = Signature::<Dilithium5, Detached>::new();
+    let sign = Signature::<Dilithium5, Detached>::new();
 
-// Create a detached signature
-let signature = sign.signature(data.clone(), secret_key);
+    // Create a detached signature
+    let signature = sign.signature(data.clone(), secret_key);
 
-// Verify the detached signature
-let is_valid = sign.verify(data, signature, public_key);
+    // Verify the detached signature
+    let is_valid = sign.verify(data, signature, public_key);
 ```
 
 ### Cryptographic Operations
@@ -101,89 +102,89 @@ let is_valid = sign.verify(data, signature, public_key);
 This example illustrates generating a key pair and saving it to files, leveraging the `KeyControKyber1024::keypair()` method for key pair generation and the `KeyControl::<KeyControKyber1024>` instance for setting and saving the keys.
 
 ```rust
-// Generate a keypair
-let (public_key, secret_key) = KeyControKyber1024::keypair().unwrap();
+    // Generate a keypair
+    let (public_key, secret_key) = KeyControKyber1024::keypair().unwrap();
 
-let keycontrol = KeyControl::<KeyControKyber1024>::new();
+    let keycontrol = KeyControl::<KeyControKyber1024>::new();
 
-// Save Public and Secret key while defining the folder (./key).
-keycontrol.set_public_key(public_key.clone()).unwrap();
-keycontrol.save(KeyTypes::PublicKey, "./key".into()).unwrap();
+    // Save Public and Secret key while defining the folder (./key).
+    keycontrol.set_public_key(public_key.clone()).unwrap();
+    keycontrol.save(KeyTypes::PublicKey, "./key".into()).unwrap();
 
-keycontrol.set_secret_key(secret_key.clone()).unwrap();
-keycontrol.save(KeyTypes::SecretKey, "./key".into()).unwrap();
+    keycontrol.set_secret_key(secret_key.clone()).unwrap();
+    keycontrol.save(KeyTypes::SecretKey, "./key".into()).unwrap();
 ```
 
 ### Encryption of a File using AES
 
 ```rust
-let message = "Hey, how are you doing?";
-let passphrase = "Test Passphrase";
+    let message = "Hey, how are you doing?";
+    let passphrase = "Test Passphrase";
 
-// Instantiate Kyber for encryption of a message with Kyber1024 and AES
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+    // Instantiate Kyber for encryption of a message with Kyber1024 and AES
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+    
+    // Encrypt message
+    let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
 
-// Encrypt message
-let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
-
-// Save the ciphertext for decryption in folder ./key
-key_control.set_ciphertext(cipher.clone()).unwrap();
-key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
+    // Save the ciphertext for decryption in folder ./key
+    key_control.set_ciphertext(cipher.clone()).unwrap();
+    key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
 ```
 
 ### Decryption of a File using AES
 
 ```rust
-let cipher = key_control.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"));
-let secret_key = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"));
+    let cipher = key_control.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"));
+    let secret_key = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"));
 
-// Instantiate Kyber for decryption of a message with Kyber1024 and AES
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+    // Instantiate Kyber for decryption of a message with Kyber1024 and AES
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+    
+    // Decrypt message
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
 
-// Decrypt message
-let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
-
-// Print the decrypted text
-println!("{:?}", String::from_utf8(decrypt_message));
+    // Print the decrypted text
+    println!("{:?}", String::from_utf8(decrypt_message));
 ```
 
 #### Encryption and decryption of a message written into a file with XChaCha20
 
 ```rust
-let message = "Hey, how are you doing?";
+    let message = "Hey, how are you doing?";
 
-let tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
-let tmp_dir = Builder::new().prefix("messages").tempdir().map_err(|e| CryptError::from(e))?;
+    let tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
+    let tmp_dir = Builder::new().prefix("messages").tempdir().map_err(|e| CryptError::from(e))?;
+    
+    let enc_path = tmp_dir.path().clone().join("message.txt");
+    let dec_path = tmp_dir.path().clone().join("message.txt.enc"); 
+    
+    fs::write(&enc_path, message.as_bytes())?;
 
-let enc_path = tmp_dir.path().clone().join("message.txt");
-let dec_path = tmp_dir.path().clone().join("message.txt.enc"); 
+    let passphrase = "Test Passphrase";
 
-fs::write(&enc_path, message.as_bytes())?;
+    // Generate key pair
+    let (public_key, secret_key) = KeyControKyber768::keypair().expect("Failed to generate keypair");
 
-let passphrase = "Test Passphrase";
+    // Instantiate Kyber for encryption of a file with Kyber768 and XChaCha20
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
 
-// Generate key pair
-let (public_key, secret_key) = KeyControKyber768::keypair().expect("Failed to generate keypair");
+    // Encrypt message
+    let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
 
-// Instantiate Kyber for encryption of a file with Kyber768 and XChaCha20
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
+    let nonce = encryptor.get_nonce();
 
-// Encrypt message
-let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
+    fs::remove_file(enc_path.clone());
 
-let nonce = encryptor.get_nonce();
-
-fs::remove_file(enc_path.clone());
-
-// Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
-
-// Decrypt message
-let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
+    // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
+    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+    let mut decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
+    
+    // Decrypt message
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
 ```
 
 ### Conclusion and Looking Forward
