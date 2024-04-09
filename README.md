@@ -4,7 +4,6 @@
 [![MIT licensed][mit-badge]][mit-url]
 [![Documentation][doc-badge]][doc-url]
 [![GitHub Library][lib-badge]][lib-link]
-[![GitHub CLI][cli-badge]][cli-link]
 
 [crates-badge]: https://img.shields.io/badge/crates.io-v1.1-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
