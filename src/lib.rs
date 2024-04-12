@@ -55,7 +55,7 @@ use std::{
 
 lazy_static! {
     static ref LOGGER: Mutex<Log> = Mutex::new(Log {
-        activated: false, // Initially deactivated; activate it as needed.
+        activated: false,
         log: String::new(),
         location: None,
     });
@@ -87,7 +87,7 @@ macro_rules! write_log {
             if let Err(e) = logger.write_log_file() {
                 eprintln!("Failed to write log file: {:?}", e);
             }
-            logger.log.clear(); // Clear the log after writing
+            logger.log.clear();
         }
     };
 }

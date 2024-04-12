@@ -1,5 +1,7 @@
 use crate::{cryptography::*, error::CryptError, hmac_sign::*};
+/// Functions for usage of falcon and dilithium
 pub mod KDF;
+/// Functions for usage of kyber for key generation
 pub mod kyber;
 pub use kyber::KeyKyber::*;
 

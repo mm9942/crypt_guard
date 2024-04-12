@@ -3,8 +3,6 @@ use pqcrypto_kyber::kyber1024;
 use pqcrypto_kyber::kyber1024::*;
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 
-// A module defining the cryptographic keypair functionality.
-//mod keypair;
 /// A module defining the cryptographic key functionality.
 mod key;
 /// A module for handling file-related metadata and operations in a cryptographic context.
