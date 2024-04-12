@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::io::Read;
 use tempfile::tempdir;
-use crate::{log::*, log_activity, write_log, activate_log, LOGGER};
+use crate::{log::*, log_activity, write_log, activate_log, logger};
 
 #[test]
 fn test_logger_activation() {
