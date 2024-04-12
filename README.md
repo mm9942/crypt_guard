@@ -40,11 +40,11 @@ Our library is undergoing a syntax overhaul to enhance detail and clarity, addre
 
 - **Flexibility and Modularity**: The recent changes to our implementation for Dilithium and Falcon emphasize a generic and unified interface. This approach not only simplifies usage but also grants developers the flexibility to integrate different algorithms and signature modes seamlessly into their projects. By abstracting the complexity, we ensure that you can focus on what matters most - securing your applications efficiently.
 
-The implementation of the logging logic is taking a bit longer as we're deliberating on the best approach to ensure it integrates seamlessly and securely into the library. Our goal is to offer a robust logging feature that enhances transparency without compromising security.
+- **Logging Functionality**: CryptGuard now includes a new logging feature designed to enhance operational transparency and assist in debugging processes. This logging functionality meticulously records every significant step in the cryptographic process without compromising security. Specifically, it logs the initiation and completion of key generation, message encryption, and decryption processes, including the cryptographic algorithm used (e.g., AES, XChaCha20) and the key encapsulation mechanism (e.g., Kyber1024). Importantly, to uphold the highest standards of security and privacy, CryptGuard's logging mechanism is carefully designed to exclude sensitive information such as encryption keys, unencrypted data, file paths, or any personally identifiable information. This ensures that while users benefit from detailed logs that can aid in troubleshooting and verifying cryptographic operations, there is no risk of exposing sensitive data.
 
 ### Current Release
 
-The present version, **1.1.7**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
+The present version, **1.1.8**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
 
 ### Future Release
 
@@ -57,6 +57,44 @@ A forthcoming update will introduce other bit sizes for Falcon and Dilithium. It
 For those considering the transition to the updated version upon its release, familiarizing yourself with the current documentation and examples is recommended. This preparation will facilitate a smoother adaptation to the new syntax and features. The next upcoming versions will gradually change the syntax and often implement things you don't need to use in the next version anymore, but these structs and methods don't cease to exist; rather, they are now automatically implemented for easier usage. If you want to use them, don't hesitate to do so!
 
 ## Usage Examples
+
+### The new Logging feature
+
+CryptGuard's latest release introduces a logging feature, meticulously designed to offer comprehensive insights into cryptographic operations while prioritizing security and privacy.
+
+#### Activating the log is enough
+
+Upon activation, CryptGuard logs each significant cryptographic operation, including key generation, encryption, and decryption processes. These logs are stored in log.txt and, for enhanced organization and accessibility, are also split into individual process logs within an automatically created directory named after the log file (log).
+
+```rust
+use crypt_guard::*;
+
+// Activate the log
+activate_log("log.txt");
+
+// Define message and passphrase
+let message = "Hey, how are you doing?";
+let passphrase = "Test Passphrase";
+
+// Generate key pair
+let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+// Instantiate Kyber for encryption with Kyber1024
+let mut encryptor = Kyber::<Encryption, Kyber1024, File, AES>::new(public_key.clone(), None)?;
+
+// Encrypt message
+let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
+
+// Instantiate Kyber for decryption with Kyber1024
+let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+
+// Decrypt message
+let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
+
+// Convert Vec<u8> to String for comparison
+let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
+println!("{}", decrypted_text);
+```
 
 ### New signature syntax for dilithium and falcon
 

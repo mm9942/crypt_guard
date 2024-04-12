@@ -7,15 +7,22 @@ where
 {   
     /// Encrypts a file with AES algorithm, given a path and a passphrase.
     /// Returns the encrypted data and cipher.
-	fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         if !Path::new(&path).exists() {
+            log_activity!(format!("Error: {}.", CryptError::FileNotFound).as_str(), "");
             return Err(CryptError::FileNotFound);
         }
 
-		let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
@@ -23,21 +30,30 @@ where
             key_encap_mechanism,
             ContentType::file(),
         );
-		let file = FileMetadata::from(path, FileTypes::other(), FileState::not_encrypted());
-		let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
-		let mut aes = CipherAES::new(infos);
+        let file = FileMetadata::from(path, FileTypes::other(), FileState::not_encrypted());
+        let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
+        let mut aes = CipherAES::new(infos);
+        log_activity!("Creating a new cipher instance of AES.", "");
 
-	    let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
-		Ok((data, cipher))
-	}
+        write_log!();
+        Ok((data, cipher))
+    }
     /// Encrypts a message with AES algorithm, given the message and a passphrase.
     /// Returns the encrypted data and cipher.
     fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-		let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
@@ -45,12 +61,15 @@ where
             key_encap_mechanism,
             ContentType::message(),
         );
-		let infos = CryptographicInformation::from(message.as_bytes().to_owned(), passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
-		let mut aes = CipherAES::new(infos);
+        let infos = CryptographicInformation::from(message.as_bytes().to_owned(), passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
+        let mut aes = CipherAES::new(infos);
+        log_activity!("Creating a new cipher instance of AES.", "");
 
-		let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
-		Ok((data, cipher))
+        write_log!();
+        Ok((data, cipher))
     }
     /// Placeholder for decrypt_file, indicating operation not allowed in encryption mode.
     fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
@@ -80,13 +99,20 @@ where
     /// Decrypts a file with AES algorithm, given a path, passphrase, and ciphertext.
     fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         if !Path::new(&path).exists() {
+            log_activity!(format!("Error: {}.", CryptError::FileNotFound).as_str(), "");
             return Err(CryptError::FileNotFound);
         }
 
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
@@ -97,16 +123,26 @@ where
         let file = FileMetadata::from(path, FileTypes::other(), FileState::encrypted());
         let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
         let mut aes = CipherAES::new(infos);
+        log_activity!("Creating a new cipher instance of AES.", "");
 
         let data = aes.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tDecryptio\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+    
+        write_log!();
         Ok(data)
     }
     /// Decrypts a message with AES algorithm, given the message, passphrase, and ciphertext.
     fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
@@ -116,8 +152,12 @@ where
         );
         let infos = CryptographicInformation::from(message, passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
         let mut aes = CipherAES::new(infos);
+        log_activity!("Creating a new cipher instance of AES.", "");
 
         let data = aes.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+        
+        write_log!();
         Ok(data)
     }
 }
@@ -132,13 +172,20 @@ where
     /// Returns the encrypted data and cipher.
     fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         if !Path::new(&path).exists() {
+            log_activity!(format!("Error: {}.", CryptError::FileNotFound).as_str(), "");
             return Err(CryptError::FileNotFound);
         }
 
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
@@ -149,20 +196,30 @@ where
         let file = FileMetadata::from(path, FileTypes::other(), FileState::not_encrypted());
         let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
         let mut xchacha = CipherChaCha::new(infos, None);
+        log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
 
         let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+        
+        write_log!();
         Ok((data, cipher))
     }
 
     /// Encrypts a message with XChaCha20 algorithm, given the message and a passphrase.
     /// Returns the encrypted data and cipher.
     fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
@@ -172,11 +229,14 @@ where
         );
         let infos = CryptographicInformation::from(message.as_bytes().to_owned(), passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
         let mut xchacha = CipherChaCha::new(infos, None);
+        log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
 
         let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?).unwrap();
-
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+        
+        write_log!();
         Ok((data, cipher))
     }
 
@@ -209,13 +269,20 @@ where
     /// Returns the decrypted data.
     fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         if !Path::new(&path).exists() {
+            log_activity!(format!("Error: {}.", CryptError::FileNotFound).as_str(), "");
             return Err(CryptError::FileNotFound);
         }
 
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
@@ -226,17 +293,27 @@ where
         let file = FileMetadata::from(path, FileTypes::other(), FileState::encrypted());
         let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
         let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+        
+        write_log!();
         Ok(data)
     }
     /// Decrypts a message with XChaCha20 algorithm, given the message, passphrase, and ciphertext.
     /// Returns the decrypted data.
     fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
-        let key_encap_mechanism = match KyberSize::variant() {
-            KyberVariant::Kyber512 => KeyEncapMechanism::kyber512(),
-            KyberVariant::Kyber768 => KeyEncapMechanism::kyber768(),
-            KyberVariant::Kyber1024 => KeyEncapMechanism::kyber1024(),
+        let (key_encap_mechanism, kybersize) = match KyberSize::variant() {
+            KyberVariant::Kyber512 => {        
+                (KeyEncapMechanism::kyber512(), 512 as usize)
+            },
+            KyberVariant::Kyber768 => {        
+                (KeyEncapMechanism::kyber768(), 768 as usize)
+            },
+            KyberVariant::Kyber1024 => {        
+                (KeyEncapMechanism::kyber1024(), 1024 as usize)
+            },
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
@@ -246,9 +323,13 @@ where
         );
         let infos = CryptographicInformation::from(message, passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
         let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
+        
         println!("data: {:?}", data);
+        write_log!();
         Ok(data)
     }
 }

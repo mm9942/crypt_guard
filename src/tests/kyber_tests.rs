@@ -4,7 +4,7 @@ use tempfile::{TempDir, Builder};
 use std::fs::{self, File};
 use std::marker::PhantomData;
 use crate::{
-    Core::{kyber::*, *},
+    Core::{kyber::{KyberFunctions, *}, *},
     error::*
 };
 

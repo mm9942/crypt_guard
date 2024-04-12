@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let enc_path = tmp_dir.path().clone().join("message.txt");
     let dec_path = tmp_dir.path().clone().join("message.txt.enc"); 
     
-    fs::write(&enc_path, message.as_bytes())?;
+    let _ = fs::write(&enc_path, message.as_bytes())?;
 
     let passphrase = "Test Passphrase";
 
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let nonce = encryptor.get_nonce();
 
-    fs::remove_file(enc_path.clone());
+    let _ = fs::remove_file(enc_path.clone());
 
     // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
     // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!

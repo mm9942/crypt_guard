@@ -11,88 +11,139 @@ use std::{
     fs,
 };
 use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage, DetachedSignature};
-use crate::error::SigningErr;
+use crate::{
+    error::SigningErr,
+    log_activity,
+    LOGGER,
+};
 
+/// Represents the type of key used in cryptographic operations.
 pub enum KeyVariant {
     Public,
     Secret,
 }
 
+/// Defines the necessary functions for signing and verifying messages.
 pub trait SignatureFunctions {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr>;
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr>;
+    
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr>;
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr>;
 }
 
+
+/// Defines operations for key pair generation.
 pub trait KeyOperations {
+    /// Generates a public and secret key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr>;
 }
 
+/// Implements Falcon1024 algorithm operations.
 pub struct Falcon1024;
 impl KeyOperations for Falcon1024 {
+    /// Generates a Falcon1024 key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = falcon1024::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
 }
 impl SignatureFunctions for Falcon1024 {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Falcon1024");
         let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon1024::sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
         Ok(signature)
     }
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Generating a detached signature from the specified data.", "\nUsed key: Falcon1024");
         let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon1024::detached_sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
         Ok(signature)
     }
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Falcon1024");
         let key = falcon1024::PublicKey::from_bytes(&key).unwrap();
         let signed_message = falcon1024::SignedMessage::from_bytes(&signed_data).unwrap();
+        log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
         Ok(falcon1024::open(&signed_message, &key).unwrap())
     }
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
+        log_activity!("Starting verification of signed message.", "\nUsed key: Falcon1024");
         let key = falcon1024::PublicKey::from_bytes(&key).unwrap();
         let ds = falcon1024::DetachedSignature::from_bytes(&signature).unwrap();
+        
+        let data = falcon1024::verify_detached_signature(&ds, &data, &key)
+            .map(|_| true)
+            .map_err(|_| SigningErr::SignatureVerificationFailed)?;
+        match &data {
+            true => log_activity!("Verification completed.", "\nUsed key: Falcon1024"),
+            false => log_activity!("Verification failed! Please use for more infos: RUST_BACKTRACE=[1 or full]", "\nUsed key: Falcon1024"),
+        };
         Ok(
-            falcon1024::verify_detached_signature(&ds, &data, &key)
-                .map(|_| true)
-                .map_err(|_| SigningErr::SignatureVerificationFailed)?
+            data
         )
     }
 }
 
 pub struct Falcon512;
 impl KeyOperations for Falcon512 {
+    /// Generates a Falcon512 key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = falcon512::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
 }
 impl SignatureFunctions for Falcon512 {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Falcon512");
         let key = falcon512::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon512::sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
         Ok(signature)
     }
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Generating a detached signature from the specified data.", "\nUsed key: Falcon512");
         let key = falcon512::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon512::detached_sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
         Ok(signature)
     }
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nSelected KDF: Falcon512");
         let key = falcon512::PublicKey::from_bytes(&key).unwrap();
         let signed_message = falcon512::SignedMessage::from_bytes(&signed_data).unwrap();
+        log_activity!("Completed signing the message.", "\nSelected KDF: Falcon512");
         Ok(falcon512::open(&signed_message, &key).unwrap())
     }
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
+        log_activity!("Starting verification of signed message.", "\nSelected KDF: Falcon512");
         let key = falcon512::PublicKey::from_bytes(&key).unwrap();
         let ds = falcon512::DetachedSignature::from_bytes(&signature).unwrap();
+        
+        let data = falcon512::verify_detached_signature(&ds, &data, &key)
+            .map(|_| true)
+            .map_err(|_| SigningErr::SignatureVerificationFailed)?;
+        match &data {
+            true => log_activity!("Verification completed.", "\nSelected KDF: Falcon512"),
+            false => log_activity!("Verification failed! Please use for more infos: RUST_BACKTRACE=[1 or full]", "\nSelected KDF: Falcon512"),
+        };
         Ok(
-            falcon512::verify_detached_signature(&ds, &data, &key)
-                .map(|_| true)
-                .map_err(|_| SigningErr::SignatureVerificationFailed)?
+            data
         )
     }
 }
@@ -100,102 +151,158 @@ impl SignatureFunctions for Falcon512 {
 
 pub struct Dilithium2;
 impl KeyOperations for Dilithium2 {
+    /// Generates a Dilithium2 key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = dilithium2::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
 }
 impl SignatureFunctions for Dilithium2 {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nSelected KDF: Dilithium2");
         let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium2::sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nSelected KDF: Dilithium2");
         Ok(signature)
     }
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nSelected KDF: Dilithium2");
         let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium2::detached_sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nSelected KDF: Dilithium2");
         Ok(signature)
     }
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nSelected KDF: Dilithium2");
         let key = dilithium2::PublicKey::from_bytes(&key).unwrap();
         let signed_message = dilithium2::SignedMessage::from_bytes(&signed_data).unwrap();
+        log_activity!("Completed signing the message.", "\nSelected KDF: Dilithium2");
         Ok(dilithium2::open(&signed_message, &key).unwrap())
     }
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
+        log_activity!("Starting verification of signed message.", "\nSelected KDF: Dilithium2");
         let key = dilithium2::PublicKey::from_bytes(&key).unwrap();
         let ds = dilithium2::DetachedSignature::from_bytes(&signature).unwrap();
+        
+        let data = dilithium2::verify_detached_signature(&ds, &data, &key)
+            .map(|_| true)
+            .map_err(|_| SigningErr::SignatureVerificationFailed)?;
+        match &data {
+            true => log_activity!("Verification completed.", "\nSelected KDF: Dilithiu2"),
+            false => log_activity!("Verification failed! Please use for more infos: RUST_BACKTRACE=[1 or full]", "\nSelected KDF: Dilithium2"),
+        };
         Ok(
-            dilithium2::verify_detached_signature(&ds, &data, &key)
-                .map(|_| true)
-                .map_err(|_| SigningErr::SignatureVerificationFailed)?
+            data
         )
     }
 }
 
 pub struct Dilithium3;
 impl KeyOperations for Dilithium3 {
+    /// Generates a Dilithium3 key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = dilithium3::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
 }
 impl SignatureFunctions for Dilithium3 {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium3");
         let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium3::sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
         Ok(signature)
     }
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium3");
         let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium3::detached_sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
         Ok(signature)
     }
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium3");
         let key = dilithium3::PublicKey::from_bytes(&key).unwrap();
         let signed_message = dilithium3::SignedMessage::from_bytes(&signed_data).unwrap();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
+
         Ok(dilithium3::open(&signed_message, &key).unwrap())
     }
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
+        log_activity!("Starting verification of signed message.", "\nUsed key: Dilithium3");
         let key = dilithium3::PublicKey::from_bytes(&key).unwrap();
         let ds = dilithium3::DetachedSignature::from_bytes(&signature).unwrap();
+        
+        let data = dilithium3::verify_detached_signature(&ds, &data, &key)
+            .map(|_| true)
+            .map_err(|_| SigningErr::SignatureVerificationFailed)?;
+        match &data {
+            true => log_activity!("Verification completed.", "\nUsed key: Dilithium3"),
+            false => log_activity!("Verification failed! Please use for more infos: RUST_BACKTRACE=[1 or full]", "\nUsed key: Dilithium3"),
+        };
         Ok(
-            dilithium3::verify_detached_signature(&ds, &data, &key)
-                .map(|_| true)
-                .map_err(|_| SigningErr::SignatureVerificationFailed)?
+            data
         )
     }
 }
 
 pub struct Dilithium5;
 impl KeyOperations for Dilithium5 {
+    /// Generates a Dilithium5 key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = dilithium5::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
 }
 impl SignatureFunctions for Dilithium5 {
+    /// Signs a given message with the provided key.
     fn sign_message(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium5");
         let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium5::sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
         Ok(signature)
     }
+    /// Creates a detached signature for the given data.
     fn detached_signature(data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium5");
         let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium5::detached_sign(&data, &key).as_bytes().to_owned();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
         Ok(signature)
     }
+    /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
+        log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium5");
         let key = dilithium5::PublicKey::from_bytes(&key).unwrap();
         let signed_message = dilithium5::SignedMessage::from_bytes(&signed_data).unwrap();
+        log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
         Ok(dilithium5::open(&signed_message, &key).unwrap())
     }
+    /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
+        log_activity!("Starting verification of signed message.", "\nUsed key: Dilithium5");
         let key = dilithium5::PublicKey::from_bytes(&key).unwrap();
         let ds = dilithium5::DetachedSignature::from_bytes(&signature).unwrap();
+        
+        let data = dilithium5::verify_detached_signature(&ds, &data, &key)
+            .map(|_| true)
+            .map_err(|_| SigningErr::SignatureVerificationFailed)?;
+        match &data {
+            true => log_activity!("Verification completed.", "\nUsed key: Dilithium5"),
+            false => log_activity!("Verification failed! Please use for more infos: RUST_BACKTRACE=[1 or full]", "\nUsed key: Dilithium5"),
+        };
         Ok(
-            dilithium5::verify_detached_signature(&ds, &data, &key)
-                .map(|_| true)
-                .map_err(|_| SigningErr::SignatureVerificationFailed)?
+            data
         )
     }
 }

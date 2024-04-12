@@ -17,17 +17,20 @@ impl KyberKeyFunctions for KeyControKyber1024{
     /// Generates a public and secret key pair using the Kyber1024 algorithm.
 	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber1024::*;
+		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_owned();
         let secret_key = sk.as_bytes().to_owned();
 
+		log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
         Ok((public_key, secret_key))
 	}
 
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
 	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber1024::*;
+		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
 		let pk = PublicKey::from_bytes(&public).unwrap();
         let (ss, ct) = encapsulate(&pk);
@@ -35,18 +38,22 @@ impl KyberKeyFunctions for KeyControKyber1024{
 		let ciphertext = ct.as_bytes().to_vec();
 		let shared_secret = ss.as_bytes().to_vec();
 
+
+		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 		Ok((shared_secret, ciphertext))
 	}
 
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
 	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
 		use pqcrypto_kyber::kyber1024::*;
+		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
         let ct = Ciphertext::from_bytes(&cipher).unwrap();        
         let sk = SecretKey::from_bytes(&sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
 
+		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 		Ok(shared_secret)
 	}
 }
@@ -57,10 +64,12 @@ impl KyberKeyFunctions for KeyControKyber768 {
     /// Generates a public and secret key pair using the Kyber768 algorithm.
 	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber768::*;
+		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_vec();
         let secret_key = sk.as_bytes().to_vec();
+		log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
         Ok((public_key, secret_key))
 	}
@@ -68,12 +77,14 @@ impl KyberKeyFunctions for KeyControKyber768 {
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
 	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber768::*;
+		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
 		let pk = PublicKey::from_bytes(&public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
 		let ciphertext = ct.as_bytes().to_vec();
 		let shared_secret = ss.as_bytes().to_vec();
+		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
 		Ok((shared_secret, ciphertext))
 	}
@@ -81,11 +92,13 @@ impl KyberKeyFunctions for KeyControKyber768 {
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
 	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
 		use pqcrypto_kyber::kyber768::*;
-		
+		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+
         let ct = Ciphertext::from_bytes(&cipher).unwrap();        
         let sk = SecretKey::from_bytes(&sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
+		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
 		Ok(shared_secret)
 	}
@@ -97,10 +110,12 @@ impl KyberKeyFunctions for KeyControKyber512 {
     /// Generates a public and secret key pair using the Kyber512 algorithm.
 	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber512::*;
+		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_vec();
         let secret_key = sk.as_bytes().to_vec();
+        log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
         Ok((public_key, secret_key))
 	}
@@ -108,12 +123,14 @@ impl KyberKeyFunctions for KeyControKyber512 {
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
 	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
 		use pqcrypto_kyber::kyber512::*;
+		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
 		let pk = PublicKey::from_bytes(&public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
 		let ciphertext = ct.as_bytes().to_vec();
 		let shared_secret = ss.as_bytes().to_vec();
+		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
 		Ok((shared_secret, ciphertext))
 	}
@@ -121,11 +138,13 @@ impl KyberKeyFunctions for KeyControKyber512 {
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
 	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
 		use pqcrypto_kyber::kyber512::*;
+		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 		
         let ct = Ciphertext::from_bytes(&cipher).unwrap();        
         let sk = SecretKey::from_bytes(&sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
+		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
 		Ok(shared_secret)
 	}

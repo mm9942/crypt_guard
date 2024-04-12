@@ -138,3 +138,13 @@ pub struct CryptographicInformation {
     pub safe: bool,
     pub location: Option<FileMetadata>,
 }
+
+impl fmt::Display for CryptographicInformation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Cryptographic Information:\n\
+                   -\tMetadata:\t\t{}\n\
+                   -\tContent Length:\t{} bytes\n",
+                   self.metadata,
+                   self.content.len())
+    }
+}
