@@ -86,7 +86,7 @@ impl CipherAES {
 	        self.infos.content = fs::read(self.infos.location()?).unwrap();
 	    }
         let encrypted_data = self.encrypt_aes()?;
-    	println!("Encrypted Data: {:?}", encrypted_data);
+    	// println!("Encrypted Data: {:?}", encrypted_data);
 
         let mut passphrase = self.infos.passphrase()?.to_vec();
         let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
@@ -160,7 +160,7 @@ impl CipherAES {
 
 	    let encrypted_data_with_hmac = self.infos.content()?.to_vec();
         let passphrase = self.infos.passphrase()?.to_vec();
-        println!("Data Length: {}", encrypted_data_with_hmac.len());
+        // println!("Data Length: {}", encrypted_data_with_hmac.len());
 
         let mut verifier = Sign::new(encrypted_data_with_hmac, passphrase, Operation::Verify, SignType::Sha512);
         let verified_data = verifier.hmac();
@@ -172,7 +172,7 @@ impl CipherAES {
         	let _ = self.infos.set_data(&data)?;
         	let _ = self.infos.safe_file()?;
         }
-        println!("Decrypted Data: {:?}", data);
+        // println!("Decrypted Data: {:?}", data);
         Ok(data)
     }
 
@@ -219,7 +219,7 @@ impl CryptographicFunctions for CipherAES {
     fn encrypt(&mut self, public_key: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let (sharedsecret, ciphertext) = key.encap(&public_key)?;
-        println!("Shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
+        // println!("Shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
         let _ = self.set_shared_secret(sharedsecret);
 
         Ok((self.encryption()?, ciphertext))
@@ -236,7 +236,7 @@ impl CryptographicFunctions for CipherAES {
     fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
         let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
-        println!("shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
+        // println!("shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
         let _ = self.set_shared_secret(sharedsecret);
 
         Ok(self.decryption()?)
