@@ -5,11 +5,11 @@
 [![Documentation][doc-badge]][doc-url]
 [![GitHub Library][lib-badge]][lib-link]
 
-[crates-badge]: https://img.shields.io/badge/crates.io-v1.1-blue.svg?style=for-the-badge
+[crates-badge]: https://img.shields.io/badge/crates.io-v1.2-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
 [mit-url]: https://github.com/mm9942/CryptGuardLib/blob/main/LICENSE
-[doc-badge]: https://img.shields.io/badge/docs-v1.1-yellow.svg?style=for-the-badge
+[doc-badge]: https://img.shields.io/badge/docs-v1.2-yellow.svg?style=for-the-badge
 [doc-url]: https://docs.rs/crypt_guard/
 [lib-badge]: https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge
 [lib-link]: https://github.com/mm9942/CryptGuardLib
