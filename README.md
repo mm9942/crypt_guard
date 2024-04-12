@@ -44,17 +44,7 @@ Our library is undergoing a syntax overhaul to enhance detail and clarity, addre
 
 ### Current Release
 
-The present version, **1.1.8**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.1 or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512.
-
-### Future Release
-
-A forthcoming update will introduce other bit sizes for Falcon and Dilithium. It will also introduce logging capabilities, not logging keys or original data, but rather information about which encryption algorithm (AES or XChaCha20) was used, whether it was a File or a Message, as well as the time it was used. Stay tuned for its release!
-
-## Important Considerations
-
-### Transition to the New Version
-
-For those considering the transition to the updated version upon its release, familiarizing yourself with the current documentation and examples is recommended. This preparation will facilitate a smoother adaptation to the new syntax and features. The next upcoming versions will gradually change the syntax and often implement things you don't need to use in the next version anymore, but these structs and methods don't cease to exist; rather, they are now automatically implemented for easier usage. If you want to use them, don't hesitate to do so!
+The present version, **1.2**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
 
 ## Usage Examples
 
