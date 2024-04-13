@@ -1,6 +1,6 @@
 [package]
 name = "crypt_guard"
-version = "1.2.1"
+version = "1.2.2"
 edition = "2021"
 description = "CryptGuardLib is a comprehensive Rust library designed for strong encryption and decryption, incorporating post-quantum cryptography to safeguard against quantum threats. It's geared towards developers who need to embed advanced cryptographic capabilities in their Rust applications."
 license = "MIT"
