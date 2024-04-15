@@ -26,7 +26,7 @@ pub use crate::{
         *,
         kyber::{
             *,
-            KeyKyber::{self, *},
+            KeyControler::{self, *},
         },
     },
     cryptography::{

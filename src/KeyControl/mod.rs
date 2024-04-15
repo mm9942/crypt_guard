@@ -76,7 +76,7 @@ impl FileTypes {
         Self::PublicKey
     }
     /// Represents a file containing a secret (private) key.
-    pub fn Secret_key() -> Self {
+    pub fn secret_key() -> Self {
         Self::SecretKey
     }
     /// Represents a file containing ciphertext.

@@ -123,7 +123,7 @@ fn test_key_control_safe_functionality() -> Result<(), Box<dyn std::error::Error
     assert_eq!(secret_key, seck?, "Secret keys do not match");
     assert_eq!(ciphertext, cipher?, "Ciphertexts do not match");
 
-    fs::remove_dir_all("./key")?;
+    let _ = fs::remove_dir_all("./key")?;
     Ok(())
 }
 
@@ -155,6 +155,6 @@ fn test_key() {
     assert_eq!(secret_key2, secret_key);
 
 
-    fs::remove_file(Path::new("key.pub"));
-    fs::remove_file(Path::new("key.sec"));
+    let _ = fs::remove_file(Path::new("key.pub"));
+    let _ = fs::remove_file(Path::new("key.sec"));
 }

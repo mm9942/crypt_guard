@@ -3,7 +3,7 @@ use crate::{cryptography::*, error::CryptError, hmac_sign::*};
 pub mod KDF;
 /// Functions for usage of kyber for key generation
 pub mod kyber;
-pub use kyber::KeyKyber::*;
+pub use kyber::KeyControler::*;
 
 /// The `cipher_aes` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption and decryption, providing a robust symmetric key cryptography solution.
 pub mod cipher_aes; 

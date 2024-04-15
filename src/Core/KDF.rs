@@ -12,6 +12,11 @@ use std::{
 };
 use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage, DetachedSignature};
 use crate::{
+    FileMetadata,
+    FileTypes,
+    FileState,
+    KeyTypes,
+    Key,
     error::SigningErr,
     log_activity,
     LOGGER,
@@ -41,6 +46,9 @@ pub trait SignatureFunctions {
 pub trait KeyOperations {
     /// Generates a public and secret key pair.
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr>;
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr>;
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr>;
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr>;
 }
 
 /// Implements Falcon1024 algorithm operations.
@@ -50,6 +58,25 @@ impl KeyOperations for Falcon1024 {
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = falcon1024::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
+    }
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Falcon1024/key.pub"), FileTypes::public_key(), FileState::not_encrypted());
+        let _ = file.save(public_key);
+        Ok(())
+    }
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Falcon1024/key.sec"), FileTypes::secret_key(), FileState::not_encrypted());
+        let _ = file.save(secret_key);
+        Ok(())
+    }
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+        let file = match path.extension().and_then(|s| s.to_str()) {
+            Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
+            Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
+            _ => FileMetadata::new(),
+        };
+        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        Ok(key)
     }
 }
 impl SignatureFunctions for Falcon1024 {
@@ -102,6 +129,25 @@ impl KeyOperations for Falcon512 {
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = falcon512::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
+    }
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Falcon512/key.pub"), FileTypes::public_key(), FileState::not_encrypted());
+        let _ = file.save(public_key);
+        Ok(())
+    }
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Falcon512/key.sec"), FileTypes::secret_key(), FileState::not_encrypted());
+        let _ = file.save(secret_key);
+        Ok(())
+    }
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+        let file = match path.extension().and_then(|s| s.to_str()) {
+            Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
+            Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
+            _ => FileMetadata::new(),
+        };
+        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        Ok(key)
     }
 }
 impl SignatureFunctions for Falcon512 {
@@ -156,6 +202,26 @@ impl KeyOperations for Dilithium2 {
         let (public_key, secret_key) = dilithium2::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
+
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium2/key.pub"), FileTypes::public_key(), FileState::not_encrypted());
+        let _ = file.save(public_key);
+        Ok(())
+    }
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium2/key.sec"), FileTypes::secret_key(), FileState::not_encrypted());
+        let _ = file.save(secret_key);
+        Ok(())
+    }
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+        let file = match path.extension().and_then(|s| s.to_str()) {
+            Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
+            Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
+            _ => FileMetadata::new(),
+        };
+        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        Ok(key)
+    }
 }
 impl SignatureFunctions for Dilithium2 {
     /// Signs a given message with the provided key.
@@ -208,6 +274,25 @@ impl KeyOperations for Dilithium3 {
         let (public_key, secret_key) = dilithium3::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
     }
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium3/key.pub"), FileTypes::public_key(), FileState::not_encrypted());
+        let _ = file.save(public_key);
+        Ok(())
+    }
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium3/key.sec"), FileTypes::secret_key(), FileState::not_encrypted());
+        let _ = file.save(secret_key);
+        Ok(())
+    }
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+        let file = match path.extension().and_then(|s| s.to_str()) {
+            Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
+            Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
+            _ => FileMetadata::new(),
+        };
+        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        Ok(key)
+    }
 }
 impl SignatureFunctions for Dilithium3 {
     /// Signs a given message with the provided key.
@@ -228,7 +313,6 @@ impl SignatureFunctions for Dilithium3 {
     }
     /// Opens (or verifies) a signed message with the provided key.
     fn open_message(signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        
         log_activity!("Starting with signing of the message.", "\nUsed key: Dilithium3");
         let key = dilithium3::PublicKey::from_bytes(&key).unwrap();
         let signed_message = dilithium3::SignedMessage::from_bytes(&signed_data).unwrap();
@@ -261,6 +345,25 @@ impl KeyOperations for Dilithium5 {
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
         let (public_key, secret_key) = dilithium5::keypair();
         Ok((public_key.as_bytes().to_owned(), secret_key.as_bytes().to_owned()))
+    }
+    fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium5/key.pub"), FileTypes::public_key(), FileState::not_encrypted());
+        let _ = file.save(public_key);
+        Ok(())
+    }
+    fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        let file = FileMetadata::from(PathBuf::from("./Dilithium5/key.sec"), FileTypes::secret_key(), FileState::not_encrypted());
+        let _ = file.save(secret_key);
+        Ok(())
+    }
+    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+        let file = match path.extension().and_then(|s| s.to_str()) {
+            Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
+            Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
+            _ => FileMetadata::new(),
+        };
+        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        Ok(key)
     }
 }
 impl SignatureFunctions for Dilithium5 {

@@ -3,7 +3,8 @@ use std::{
     marker::PhantomData, 
     result::Result, 
     io::{Read, Write}, 
-    fs::{self, OpenOptions}
+    fs::{self, OpenOptions},
+    sync::Arc
 };
 use chrono::{Local, NaiveDateTime};
 use crate::error::CryptError;
@@ -67,7 +68,7 @@ impl Log {
 
             let log_dir = parent_dir.join(file_stem);
             if !log_dir.exists() {
-                fs::create_dir_all(&log_dir).map_err(|e| CryptError::IOError(e.to_string()))?;
+                fs::create_dir_all(&log_dir).map_err(|e| CryptError::IOError(Arc::new(e)))?;
             }
 
             let mut file_path = log_dir.join(format!("{}.{}", file_stem, extension));

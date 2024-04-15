@@ -18,3 +18,10 @@ mod SignatureTests;
 #[cfg(test)]
 mod LoggingTests;
 
+#[cfg(test)]
+#[test]
+fn end() {
+	use std::fs;
+	let _ = fs::remove_file("crypt_tests.log");
+	let _ = fs::remove_dir_all("./crypt_tests");
+}

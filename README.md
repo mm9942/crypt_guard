@@ -32,7 +32,7 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Current Release
 
-The present version, **1.2.2**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+The present version, **1.2.3**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
 
 - **Simplified Syntax**: We've re-engineered the use of Dilithium and Falcon, adopting a straightforward, modular, and flexible approach akin to our encryption and decryption syntax. This enhancement aims to streamline operations for developers.
 
@@ -84,13 +84,18 @@ println!("{}", decrypted_text);
 
 ### New signature syntax for dilithium and falcon
 
-#### Signing and opening with Falcon
+#### Signing and opening from "messages" with Falcon
 
 ```rust
 use crypt_guard::KDF::*;
 
 // Create a new keypair
 let (public_key, secret_key) = Falcon1024::keypair();
+
+// Save the keys, in the case of Falcon1024, they are saved in the folder ./Falcon1024/key(.pub & .sec)
+let _ = Falcon1024::save_public(&public_key);
+let _ = Falcon1024::save_secret(&secret_key);
+
 let data = b"Hello, world!".to_vec();
 let sign = Signature::<Falcon1024, Message>::new();
 // Sign the message
@@ -100,13 +105,15 @@ let signed_message = sign.signature(data.clone(), secret_key);
 let opened_message = sign.open(signed_message, public_key);
 ```
 
-#### Signing and verifying detached with Dilithium
+#### Creating and verifying detached signature with Dilithium 5
 
 ```rust
 use crypt_guard::KDF::*;
 
-// Create a new keypair
-let (public_key, secret_key) = Dilithium5::keypair();
+// Load the public and secret dilithium 5 key
+let public_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.pub"))?;
+let secret_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.sec"))?;
+
 let data = b"Hello, world!".to_vec();
 
 let sign = Signature::<Dilithium5, Detached>::new();

@@ -1,8 +1,8 @@
-use std::{fmt::{self, Display, Formatter}, error::Error, io, };
+use std::{fmt::{self, Display, Formatter}, error::Error, io, sync::Arc};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum CryptError {
-    IOError(String),
+    IOError(Arc<io::Error>),
     MessageExtractionError,
     InvalidMessageFormat,
     HexError(hex::FromHexError),
@@ -37,7 +37,7 @@ pub enum CryptError {
 impl fmt::Display for CryptError {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
        match self {
-            CryptError::IOError(message) => write!(f, "IO error: {:?}", message),
+            CryptError::IOError(message) => write!(f, "IO error: {}", message),
             CryptError::MessageExtractionError => write!(f, "Error extracting message"),
             CryptError::InvalidMessageFormat => write!(f, "Invalid message format"),
             CryptError::HexError(err) => write!(f, "Hex error: {}", err),
@@ -71,6 +71,16 @@ impl fmt::Display for CryptError {
     }
 }
 
+impl Clone for CryptError {
+    fn clone(&self) -> Self {
+        match self {
+            CryptError::IOError(e) => CryptError::IOError(Arc::clone(e)),
+            _ => todo!(),
+        }
+    }
+}
+
+
 impl CryptError {
     // `new` method for creating a CryptError with a custom message
     pub fn new(msg: &str) -> Self {
@@ -78,12 +88,9 @@ impl CryptError {
     }
 }
 
-impl From<std::io::Error> for CryptError {
-    fn from(error: std::io::Error) -> Self {
-        // Here, you might want to match on the error kind to provide more specific error variants if applicable
-        // For a simple catch-all conversion, you can use a general error variant from your CryptError enum
-        // Assume CryptError has a variant like IOError(String) for holding io::Error descriptions
-        CryptError::IOError(error.to_string())
+impl From<io::Error> for CryptError {
+    fn from(error: io::Error) -> Self {
+        CryptError::IOError(Arc::new(error))
     }
 }
 
@@ -104,8 +111,19 @@ pub enum SigningErr {
     SignatureMissing,
     FileCreationFailed,
     FileWriteFailed,
+    UnsupportedFileType(String),
+    CustomError(String),
     IOError(io::Error),
 }
+
+
+impl SigningErr {
+    // `new` method for creating a CryptError with a custom message
+    pub fn new(msg: &str) -> Self {
+        SigningErr::CustomError(msg.to_owned())
+    }
+}
+
 
 impl Display for SigningErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -117,6 +135,8 @@ impl Display for SigningErr {
             SigningErr::SignatureMissing => write!(f, "Signature is missing"),
             SigningErr::FileCreationFailed => write!(f, "Failed to create file"),
             SigningErr::FileWriteFailed => write!(f, "Failed to write to file"),
+            SigningErr::UnsupportedFileType(ext) => write!(f, "Unsupported file extension: .{}", ext),
+            SigningErr::CustomError(message) => write!(f, "{}", message),
             SigningErr::IOError(err) => write!(f, "IOError occurred: {}", err),
         }
     }

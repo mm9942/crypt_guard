@@ -1,8 +1,9 @@
 /// Kyber key functionalitys
-pub mod KeyKyber;
+pub mod KeyControler;
 mod kyber_crypto;
 /// Cryptographic kyber functionalitys
 pub use kyber_crypto::*;
+use KeyControler::*;
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 use crate::{
 	*,
