@@ -3,8 +3,13 @@
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Documentation][doc-badge]][doc-url]
+[![Hashnode Blog][blog-badge]][blog-url]
 [![GitHub Library][lib-badge]][lib-link]
 
+[blog-badge]:
+https://img.shields.io/badge/blog-hashnode-lightblue.svg?style=for-the-badge
+[blog-url]:
+https://blog.mm29942.com/
 [crates-badge]: https://img.shields.io/badge/crates.io-v1.2-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
