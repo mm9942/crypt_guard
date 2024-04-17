@@ -1,9 +1,13 @@
+use super::*;
 use crate::{
     *, 
     error::CryptError, 
-    hmac_sign::*, 
+    cryptography::{
+        CryptographicInformation,
+        CipherAES,
+        hmac_sign::*, 
+    },
     Core::{
-        CryptographicFunctions, 
         KeyControl, 
         KeyControKyber512, 
         KeyControKyber768, 
@@ -166,7 +170,7 @@ impl CipherAES {
         let verified_data = verifier.hmac();
 
         self.infos.set_data(&verified_data)?;
-        //println!("{:?}", verified_data);
+        // println!("{:?}", verified_data);
         let data = self.decrypt_aes()?;
         if self.infos.safe()? {
         	let _ = self.infos.set_data(&data)?;

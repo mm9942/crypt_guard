@@ -59,7 +59,7 @@ impl Log {
     /// Create a new splitted log file
     pub fn write_log_file(&mut self) -> Result<(), CryptError> {
         if !self.activated {
-            return Err(CryptError::CustomError("Logger is not activated.".to_string()));
+            return Ok(());
         }
         if let Some(ref location) = self.location {
             let parent_dir = location.parent().unwrap_or_else(|| Path::new(""));

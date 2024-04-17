@@ -70,9 +70,9 @@ impl Sign {
                     .expect("HMAC can take key of any size");
                 mac.update(&data);
                 let hmac = mac.finalize().into_bytes().to_vec();
-                println!("HMAC: {:?}", hmac);
+                // println!("HMAC: {:?}", hmac);
                 let concat_data = [&self.data.data, hmac.as_slice()].concat();
-                println!("Concated data: {:?}", concat_data);
+                // println!("Concated data: {:?}", concat_data);
                 concat_data
             },
             _ => vec![],
@@ -130,7 +130,7 @@ impl Sign {
         };
 
         if verification_success {
-            println!("splittet data: {:?}", data);
+            // println!("splittet data: {:?}", data);
             Ok(data.to_owned())
         } else {
             Err("HMAC verification failed")

@@ -37,7 +37,43 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Current Release
 
-The present version, **1.2.3**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+The present version, **1.2.6**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+
+### Simplifying Encryption and Decryption with Macros
+
+We've introduced new macros to make the encryption and decryption processes more straightforward since we only separate into encryption of bytes and automated encryption of files, thus providing an alternative to the need of manually invoking specific functions such as `encrypt_msg`, `encrypt_file`, `encrypt_data`, and their decryption equivalents. Here’s a guide on how to effectively utilize these macros:
+
+- **Encryption Macro**: Use the `encrypt!` macro for seamless encryption tasks. Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (as a `Vec<u8>`), and a passphrase (as a string slice `&str`).
+
+  **Syntax**:
+  ```rust
+  encrypt!(kyber_encryption_instance, data: Vec<u8>, passphrase)
+  ```
+
+- **Decryption Macro**: The `decrypt!` macro simplifies the decryption process. Supply it with an instance of Kyber configured for decryption, the encrypted data (as `Vec<u8>`), the passphrase, and the ciphertext.
+
+  **Syntax**:
+  ```rust
+  decrypt!(kyber_decryption_instance, data: Vec<u8>, passphrase, cipher)
+  ```
+
+- **File Encryption Macro**: We've also implemented a macro specifically for file encryption, `encrypt_file!()`. This macro is similar to `encrypt!` but takes a `PathBuf` for file paths instead of `Vec<u8>`.
+
+  **Syntax**:
+  ```rust
+  encrypt_file!(kyber_encryption_instance, data: PathBuf, passphrase)
+  ```
+
+- **File Decryption Macro**: Corresponding to the file encryption macro, the `decrypt_file!()` macro is designed for file decryption, accepting a `PathBuf` instead of `Vec<u8>`.
+
+  **Syntax**:
+  ```rust
+  decrypt_file!(kyber_decryption_instance, data: PathBuf, passphrase, cipher)
+  ```
+
+These macros are intended to make your cryptographic operations more intuitive and less prone to errors, by removing the complexities associated with selecting the appropriate function for different data types. Note that with these macros, it is necessary to convert messages into `Vec<u8>` before encryption.
+
+#### Other Changes
 
 - **Simplified Syntax**: We've re-engineered the use of Dilithium and Falcon, adopting a straightforward, modular, and flexible approach akin to our encryption and decryption syntax. This enhancement aims to streamline operations for developers.
 
@@ -48,6 +84,92 @@ The present version, **1.2.3**, emphasizes detailed cryptographic operations. Th
 - **Logging Functionality**: CryptGuard now includes a new logging feature designed to enhance operational transparency and assist in debugging processes. This logging functionality meticulously records every significant step in the cryptographic process without compromising security. Specifically, it logs the initiation and completion of key generation, message encryption, and decryption processes, including the cryptographic algorithm used (e.g., AES, XChaCha20) and the key encapsulation mechanism (e.g., Kyber1024). Importantly, to uphold the highest standards of security and privacy, CryptGuard's logging mechanism is carefully designed to exclude sensitive information such as encryption keys, unencrypted data, file paths, or any personally identifiable information. This ensures that while users benefit from detailed logs that can aid in troubleshooting and verifying cryptographic operations, there is no risk of exposing sensitive data.
 
 ## Usage Examples
+
+### New encryption and decryption macros
+
+```rust
+use crypt_guard::{
+    encrypt,
+    decrypt,
+    KyberFunctions,
+    KeyControKyber1024,
+    KyberKeyFunctions,
+    error::*,
+    Encryption, 
+    Decryption, 
+    Kyber1024, 
+    Message, 
+    AES,
+    Kyber,
+};
+
+// Since we only allow encryption/ decryption of Vec<u8> or files through selecting a path as &str, please use 
+let message = "Hey, how are you doing?".as_bytes().to_owned();
+let passphrase = "Test Passphrase";
+
+// Generate key pair
+let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+// Instantiate Kyber for encryption with Kyber1024
+let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+
+// Encrypt message with new encryption macro
+// Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and boolean checking if it is a file
+let (encrypt_message, cipher) = encrypt!(encryptor, message, passphrase)?;
+
+// Instantiate Kyber for decryption with Kyber1024
+let mut decryptor = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None)?;
+
+// Decrypt message with new decryption macro
+// Provide it with an instance of Kyber configured for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and boolean checking if it is a file
+let decrypt_message = decrypt!(decryptor, encrypt_message, passphrase, cipher);
+println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
+Ok(())
+
+```
+
+#### Usage of the new macros with a file
+
+```rust
+use crypt_guard::{
+    encrypt,
+    decrypt,
+    KyberFunctions,
+    KeyControKyber1024,
+    KyberKeyFunctions,
+    error::*,
+    Encryption, 
+    Decryption, 
+    Kyber1024, 
+    Message, 
+    AES,
+    Kyber,
+};
+
+// Since we only allow encryption/ decryption of Vec<u8> or files through selecting a path as &str
+let path = "./message.txt";
+let passphrase = "Test Passphrase";
+
+// Generate key pair
+let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+// Instantiate Kyber for encryption with Kyber1024
+let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+
+// Encrypt message with new encryption macro
+// Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and boolean checking if it is a file
+let (encrypt_message, cipher) = encrypt_file!(encryptor, PathBuf::from(&path), passphrase)?;
+
+// Instantiate Kyber for decryption with Kyber1024
+let mut decryptor = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None)?;
+
+// Decrypt message with new decryption macro
+// Provide it with an instance of Kyber configured for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and boolean checking if it is a file
+let decrypt_message = decrypt_file!(decryptor, PathBuf::from(format!("{}.enc", path)), passphrase, cipher);
+println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
+Ok(())
+
+```
 
 ### The new Logging feature
 
@@ -71,13 +193,13 @@ let passphrase = "Test Passphrase";
 let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
 // Instantiate Kyber for encryption with Kyber1024
-let mut encryptor = Kyber::<Encryption, Kyber1024, File, AES>::new(public_key.clone(), None)?;
+let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.clone(), None)?;
 
 // Encrypt message
 let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
 
 // Instantiate Kyber for decryption with Kyber1024
-let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
 
 // Decrypt message
 let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
@@ -150,7 +272,7 @@ keycontrol.set_secret_key(secret_key.clone()).unwrap();
 keycontrol.save(KeyTypes::SecretKey, "./key".into()).unwrap();
 ```
 
-### Encryption of a File using AES
+### Encryption of a Message using AES
 
 ```rust
 let message = "Hey, how are you doing?";
@@ -168,6 +290,24 @@ key_control.set_ciphertext(cipher.clone()).unwrap();
 key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
 ```
 
+### Encryption of a Data using AES
+
+```rust
+let message = "Hey, how are you doing?".as_bytes().to_owned();
+let passphrase = "Test Passphrase";
+
+// Instantiate Kyber for encryption of a message with Kyber1024 and AES
+// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
+let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None)?;
+
+// Encrypt message
+let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), passphrase.clone())?;
+
+// Save the ciphertext for decryption in folder ./key
+key_control.set_ciphertext(cipher.clone()).unwrap();
+key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
+```
+
 ### Decryption of a File using AES
 
 ```rust
@@ -176,7 +316,7 @@ let secret_key = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_k
 
 // Instantiate Kyber for decryption of a message with Kyber1024 and AES
 // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut decryptor = Kyber::<Decryption, Kyber1024, File, AES>::new(secret_key, None)?;
+let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
 
 // Decrypt message
 let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
@@ -205,7 +345,7 @@ let (public_key, secret_key) = KeyControKyber768::keypair().expect("Failed to ge
 
 // Instantiate Kyber for encryption of a file with Kyber768 and XChaCha20
 // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
+let mut encryptor = Kyber::<Encryption, Kyber768, Files, XChaCha20>::new(public_key.clone(), None)?;
 
 // Encrypt message
 let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
@@ -216,7 +356,7 @@ fs::remove_file(enc_path.clone());
 
 // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
 // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
+let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
 
 // Decrypt message
 let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;

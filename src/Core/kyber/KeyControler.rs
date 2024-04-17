@@ -11,6 +11,7 @@ pub trait KyberKeyFunctions {
     /// Decapsulates a secret using a secret key and a ciphertext.
     fn decap(secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError>;
 }
+
 /// Implementation for Kyber 1024 variant.
 pub struct KeyControKyber1024;
 impl KyberKeyFunctions for KeyControKyber1024{

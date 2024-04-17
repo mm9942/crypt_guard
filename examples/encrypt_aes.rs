@@ -1,4 +1,4 @@
-//use crypt_guard::KeyKyber::KeyControl;
+use crypt_guard::KeyControler::KeyControl;
 use crypt_guard::{*, error::*};
 use std::{
     fs::{self, File}, 
@@ -13,6 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let message = "Hey, how are you doing?";
     let passphrase = "Test Passphrase";
 
+    let mut key_control = KeyControl::<KeyControKyber1024>::new();
+
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
@@ -22,6 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Encrypt message
     let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
+
+    key_control.set_ciphertext(cipher.clone()).unwrap();
+    key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
 
     // Instantiate Kyber for decryption of a message with Kyber1024 and AES
     // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
