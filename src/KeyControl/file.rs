@@ -1,6 +1,6 @@
 use std::{
-	path::{Path, PathBuf},
-	io::{Seek, Write},
+	path::{PathBuf},
+	io::{Write},
 	fs::{self, File},
 };
 use crate::error::CryptError;

@@ -1,9 +1,9 @@
 use super::*;
-use crate::error::SigningErr;
+
 
 use hmac::{Hmac, Mac};
 use sha2::{Sha512, Sha256};
-use crate::{cryptography::*, error::*};
+
 
 /// Represents a cryptographic signing operation, including data, passphrase, operational status,
 /// hash type, signature length, and verification status.
@@ -53,7 +53,7 @@ impl Sign {
     /// # Returns
     /// Concatenated original data and its HMAC as a `Vec<u8>`.
     pub fn generate_hmac(&self) -> Vec<u8> {
-        let mut data = &self.data.data;
+        let data = &self.data.data;
         match &self.hash_type {
             SignType::Sha512 => {
                 let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(&self.data.passphrase)

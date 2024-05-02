@@ -1,26 +1,22 @@
-use hmac::{Hmac, Mac};
-use sha2::{Sha512, Sha256};
+use hmac::{Mac};
+
 use pqcrypto_falcon::{falcon1024, falcon512};
 use pqcrypto_dilithium::{dilithium2, dilithium3, dilithium5};
 use std::{
-    path::{PathBuf, Path}, 
-    collections::HashMap,
+    path::{PathBuf},
     marker::PhantomData, 
-    result::Result, 
-    io::{Read, Write}, 
-    fs,
+    result::Result,
 };
 use pqcrypto_traits::sign::{PublicKey, SecretKey, SignedMessage, DetachedSignature};
 use crate::{
     FileMetadata,
     FileTypes,
     FileState,
-    KeyTypes,
-    Key,
     error::SigningErr,
-    log_activity,
+    //log_activity,
     LOGGER,
 };
+use crate::{log_activity};
 
 /// Represents the type of key used in cryptographic operations.
 pub enum KeyVariant {
@@ -75,7 +71,7 @@ impl KeyOperations for Falcon1024 {
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
             _ => FileMetadata::new(),
         };
-        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
     }
 }
@@ -146,7 +142,7 @@ impl KeyOperations for Falcon512 {
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
             _ => FileMetadata::new(),
         };
-        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
     }
 }
@@ -219,7 +215,7 @@ impl KeyOperations for Dilithium2 {
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
             _ => FileMetadata::new(),
         };
-        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
     }
 }
@@ -290,7 +286,7 @@ impl KeyOperations for Dilithium3 {
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
             _ => FileMetadata::new(),
         };
-        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
     }
 }
@@ -362,7 +358,7 @@ impl KeyOperations for Dilithium5 {
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
             _ => FileMetadata::new(),
         };
-        let key = file.load().map_err(|e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
+        let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
     }
 }

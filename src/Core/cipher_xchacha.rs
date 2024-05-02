@@ -1,35 +1,27 @@
 use super::*;
+
+//use crypt_guard_proc::{*, log_activity, write_log};
 use crate::{
     *,
     cryptography::{
         CryptographicInformation,
-        CipherChaCha,
-        hmac_sign::*, 
+        CipherChaCha, 
     },
     error::*, 
     Core::{
-        KeyControl, 
-        KeyControKyber512, 
-        KeyControKyber768, 
-        KeyControKyber1024, 
-        KyberKeyFunctions, 
-        kyber::KyberSizeVariant,
+        KyberKeyFunctions,
         KeyControlVariant,
-    }
+    },
 };
-use pqcrypto_traits::kem::{PublicKey as PublicKeyKem, SecretKey as SecKeyKem, SharedSecret as SharedSecretKem, Ciphertext as CiphertextKem};
-use pqcrypto_kyber::kyber1024;
-use pqcrypto_kyber::kyber1024::*;
+
+
+
 use chacha20::{
     XChaCha20, 
-    cipher::{KeyIvInit, StreamCipher, StreamCipherSeek, generic_array::GenericArray}
+    cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray}
 };
 use std::{
-    iter::repeat,
-    path::{PathBuf, Path}, 
-    marker::PhantomData, 
     result::Result, 
-    io::{Read, Write}, 
     fs
 };
 use rand::{RngCore, rngs::OsRng};
@@ -72,7 +64,7 @@ impl CipherChaCha {
     /// A result containing the data as a vector of bytes (`Vec<u8>`) or a `CryptError`.
 	pub fn get_data(&self) -> Result<Vec<u8>, CryptError> {
 		let data = &self.infos.content()?;
-		let mut data = data.to_vec();
+		let data = data.to_vec();
 
         Ok(data)
     }
@@ -193,7 +185,7 @@ impl CryptographicFunctions for CipherChaCha {
     /// A result containing a tuple of the encrypted data (`Vec<u8>`) and the key used, or a `CryptError`.
     /// Additionally, prints a message to stdout with the nonce for user reference.
     fn encrypt(&mut self, public_key: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-        let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
+        let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let (sharedsecret, ciphertext) = key.encap(&public_key)?;
         let _ = self.set_shared_secret(sharedsecret);
         let (encrypted_data, nonce) = self.cryptography()?;
@@ -210,10 +202,10 @@ impl CryptographicFunctions for CipherChaCha {
     /// # Returns
     /// A result containing the decrypted data (`Vec<u8>`), or a `CryptError`.
     fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
-        let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
+        let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);
-        let (decrypted_data, nonce) = self.cryptography()?;
+        let (decrypted_data, _nonce) = self.cryptography()?;
         Ok(decrypted_data)
     }
 }

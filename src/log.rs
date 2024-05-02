@@ -1,19 +1,33 @@
 use std::{
     path::{PathBuf, Path}, 
-    marker::PhantomData, 
     result::Result, 
-    io::{Read, Write}, 
+    io::{Write}, 
     fs::{self, OpenOptions},
     sync::Arc
 };
-use chrono::{Local, NaiveDateTime};
+use chrono::{Local};
 use crate::error::CryptError;
+use std::sync::Mutex;
+
+lazy_static! {
+    pub static ref LOGGER: Mutex<Log> = Mutex::new(Log {
+        activated: false,
+        log: String::new(),
+        location: None,
+    });
+}
 
 /// Struct used for logging 
 pub struct Log {
     pub activated: bool,
     pub log: String,
     pub location: Option<PathBuf>,
+}
+
+pub fn initialize_logger(log_file: PathBuf) {
+    let mut logger = LOGGER.lock().unwrap();
+    logger.activated = true;
+    logger.location = Some(log_file);
 }
 
 impl Log {

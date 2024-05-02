@@ -6,9 +6,9 @@ mod cryptographic;
 
 //pub use cipher_aes::*;
 //pub use cipher_xchacha::*;
-pub use cryptographic::*;
+
 use std::path::PathBuf;
-use crate::{error::CryptError, FileMetadata, Key};
+use crate::{error::CryptError, FileMetadata};
 use std::fmt;
 
 /// Represents the AES cipher for encryption and decryption processes.

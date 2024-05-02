@@ -36,41 +36,45 @@
 //! The encryption functions `encrypt_msg`, `encrypt_data`, and `encrypt_file` are specifically tailored for different types of data. Using distinct functions ensures that the correct methods and optimizations are applied depending on whether you're encrypting raw bytes, structured data, or files. Each encryption function requires a new instance of the Kyber object, tailored for the type of encryption (Message, Data, Files), to guarantee that the cryptographic parameters are initialized correctly and securely for each session.
 //!
 //! ```rust
-//! use crypt_guard::*;
+//! use crypt_guard::{*, error::*};
+//! use std::{
+//!     path::{Path, PathBuf},
+//!     fs,
+//! };
 //!
 //! let message = "Hey, how are you doing?";
 //! let passphrase = "Test Passphrase";
 //! 
-//! let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+//! let (public_key, secret_key) = KyberKeypair!(1024);
 //! 
 //! // Creating new Kyber AES message instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None).unwrap();
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None).expect("");
 //! 
 //! // Now are multiple options available:
 //! // Using the Macro
-//! let (encrypt_message, cipher) = encrypt!(encryptor, message.clone(), passphrase.clone()).unwrap();
+//! let (encrypt_message, cipher) = Encryption!(public_key.clone(), 1024, message.clone().as_bytes().to_owned(), passphrase.clone(), AES).expect("");
 //! 
 //! // Using the encrypt_ functions:
 //! 
 //! // Message:
-//! let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone()).unwrap();
+//! let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone()).expect("");
 //! 
 //! // Data:
 //! // Creating new Kyber AES data instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None).unwrap();
-//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone().as_bytes().to_owned(), passphrase.clone()).unwrap();
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None).expect("");
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone().as_bytes().to_owned(), passphrase.clone()).expect("");
 //! 
 //! // Last but not least the encryption function for files:
-//! fs::write(PathBuf::from("message.txt"), message.clone().as_bytes()).unwrap();
+//! fs::write(PathBuf::from("message.txt"), message.clone().as_bytes()).expect("");
 //! 
 //! // Creating new Kyber AES file instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.clone(), None).unwrap();
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.clone(), None).expect("");
 //! 
 //! // Encrypt file macro:
-//! let (encrypt_message, cipher) = encrypt_file!(encryptor, PathBuf::from("message.txt"), passphrase.clone()).unwrap();
+//! let (encrypt_message, cipher) = EncryptFile!(public_key.clone(), 1024, PathBuf::from("message.txt"), passphrase.clone(), AES).expect("");
 //! 
 //! // Encrypt file function:
-//! let (encrypt_message, cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).unwrap();
+//! let (encrypt_message, cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).expect("");
 //! ```
 //!
 //! #### Infos about XChaCha20 differences
@@ -78,63 +82,87 @@
 //! XChaCha20, unlike AES, requires handling of a nonce (number used once) which must be generated during encryption and subsequently used during decryption. This introduces additional steps in the cryptographic process when using XChaCha20 compared to AES, which does not explicitly require nonce management by the user.
 //!
 //! ```rust
-//! use crypt_guard::*;
+//! use crypt_guard::{*, error::*, KDF::*};
+//! use std::{
+//!     path::{Path, PathBuf},
+//!     fs,
+//! };
+//!
+//! let (public_key, secret_key) = KyberKeypair!(768);
+//!
+//! let message = "Hey, how are you doing?";
+//! let passphrase = "Test Passphrase";
+//! 
+//! fs::write(PathBuf::from("message.txt"), message.clone().as_bytes()).expect("");
 //!
 //! // You need to save the nonce when not using AES but XChaCha20 instead:
 //! // Creating new Kyber XChaCha20 file encryption instance
-//! let mut encryptor = Kyber::<Encryption, Kyber768, Files, XChaCha20>::new(public_key.clone(), None).unwrap();
+//! let mut encryptor = Kyber::<Encryption, Kyber768, Files, XChaCha20>::new(public_key.clone(), None).expect("");
 //! 
 //! // Encrypt file
-//! let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone()).unwrap();
+//! let (encrypt_message, cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).expect("");
 //!
 //! // Should be executed after encryption is already done, since doing it before that would trigger an error.
-//! let nonce = encryptor.get_nonce(); 
+//! let nonce = encryptor.get_nonce().expect("").to_string(); 
 //! 
 //! // Creating new Kyber XChaCha20 file decryption instance (this time also adding the nonce beside the key)
-//! let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key, Some(nonce?.to_string())).unwrap();
+//! let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key.clone(), Some(nonce)).expect("");
 //! 
 //! // Decrypt message
-//! let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher).unwrap();
+//! let decrypt_message = decryptor.decrypt_file(PathBuf::from("message.txt.enc"), passphrase.clone(), cipher.clone()).expect("");
 //! ```
 //!
-//! ### Decryption:
+//! ### Using Encryption and Decryption macros
 //!
-//! Decryption functions work similarly to encryption but in reverse, designed to safely convert encrypted data back into its original form. Each type of data (Message, Data, Files) requires a specific decryption function to correctly handle the format and details of the encrypted content. Like encryption, every decryption session uses a fresh Kyber object to ensure isolation between sessions, enhancing security by preventing potential leakage or reuse of cryptographic parameters.
+//! Beside the main macros encrypt, decrypt, encrypt_file, decrypt_file, I've added the Encryption and Decryption macros. Instead of linking the encryption/ decryption instance, we define the macro by using Encryption!(public_key, keysize [ 1024 | 768 | 512 ] contents_bytes_vec, passphrase_as_str, [ AES | XChaCha20 ]) and get the content and ciphertext returned, or additionally when using XChaCha20, we also get the nonce.
 //!
 //! ```rust
-//! use crypt_guard::*;
-//!
-//! // Creating new Kyber AES message instance for decryption
-//! let mut decryptor = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None).unwrap();
-//! let decrypt_message = decrypt!(decryptor, encrypt_message.clone(), passphrase.clone(), cipher).unwrap();
-//!
-//!  // Using the decrypt_ functions:
+//! use crypt_guard::{*, error::*};
+//! use std::{
+//!     fs::{self, File}, 
+//!     marker::PhantomData,
+//!     path::{PathBuf, Path},
+//!     io::{Read, Write},
 //! 
-//! // Message:
-//! let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher).unwrap();
+//! };
+//! //use crypt_guard_proc::{*, log_activity, write_log};
+//! use tempfile::{TempDir, Builder};
+//! use crypt_guard::KeyControler::KeyControl;
 //! 
-//! // Data:
-//! // Creating new Kyber AES data instance for decryption
-//! let mut decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(secret_key, None).unwrap();
-//! let decrypt_message = decryptor.decrypt_data(encrypt_message.clone(), passphrase.clone(), cipher).unwrap();
+//! //#[crypt_guard_proc]
+//! #[activate_log("log.txt")]
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let _ = initialize_logger(); 
+//!     let message = "Hey, how are you doing?";
+//!     let passphrase = "Test Passphrase";
 //! 
-//! // Last but not least the decryption function for files:
-//! let file_path = PathBuf::from("message.txt");
-//! let encrypted_file_path = PathBuf::from("message.txt.enc");
-//!
-//! // Creating new Kyber AES file instance for decryption
-//! let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None).unwrap();
+//!     let mut key_control = KeyControl::<KeyControKyber1024>::new();
+//!     let _ = log_activity!("Starting with signing of the message.", "Test");
 //! 
-//! // Decrypt file macro
-//! let decrypt_message = decrypt!(decryptor, encrypted_file_path, passphrase.clone(), cipher).unwrap();
+//!     // Generate key pair
+//!     let (public_key, secret_key) = KyberKeypair!(1024);
 //! 
-//! // Decrypt file function
-//! let decrypt_message = decryptor.decrypt_file(encrypted_file_path, passphrase.clone(), cipher).unwrap();
+//!     // Instantiate Kyber for encryption of a message with Kyber1024 and AES
+//!     // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!    
+//!     // Encrypt message
+//!     let (encrypt_message, cipher) = Encryption!(public_key.clone(), 1024, message.as_bytes().to_owned(), passphrase.clone(), AES)?;
+//! 
+//!     key_control.set_ciphertext(cipher.clone()).unwrap();
+//!     key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
+//! 
+//!     // Decrypt message
+//!     let decrypt_message = Decryption!(secret_key, 1024, encrypt_message.clone(), passphrase.clone(), cipher, AES)?;
+//! 
+//!     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
+//!     write_log!();
+//!     println!("{:?}", decrypted_text);
+//!     Ok(())
+//! }  
 //! ```
 
 #[macro_use]
 extern crate lazy_static;
-
+pub use crypt_guard_proc::*;
 
 /// Core functionalitys for control of Kyber keys as well as encryption and decryption
 mod Core;
@@ -163,49 +191,177 @@ pub use crate::{
     },
 };
 
-use KeyControl::*;
-use pqcrypto_falcon::falcon1024::{self, *};
-use pqcrypto_kyber::kyber1024::{self, *};
+
+
+
 use std::{
-    error::Error,
-    fmt::{self, *},
-    iter::repeat,
-    path::{PathBuf, Path}, 
-    marker::PhantomData, 
-    result::Result, 
-    io::{Read, Write}, 
-    sync::Mutex,
-    fs
+    fmt::{*}
 };
-
-
-lazy_static! {
-    static ref LOGGER: Mutex<Log> = Mutex::new(Log {
-        activated: false,
-        log: String::new(),
-        location: None,
-    });
-}
+use hex;
 
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile
-pub fn activate_log<P: AsRef<Path>>(log_file: P) {
+/*pub fn activate_log<P: AsRef<Path>>(log_file: P) {
     let mut logger = LOGGER.lock().unwrap();
     logger.activated = true;
     logger.location = Some(log_file.as_ref().to_path_buf());
+}*/
+
+/// Macro for signing and encrypting data, a 1024 falcon secret key is required for signing
+#[macro_export]
+macro_rules! EncryptSign {
+    ($key:expr, $sign:expr, $content:expr, $passphrase:expr)  => {{
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key, None).unwrap();
+        let sign = Signature::<Falcon1024, Message>::new();
+        let signed_message = sign.signature($content, $sign).unwrap();
+        encryptor.encrypt_data(signed_message, $passphrase)
+    }};
 }
 
-/// Macro for encryption of data, taking a Kyber encryption instance, a `Vec<u8>` as well as a passphrase and ciphertext as arguments
+/// Macro for decrypting and opening data, a 1024 falcon public key is required
+#[macro_export]
+macro_rules! DecryptOpen {
+    ($key:expr, $sign:expr, $content:expr, $passphrase:expr, $cipher:expr)  => {{
+        let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key, None).unwrap();
+        let data = decryptor.decrypt_data($content, $passphrase, $cipher).unwrap();
+        let sign = Signature::<Falcon1024, Message>::new();
+        sign.open(data, $sign).unwrap()
+    }};
+}
+
+/// Macro for kyber keypair generation
+#[macro_export]
+macro_rules! KyberKeypair {
+    ($size:expr) => {{
+        let (public_key, secret_key) = match $size {
+            1024 => {
+                KeyControKyber1024::keypair().expect("Failed to generate keypair")
+            },
+            768 => {
+                KeyControKyber768::keypair().expect("Failed to generate keypair")
+            },
+            512 => {
+                KeyControKyber512::keypair().expect("Failed to generate keypair")
+            },
+            _ => {
+                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
+            }.unwrap()
+        };
+        (public_key, secret_key)
+    }};
+}
+
+/// Macro for falcon keypair generation
+#[macro_export]
+macro_rules! FalconKeypair {
+    ($size:expr) => {{
+        let (public_key, secret_key) = match $size {
+            1024 => {
+                Falcon1024::keypair().expect("Failed to generate keypair")
+            },
+            512 => {
+                Falcon512::keypair().expect("Failed to generate keypair")
+            },
+            _ => {
+                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
+            }.unwrap()
+        };
+        (public_key, secret_key)
+    }};
+}
+
+/// Macro for dilithium keypair generation
+#[macro_export]
+macro_rules! DilithiumKeypair {
+    ($version:expr) => {{
+        let (public_key, secret_key) = match $version {
+            5 => {
+                Dilithium5::keypair().expect("Failed to generate keypair")
+            },
+            3 => {
+                Dilithium3::keypair().expect("Failed to generate keypair")
+            },
+            2 => {
+                Dilithium2::keypair().expect("Failed to generate keypair")
+            },
+            _ => {
+                return eprintln!("Unsupported key size")
+            }
+        };
+        (public_key, secret_key)
+    }};
+}
+
+#[macro_export]
+macro_rules! Encryption {
+    // AES
+    ($key:expr, 1024, $data:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_data($data, $passphrase)
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_data($data, $passphrase)
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_data($data, $passphrase)
+    }};
+    // XChaCha20
+    ($key:expr, 1024, $data:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
+    }};
+}
+
+#[macro_export]
+macro_rules! Decryption {
+    // AES
+    ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_data($data, $passphrase, $cipher)
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_data($data, $passphrase, $cipher)
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_data($data, $passphrase, $cipher)
+    }};
+    // XChaCha20
+    ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_data($data, $passphrase)
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_data($data, $passphrase)
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_data($data, $passphrase)
+    }};
+}
+
+/* /// Macro for encryption of data, taking a Kyber encryption instance, a `Vec<u8>` as well as a passphrase and ciphertext as arguments
 #[macro_export]
 macro_rules! encrypt {
     ($kyber:expr, $data:expr, $passphrase:expr) => {{
         $kyber.encrypt_data($data, $passphrase)
-    }};
-}
-/// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
-#[macro_export]
-macro_rules! encrypt_file {
-    ($kyber:expr, $path:expr, $passphrase:expr) => {{
-        $kyber.encrypt_file($path, $passphrase)
     }};
 }
 
@@ -215,39 +371,72 @@ macro_rules! decrypt {
     ($kyber:expr, $encrypted_data:expr, $passphrase:expr, $cipher:expr) => {{
         $kyber.decrypt_data($encrypted_data, $passphrase, $cipher)
     }};
-}
+}*/
 
-/// Macro for decryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
+/// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
 #[macro_export]
-macro_rules! decrypt_file {
-    ($kyber:expr, $path:expr, $passphrase:expr, $cipher:expr) => {{
-        $kyber.decrypt_file($path, $passphrase, $cipher)
+macro_rules! EncryptFile {
+    // AES
+    ($key:expr, 1024, $path:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_file($path, $passphrase)
+    }};
+    ($key:expr, 768, $path:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_file($path, $passphrase)
+    }};
+    ($key:expr, 512, $path:expr, $passphrase:expr, AES) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new($key, None).expect("");
+        encryptor.encrypt_file($path, $passphrase)
+    }};
+    // XChaCha20
+    ($key:expr, 1024, $path:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_file($path, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
+    }};
+    ($key:expr, 768, $path:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_file($path, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
+    }};
+    ($key:expr, 512, $path:expr, $passphrase:expr, XChaCha20) => {{
+        let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key, None).expect("");
+        let (encrypt_message, cipher) = encryptor.encrypt_file($path, $passphrase);
+        let nonce = encryptor.get_nonce();
+        (encrypt_message, cipher, nonce)
     }};
 }
 
-
+/// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
 #[macro_export]
-macro_rules! log_activity {
-    ($process:expr, $detail:expr) => {
-        match LOGGER.lock() {
-            Ok(mut logger) => {
-                let _ = logger.append_log($process, $detail);
-            },
-            Err(e) => eprintln!("Logger lock error: {}", e),
-        }
-    };
-}
-
-/// Macro commanding to write the current in a string stored log into a logfile
-#[macro_export]
-macro_rules! write_log {
-    () => {
-        {
-            let mut logger = $crate::LOGGER.lock().expect("Logger lock failed");
-            if let Err(e) = logger.write_log_file() {
-                eprintln!("Failed to write log file: {:?}", e);
-            }
-            logger.log.clear();
-        }
-    };
+macro_rules! DecryptFile {
+    // AES
+    ($key:expr, 1024, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
+    ($key:expr, 768, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
+    ($key:expr, 512, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new($key, None).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
+    // XChaCha20
+    ($key:expr, 1024, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
+    ($key:expr, 768, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
+    ($key:expr, 512, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
+        let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
+        decryptor.decrypt_file($path, $passphrase, $cipher)
+    }};
 }

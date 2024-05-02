@@ -1,7 +1,6 @@
 use crate::{
     KeyControl::*,
     cryptography::{
-        CipherAES,
         *,
     },
 };
@@ -146,7 +145,7 @@ impl CryptographicInformation {
 
     /// Sets the content to be encrypted or decrypted.
 	pub fn set_data(&mut self, data: &[u8]) -> Result<(), CryptError> {
-		let mut data = data.to_vec();
+		let data = data.to_vec();
 		self.content = data;
 		Ok(())
 	}

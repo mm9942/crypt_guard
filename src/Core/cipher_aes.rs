@@ -1,19 +1,12 @@
 use super::*;
 use crate::{
-    *, 
-    error::CryptError, 
+    error::CryptError,
     cryptography::{
         CryptographicInformation,
-        CipherAES,
-        hmac_sign::*, 
+        CipherAES, 
     },
     Core::{
-        KeyControl, 
-        KeyControKyber512, 
-        KeyControKyber768, 
-        KeyControKyber1024, 
-        KyberKeyFunctions, 
-        kyber::KyberSizeVariant,
+        KyberKeyFunctions,
         KeyControlVariant,
     }
 };
@@ -27,15 +20,14 @@ use aes::{
     Aes256
 };
 use std::{
-    path::{PathBuf, Path}, 
-    marker::PhantomData, 
+    path::{PathBuf}, 
     result::Result, 
-    io::{Read, Write}, 
+    io::{Write}, 
     fs
 };
-use pqcrypto_traits::kem::{PublicKey as PublicKeyKem, SecretKey as SecKeyKem, SharedSecret as SharedSecretKem, Ciphertext as CiphertextKem};
-use pqcrypto_kyber::kyber1024;
-use pqcrypto_kyber::kyber1024::*;
+
+
+
 
 /// Provides AES encryption functionality, handling cryptographic information and shared secrets.
 impl CipherAES {
@@ -56,7 +48,7 @@ impl CipherAES {
     /// The data as a vector of bytes (`Vec<u8>`) or a `CryptError` if the content cannot be accessed.
     pub fn get_data(&self) -> Result<Vec<u8>, CryptError> {
 		let data = &self.infos.content()?;
-		let mut data = data.to_vec();
+		let data = data.to_vec();
 		Ok(data)
 	}
 	    
@@ -92,7 +84,7 @@ impl CipherAES {
         let encrypted_data = self.encrypt_aes()?;
     	// println!("Encrypted Data: {:?}", encrypted_data);
 
-        let mut passphrase = self.infos.passphrase()?.to_vec();
+        let passphrase = self.infos.passphrase()?.to_vec();
         let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
         let data = hmac.hmac();
         if self.infos.safe()? {
@@ -109,7 +101,7 @@ impl CipherAES {
     ///
     /// # Returns
     /// An `Ok(())` upon successful save or a `CryptError` if saving fails.
-    fn save_ciphertext(&self, encrypted_data: &[u8]) -> Result<(), CryptError> {
+    fn save_ciphertext(&self, _encrypted_data: &[u8]) -> Result<(), CryptError> {
     	use std::{fs::File, io::Write};
         
         if let Some(file_metadata) = &self.infos.location {
@@ -221,7 +213,7 @@ impl CryptographicFunctions for CipherAES {
     /// # Returns
     /// A result containing the encrypted data and the ciphertext as a key, or a `CryptError`.
     fn encrypt(&mut self, public_key: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-        let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
+        let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let (sharedsecret, ciphertext) = key.encap(&public_key)?;
         // println!("Shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
         let _ = self.set_shared_secret(sharedsecret);
@@ -238,7 +230,7 @@ impl CryptographicFunctions for CipherAES {
     /// # Returns
     /// The decrypted data as a byte vector or a `CryptError` if decryption fails.
     fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
-        let mut key = KeyControlVariant::new(self.infos.metadata.key_type()?);
+        let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         // println!("shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
         let _ = self.set_shared_secret(sharedsecret);

@@ -1,14 +1,12 @@
-use super::*;
-use crate::error::CryptError;
+
+
 use std::{
-    fs::{self, File},
-    io::{Read, self},
+    fs::{self},
+    io::{Read},
     path::{PathBuf, Path},
 };
 use crate::{
     cryptography::{
-        CryptographicInformation,
-        CipherAES,
         hmac_sign::*, 
     },
     KeyControKyber1024, 
@@ -22,12 +20,18 @@ use crate::{
     FileState,
 };
 
-use tempfile::{TempDir, Builder, tempdir};
+
+use crate::initialize_logger;
 
 fn test_keypair_generation<T: KyberKeyFunctions>() {
     let (public_key, secret_key) = T::keypair().expect("Key pair generation failed");
     assert!(!public_key.is_empty(), "Public key is empty");
     assert!(!secret_key.is_empty(), "Secret key is empty");
+}
+
+#[test]
+fn begin() {
+    initialize_logger(PathBuf::from("crypt_tests.log"));
 }
 
 #[test]
@@ -72,7 +76,7 @@ fn encap_decap_kyber512() {
 // Test the functionality of the KeyControl struct
 #[test]
 fn key_control_functionality() {
-    let base_path = PathBuf::from("/tmp"); // Example path, adjust as needed
+    let _base_path = PathBuf::from("/tmp"); // Example path, adjust as needed
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("");
     let mut key_control = KeyControl::<KeyControKyber1024>::new();
     let _ = key_control.set_public_key(public_key).unwrap();
@@ -100,7 +104,7 @@ fn test_key_control_safe_functionality() -> Result<(), Box<dyn std::error::Error
     let (public_key, secret_key) = KeyControKyber1024::keypair().unwrap();
 
     // Encapsulate a secret with the public key
-    let (shared_secret, ciphertext) = KeyControKyber1024::encap(&public_key).unwrap();
+    let (_shared_secret, ciphertext) = KeyControKyber1024::encap(&public_key).unwrap();
 
     // Initialize KeyControl and set keys
     let mut key_control = KeyControl::<KeyControKyber1024>::new();

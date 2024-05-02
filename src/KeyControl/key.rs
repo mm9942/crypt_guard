@@ -4,7 +4,7 @@ use pqcrypto_kyber::kyber1024::*;
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 use crate::KeyControl::*;
 use std::{
-    path::{Path, PathBuf},
+    path::{PathBuf},
 };
 
 /// Represents a cryptographic key, including its type and raw content.

@@ -1,9 +1,8 @@
 /// Kyber key functionalitys
 pub mod KeyControler;
 mod kyber_crypto;
-/// Cryptographic kyber functionalitys
-pub use kyber_crypto::*;
-use KeyControler::*;
+
+
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 use crate::{
 	*,
@@ -17,14 +16,12 @@ use crate::{
 	KeyTypes,
 	Key,
 	Core::CryptographicFunctions,
+    write_log,
 };
 use std::{
-    path::{PathBuf, Path}, 
-    collections::HashMap,
+    path::{PathBuf, Path},
     marker::PhantomData, 
-    result::Result, 
-    io::{Read, Write}, 
-    fs,
+    result::Result,
 };
 
 /// Trait for Kyber cryptographic functions.

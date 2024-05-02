@@ -102,15 +102,15 @@ where
         Ok((data, cipher))
     }
     /// Placeholder for decrypt_file, indicating operation not allowed in encryption mode.
-    fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(&self, _path: PathBuf, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for decrypt_msg, indicating operation not allowed in encryption mode.
-    fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(&self, _message: Vec<u8>, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for decrypt_data, indicating operation not allowed in encryption mode.
-    fn decrypt_data(&self, data: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(&self, _data: Vec<u8>, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of data isn't allowed!"))
     }
 }
@@ -122,15 +122,15 @@ where
     KyberSize: KyberSizeVariant,
 {   
     /// Placeholder for encrypt_file, indicating operation not allowed in decryption mode.
-    fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(&mut self, _path: PathBuf, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for encrypt_msg, indicating operation not allowed in decryption mode.
-    fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(&mut self, _message: &str, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for encrypt_msg, indicating operation not allowed in decryption mode.
-    fn encrypt_data(&mut self, data: Vec<u8>, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(&mut self, _data: Vec<u8>, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of data isn't allowed!"))
     }
     /// Decrypts a file with AES algorithm, given a path, passphrase, and ciphertext.
@@ -337,15 +337,15 @@ where
         Ok((data, cipher))
     }
     /// Placeholder for decrypt_file, indicating operation not allowed in encryption mode.
-    fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(&self, _path: PathBuf, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for decrypt_msg, indicating operation not allowed in encryption mode.
-    fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(&self, _message: Vec<u8>, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for decrypt_data, indicating operation not allowed in encryption mode.
-    fn decrypt_data(&self, data: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(&self, _data: Vec<u8>, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of data isn't allowed!"))
     }
 }
@@ -357,15 +357,15 @@ where
     KyberSize: KyberSizeVariant,
 {   
     /// Placeholder for encrypt_file, indicating operation not allowed in decryption mode.
-    fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(&mut self, _path: PathBuf, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for encrypt_msg, indicating operation not allowed in decryption mode.
-    fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(&mut self, _message: &str, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for encrypt_data, indicating operation not allowed in decryption mode.
-    fn encrypt_data(&mut self, data: Vec<u8>, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(&mut self, _data: Vec<u8>, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Decrypts a file with XChaCha20 algorithm, given a path, passphrase, and ciphertext.

@@ -1,6 +1,4 @@
 use crypt_guard::{
-    encrypt,
-    decrypt,
     KyberFunctions,
     KeyControKyber1024,
     KyberKeyFunctions,
@@ -11,6 +9,7 @@ use crypt_guard::{
     Message, 
     AES,
     Kyber,
+    Data,
 };
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let message = "Hey, how are you doing?".as_bytes().to_owned();
@@ -19,17 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
-    // Instantiate Kyber for encryption with Kyber1024
-    let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
-
     // Encrypt message
-    let (encrypt_message, cipher) = encrypt!(encryptor, message, passphrase)?;
-
-    // Instantiate Kyber for decryption with Kyber1024
-    let mut decryptor = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None)?;
+    let (encrypt_message, cipher) = Encryption!(public_key.clone(), 1024, message, passphrase, AES)?;
 
     // Decrypt message
-    let decrypt_message = decrypt!(decryptor, encrypt_message, passphrase, cipher);
+    let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
     println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
     Ok(())
 }

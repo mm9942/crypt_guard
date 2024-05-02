@@ -1,8 +1,8 @@
 mod sign;
-pub use sign::*;
-use hmac::{Hmac, Mac};
-use sha2::{Sha512, Sha256};
-use crate::{cryptography::*, error::*};
+
+use hmac::{Mac};
+
+use crate::{cryptography::*};
 use crate::error::SigningErr;
 
 /// Defines the operation being performed, either verification or signing.
