@@ -38,6 +38,27 @@ fn encrypt_decrypt_msg_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
+fn encrypt_decrypt_msg_macro_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = "Hey, how are you doing?".as_bytes().to_owned();
+    let passphrase = "Test Passphrase";
+
+    // Generate key pair
+    let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+    // Encrypt message
+    let (encrypt_message, cipher, nonce) = Encryption!(public_key.clone(), 1024, message.clone(), passphrase, XChaCha20);
+
+    // Decrypt message
+    let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, Some(nonce.clone()), XChaCha20);
+
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypt_message?, message);
+
+    Ok(())
+}
+
+
+#[test]
 fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let data = "Hey, how are you doing?".as_bytes().to_owned();
     let passphrase = "Test Passphrase";

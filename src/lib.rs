@@ -284,8 +284,8 @@ macro_rules! DilithiumKeypair {
                 Dilithium2::keypair().expect("Failed to generate keypair")
             },
             _ => {
-                return eprintln!("Unsupported key size")
-            }
+                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
+            }.unwrap()
         };
         (public_key, secret_key)
     }};
@@ -309,21 +309,21 @@ macro_rules! Encryption {
     // XChaCha20
     ($key:expr, 1024, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new($key, None).expect("");
-        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
-        let nonce = encryptor.get_nonce();
-        (encrypt_message, cipher, nonce)
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+        let nonce = encryptor.get_nonce().expect("");
+        (encrypt_message, cipher, nonce.to_string())
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new($key, None).expect("");
-        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
-        let nonce = encryptor.get_nonce();
-        (encrypt_message, cipher, nonce)
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+        let nonce = encryptor.get_nonce().expect("");
+        (encrypt_message, cipher, nonce.to_string())
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key, None).expect("");
-        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase);
-        let nonce = encryptor.get_nonce();
-        (encrypt_message, cipher, nonce)
+        let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+        let nonce = encryptor.get_nonce().expect("");
+        (encrypt_message, cipher, nonce.to_string())
     }};
 }
 
@@ -345,33 +345,17 @@ macro_rules! Decryption {
     // XChaCha20
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new($key, $nonce).expect("");
-        decryptor.decrypt_data($data, $passphrase)
+        decryptor.decrypt_data($data, $passphrase, $cipher)
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new($key, $nonce).expect("");
-        decryptor.decrypt_data($data, $passphrase)
+        decryptor.decrypt_data($data, $passphrase, $cipher)
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
-        decryptor.decrypt_data($data, $passphrase)
+        decryptor.decrypt_data($data, $passphrase, $cipher)
     }};
 }
-
-/* /// Macro for encryption of data, taking a Kyber encryption instance, a `Vec<u8>` as well as a passphrase and ciphertext as arguments
-#[macro_export]
-macro_rules! encrypt {
-    ($kyber:expr, $data:expr, $passphrase:expr) => {{
-        $kyber.encrypt_data($data, $passphrase)
-    }};
-}
-
-/// Macro for decryption of data, taking a Kyber decryption instance, a `Vec<u8>` as well as a passphrase and ciphertext as arguments
-#[macro_export]
-macro_rules! decrypt {
-    ($kyber:expr, $encrypted_data:expr, $passphrase:expr, $cipher:expr) => {{
-        $kyber.decrypt_data($encrypted_data, $passphrase, $cipher)
-    }};
-}*/
 
 /// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
 #[macro_export]
@@ -439,4 +423,62 @@ macro_rules! DecryptFile {
         let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
         decryptor.decrypt_file($path, $passphrase, $cipher)
     }};
+}
+
+
+#[macro_export]
+macro_rules! Signature {
+
+    // Falcon
+    // 1024
+    (Falcon, $key:expr, 1024, $content:expr, Message) => {{
+        let sign = Signature::<Falcon1024, Message>;
+        sign.signature($content, $key).unwrap()
+    }};
+    (Falcon, $key:expr, 1024, $content:expr, Detached) => {{
+        let sign = Signature::<Falcon1024, Detached>;
+        sign.signature($content, $key).unwrap()
+    }};
+
+    // 512
+    (Falcon, $key:expr, 512, $content:expr, Message) => {{
+        let sign = Signature::<Falcon512, Message>;
+        sign.signature($content, key).unwrap()
+    }};
+    (Falcon, $key:expr, 512, $content:expr, Detached) => {{
+        let sign = Signature::<Falcon512, Detached>;
+        sign.signature($content, $key).unwrap()
+    }};
+
+    // Dilithium
+    // 5
+    (Dilithium, $key:expr, 5, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium5, Message>;
+        sign.signature($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 5, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium5, Detached>;
+        sign.signature($content, $key).unwrap()
+    }};
+
+    // 3
+    (Dilithium, $key:expr, 3, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium3, Message>;
+        sign.signature($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 3, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium3, Detached>;
+        sign.signature($content, $key).unwrap()
+    }};
+
+    // 2
+    (Dilithium, $key:expr, 2, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium2, Message>;
+        sign.signature($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 2, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium2, Detached>;
+        sign.signature($content, $key).unwrap()
+    }};
+
 }

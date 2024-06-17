@@ -35,7 +35,7 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Current Release
 
-The present version, **1.2.9**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+The present version, **1.2.11**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
 
 ### Simplifying Encryption and Decryption with Macros
 
@@ -122,8 +122,6 @@ let decrypt_message = DecryptOpen!(secret_key, public, encrypt_message, "hey, ho
 
 ```rust
 use crypt_guard::{
-    encrypt,
-    decrypt,
     KyberFunctions,
     KeyControKyber1024,
     KyberKeyFunctions,
@@ -159,8 +157,6 @@ Ok(())
 
 ```rust
 use crypt_guard::{
-    encrypt,
-    decrypt,
     KyberFunctions,
     KeyControKyber1024,
     KyberKeyFunctions,
