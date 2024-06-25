@@ -35,7 +35,7 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Current Release
 
-The present version, **1.2.12**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+The present version, **1.2.13**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
 
 ### Simplifying Encryption and Decryption with Macros
 
@@ -116,6 +116,39 @@ let (encrypt_message, cipher) = EncryptSign!(public_key, secret, message.clone()
 
 // Decrypt and open the data using the new DecryptOpen macro, the first key is the secret kyber key and the seccond is the public falcon key.
 let decrypt_message = DecryptOpen!(secret_key, public, encrypt_message, "hey, how are you?", cipher);
+```
+
+### New signature and verify macros
+
+##### Detached Signature
+
+```rust
+use crypt_guard::{
+    *,
+    KDF::*,
+    error::*,
+}
+    
+let data = b"hey, how are you?".to_vec();
+let (public_key, secret_key) = FalconKeypair!(1024);
+let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Detached);
+let verified = Verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
+```
+
+##### Signed Message
+
+
+```rust
+use crypt_guard::{
+    *,
+    KDF::*,
+    error::*,
+}
+    
+let data = b"hey, how are you?".to_vec();
+let (public_key, secret_key) = DilithiumKeypair!(5);
+let sign = Signature!(Dilithium, secret_key, 5, data.clone(), Message);
+let verified = Verify!(Dilithium, public_key, 5, sign.clone(), Message);
 ```
 
 ### New encryption and decryption macros
