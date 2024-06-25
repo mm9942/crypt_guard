@@ -1,9 +1,30 @@
-
-use crate::KDF::*;
+use crate::{KDF::*, error::*, FalconKeypair, Signature, Verify};
 use std::{
     fs,
     path::{Path, PathBuf}
 };
+
+
+#[test]
+fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hey, how are you?".to_vec();
+    let (public_key, secret_key) = FalconKeypair!(1024);
+    let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Message);
+    let verified = Verify!(Falcon, public_key, 1024, sign.clone(), Message);
+    assert_eq!(data, verified);
+    Ok(())
+}
+
+
+#[test]
+fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hey, how are you?".to_vec();
+    let (public_key, secret_key) = FalconKeypair!(1024);
+    let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Detached);
+    let verified = Verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
+    assert!(verified);
+    Ok(())
+}
 
 #[test]
 fn test_save_Falcon1024_keys() -> Result<(), Box<dyn std::error::Error>> {

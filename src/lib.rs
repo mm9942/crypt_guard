@@ -11,11 +11,11 @@
 //!  [crates-badge]: https://img.shields.io/badge/crates.io-v1.2-blue.svg?style=for-the-badge
 //!  [crates-url]: https://crates.io/crates/crypt_guard
 //!  [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
-//!  [mit-url]: https://github.com/mm9942/CryptGuardLib/blob/main/LICENSE
+//!  [mit-url]: https://github.com/mm9942/crypt_guard/blob/main/LICENSE
 //!  [doc-badge]: https://img.shields.io/badge/docs-v1.2-yellow.svg?style=for-the-badge
 //!  [doc-url]: https://docs.rs/crypt_guard/
 //!  [lib-badge]: https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge
-//!  [lib-link]: https://github.com/mm9942/CryptGuardLib
+//!  [lib-link]: https://github.com/mm9942/crypt_guard
 //! 
 //! ## Introduction
 //! 
@@ -428,57 +428,112 @@ macro_rules! DecryptFile {
 
 #[macro_export]
 macro_rules! Signature {
-
     // Falcon
     // 1024
     (Falcon, $key:expr, 1024, $content:expr, Message) => {{
-        let sign = Signature::<Falcon1024, Message>;
+        let sign = Signature::<Falcon1024, Message>::new();
         sign.signature($content, $key).unwrap()
     }};
     (Falcon, $key:expr, 1024, $content:expr, Detached) => {{
-        let sign = Signature::<Falcon1024, Detached>;
+        let sign = Signature::<Falcon1024, Detached>::new();
         sign.signature($content, $key).unwrap()
     }};
 
     // 512
     (Falcon, $key:expr, 512, $content:expr, Message) => {{
-        let sign = Signature::<Falcon512, Message>;
-        sign.signature($content, key).unwrap()
+        let sign = Signature::<Falcon512, Message>::new();
+        sign.signature($content, $key).unwrap()
     }};
     (Falcon, $key:expr, 512, $content:expr, Detached) => {{
-        let sign = Signature::<Falcon512, Detached>;
+        let sign = Signature::<Falcon512, Detached>::new();
         sign.signature($content, $key).unwrap()
     }};
 
     // Dilithium
     // 5
     (Dilithium, $key:expr, 5, $content:expr, Message) => {{
-        let sign = Signature::<Dilithium5, Message>;
+        let sign = Signature::<Dilithium5, Message>::new();
         sign.signature($content, $key).unwrap()
     }};
     (Dilithium, $key:expr, 5, $content:expr, Detached) => {{
-        let sign = Signature::<Dilithium5, Detached>;
+        let sign = Signature::<Dilithium5, Detached>::new();
         sign.signature($content, $key).unwrap()
     }};
 
     // 3
     (Dilithium, $key:expr, 3, $content:expr, Message) => {{
-        let sign = Signature::<Dilithium3, Message>;
+        let sign = Signature::<Dilithium3, Message>::new();
         sign.signature($content, $key).unwrap()
     }};
     (Dilithium, $key:expr, 3, $content:expr, Detached) => {{
-        let sign = Signature::<Dilithium3, Detached>;
+        let sign = Signature::<Dilithium3, Detached>::new();
         sign.signature($content, $key).unwrap()
     }};
 
     // 2
     (Dilithium, $key:expr, 2, $content:expr, Message) => {{
-        let sign = Signature::<Dilithium2, Message>;
+        let sign = Signature::<Dilithium2, Message>::new();
         sign.signature($content, $key).unwrap()
     }};
     (Dilithium, $key:expr, 2, $content:expr, Detached) => {{
-        let sign = Signature::<Dilithium2, Detached>;
+        let sign = Signature::<Dilithium2, Detached>::new();
         sign.signature($content, $key).unwrap()
+    }};
+
+}
+
+#[macro_export]
+macro_rules! Verify {
+    // Falcon
+    // 1024
+    (Falcon, $key:expr, 1024, $content:expr, Message) => {{
+        let sign = Signature::<Falcon1024, Message>::new();
+        sign.open($content, $key).unwrap()
+    }};
+    (Falcon, $key:expr, 1024, $signature:expr, $content:expr, Detached) => {{
+        let sign = Signature::<Falcon1024, Detached>::new();
+        sign.verify($content, $signature, $key).unwrap()
+    }};
+
+    // 512
+    (Falcon, $key:expr, 512, $content:expr, Message) => {{
+        let sign = Signature::<Falcon512, Message>::new();
+        sign.open($content, $key).unwrap()
+    }};
+    (Falcon, $key:expr, 512, $signature:expr, $content:expr, Detached) => {{
+        let sign = Signature::<Falcon512, Detached>::new();
+        sign.verify($content, $signature, $key).unwrap()
+    }};
+
+    // Dilithium
+    // 5
+    (Dilithium, $key:expr, 5, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium5, Message>::new();
+        sign.open($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 5, $signature:expr, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium5, Detached>::new();
+        sign.verify($content, $signature, $key).unwrap()
+    }};
+
+    // 3
+    (Dilithium, $key:expr, 3, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium3, Message>::new();
+        sign.open($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 3, $signature:expr, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium3, Detached>::new();
+        sign.verify($content, $signature, $key).unwrap()
+    }};
+
+    // 2
+    (Dilithium, $key:expr, 2, $content:expr, Message) => {{
+        let sign = Signature::<Dilithium2, Message>::new();
+        sign.open($content, $key).unwrap()
+    }};
+    (Dilithium, $key:expr, 2, $signature:expr, $content:expr, Detached) => {{
+        let sign = Signature::<Dilithium2, Detached>::new();
+        sign.verify($content, $signature, $key).unwrap()
     }};
 
 }
