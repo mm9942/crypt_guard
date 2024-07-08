@@ -15,8 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
     let tmp_dir = Builder::new().prefix("messages").tempdir().map_err(|e| CryptError::from(e))?;
     
-    let enc_path = tmp_dir.path().clone().join("message.txt");
-    let dec_path = tmp_dir.path().clone().join("message.txt.enc"); 
+    let enc_path = tmp_dir.path().join("message.txt");
+    let dec_path = tmp_dir.path().join("message.txt.enc"); 
     
     let _ = fs::write(&enc_path, message.as_bytes())?;
 

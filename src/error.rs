@@ -1,3 +1,4 @@
+pub use zeroize::Zeroize;
 use std::{fmt::{self, Display, Formatter}, error::Error, io, sync::Arc};
 
 #[derive(Debug)]

@@ -33,9 +33,13 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Newest Features
 
+The macros now automatically zero out the used values to enhance data security during execution. For other execution methods, ensure data safety by manually addressing confidentiality. Developers using this crate are responsible for securely storing, hiding, and zeroing out keys in memory to protect encrypted information. As these values are generated, they fall outside my control for adding security measures. Note that the macros now require data ownership; to ensure safety, avoid cloning and instead use `.to_owned()`.
+
+**Regarding the transfer of ownership, please take a look at the `src` folder in the Git repository. It contains the `tests` module folder and the test file `MacroTests.rs`, which uses the approach mentioned. The same is true for `KyberTests` and parts of the example `encrypt_aes.rs`.**
+
 ### Current Release
 
-The present version, **1.2.13**, emphasizes detailed cryptographic operations. This version is ideal for those who want a fast but not too complicated, elaborate approach to cryptography and don't want to use asynchronous code. Asynchronous capabilities will be reimplemented in a later update (but this time as a feature). For those who prefer using async implementation, use version 1.0.3 until a later update is released. This version's syntax is more user-friendly and does not require the definition of too many structs like in 1.1.X or 1.1.0 but allows for precise control over the encryption and decryption algorithm as well as the Kyber key size. It allows the usage of Kyber1024, Kyber768, and Kyber512. Now you also can use logging cappabilitys.
+The present version, **1.2.14**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. Version 1.2.14 offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 
@@ -414,6 +418,12 @@ let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_
 // Decrypt message
 let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
 ```
+
+#### News regarding the CLI version[![Crates.io][cli-badge]][cli-link]
+[cli-badge]: https://img.shields.io/badge/github-cli-black.svg?style=for-the-badge
+[cli-link]: https://github.com/mm9942/crypt_guard_cli
+
+I have almost finished each subcommand, with only the verify subcommand remaining. After completing this, I will test signing and verification. The pre-release is now available on GitHub, and the finished product should be released within a few days or by the end of the month at the latest!
 
 ### Conclusion and Looking Forward
 

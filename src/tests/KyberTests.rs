@@ -16,40 +16,39 @@ use crate::{
 
 #[test]
 fn encrypt_decrypt_msg_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
-    let message = "Hey, how are you doing?";
+    let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+    let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher) = Encryption!(public_key.clone(), 1024, message.as_bytes().to_owned(), passphrase, AES)?;
+    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.clone().to_vec(), passphrase, AES)?;
     
     // Decrypt message
-    let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
-
-    // Convert Vec<u8> to String for comparison
-    let decrypted_text = String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string");
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES);
 
     // Assert that the decrypted message matches the original message
-    assert_eq!(decrypted_text, message);
+    assert_eq!(decrypt_message?, message.to_owned());
 
     Ok(())
 }
 
 #[test]
 fn encrypt_decrypt_msg_macro_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
-    let message = "Hey, how are you doing?".as_bytes().to_owned();
+    let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+    let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = Encryption!(public_key.clone(), 1024, message.clone(), passphrase, XChaCha20);
+    let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.clone().to_owned(), passphrase, XChaCha20);
 
     // Decrypt message
-    let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, Some(nonce.clone()), XChaCha20);
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce.clone()), XChaCha20);
 
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message?, message);
@@ -65,12 +64,13 @@ fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
 
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+    let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher) = Encryption!(public_key, 1024, data.clone(), passphrase, AES)?;
+    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, data.clone(), passphrase, AES)?;
 
     // Decrypt message
-    let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES);
 
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message?, data);
@@ -101,7 +101,7 @@ fn encrypt_decrypt_file_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
     fs::remove_file(enc_path.clone());
     
     // Decrypt message
-    let decrypt_message = DecryptFile!(secret_key, 1024, dec_path.clone(), passphrase, cipher, AES);
+    let decrypt_message = DecryptFile!(secret_key, 1024, dec_path.clone(), passphrase, cipher.to_owned(), AES);
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string");
@@ -135,7 +135,7 @@ fn encrypt_message_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -164,7 +164,7 @@ fn encrypt_data_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_data(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_data(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message);
@@ -191,7 +191,7 @@ fn encrypt_message_AES_Kyber768() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber768, Message, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -219,7 +219,7 @@ fn encrypt_message_AES_Kyber512() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber512, Message, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -259,7 +259,7 @@ fn encrypt_file_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -303,7 +303,7 @@ fn encrypt_file_AES_Kyber768() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber768, Files, AES>::new(secret_key, None)?;
     
     // Decrypt file
-    let decrypt_file = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_file = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_file).expect("Failed to convert decrypted message to string");
@@ -348,7 +348,7 @@ fn encrypt_file_AES_Kyber512() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber512, Files, AES>::new(secret_key, None)?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -383,7 +383,7 @@ fn encrypt_message_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error
     let decryptor = Kyber::<Decryption, Kyber1024, Message, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Assert that the decrypted message matches the original message
     assert_eq!(String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string"), message);
@@ -411,7 +411,7 @@ fn encrypt_message_XChaCha20_Kyber768() -> Result<(), Box<dyn std::error::Error>
     let decryptor = Kyber::<Decryption, Kyber768, Message, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Assert that the decrypted message matches the original message
     assert_eq!(String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string"), message);
@@ -439,7 +439,7 @@ fn encrypt_message_XChaCha20_Kyber512() -> Result<(), Box<dyn std::error::Error>
     let decryptor = Kyber::<Decryption, Kyber512, Message, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase, cipher.to_owned())?;
 
     // Assert that the decrypted message matches the original message
     assert_eq!(String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string"), message);
@@ -478,7 +478,7 @@ fn encrypt_file_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error>> 
     let decryptor = Kyber::<Decryption, Kyber1024, Files, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -524,7 +524,7 @@ fn encrypt_file_XChaCha20_Kyber768() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
@@ -570,7 +570,7 @@ fn encrypt_file_XChaCha20_Kyber512() -> Result<(), Box<dyn std::error::Error>> {
     let decryptor = Kyber::<Decryption, Kyber512, Files, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");

@@ -1,7 +1,7 @@
 workspace = { members = ["crypt_guard_proc"] }
 [package]
 name = "crypt_guard"
-version = "1.2.13"
+version = "1.2.14"
 edition = "2021"
 description = "CryptGuardLib is a comprehensive Rust library designed for strong encryption and decryption, incorporating post-quantum cryptography to safeguard against quantum threats. It's geared towards developers who need to embed advanced cryptographic capabilities in their Rust applications."
 license = "MIT"
@@ -24,6 +24,7 @@ pqcrypto-kyber = "0.8.1"
 chrono = "0.4.37"
 lazy_static = "1.4.0"
 crypt_guard_proc = { path = "./crypt_guard_proc", version = "0.1.0" }
+zeroize = "1.8.1"
 
 [dev-dependencies]
 tempfile = "3.10.1"
