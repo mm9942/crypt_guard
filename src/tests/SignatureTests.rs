@@ -9,8 +9,8 @@ use std::{
 fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = FalconKeypair!(1024);
-    let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Message);
-    let verified = Verify!(Falcon, public_key, 1024, sign.clone(), Message);
+    let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Message);
+    let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), Message);
     assert_eq!(data, verified);
     Ok(())
 }
@@ -20,8 +20,8 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
 fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = FalconKeypair!(1024);
-    let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Detached);
-    let verified = Verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
+    let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Detached);
+    let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), data.clone(), Detached);
     assert!(verified);
     Ok(())
 }
@@ -110,7 +110,7 @@ fn test_falcon1024_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let signed_message = sign.signature(data.clone(), secret_key)?;
 
     // Open the message
-    let opened_message = sign.open(signed_message, public_key)?;
+    let opened_message = sign.open(signed_message, public_key.to_owned())?;
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
@@ -130,7 +130,7 @@ fn test_falcon1024_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let signature = sign.signature(data.clone(), secret_key)?;
 
     // Verify the detached signature
-    let is_valid = sign.verify(data, signature, public_key)?;
+    let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
     Ok(())
@@ -146,7 +146,7 @@ fn test_falcon512_signature_message() -> Result<(), Box<dyn std::error::Error>> 
     let signed_message = sign.signature(data.clone(), secret_key)?;
 
     // Open the message
-    let opened_message = sign.open(signed_message, public_key)?;
+    let opened_message = sign.open(signed_message, public_key.to_owned())?;
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
@@ -165,7 +165,7 @@ fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>>
     let signature = sign.signature(data.clone(), secret_key)?;
 
     // Verify the detached signature
-    let is_valid = sign.verify(data, signature, public_key)?;
+    let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
     Ok(())
@@ -181,7 +181,7 @@ fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let signed_message = sign.signature(data.clone(), secret_key)?;
 
     // Open the message
-    let opened_message = sign.open(signed_message, public_key)?;
+    let opened_message = sign.open(signed_message, public_key.to_owned())?;
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
@@ -200,7 +200,7 @@ fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let signature = sign.signature(data.clone(), secret_key)?;
 
     // Verify the detached signature
-    let is_valid = sign.verify(data, signature, public_key)?;
+    let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
     Ok(())
@@ -216,7 +216,7 @@ fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let signed_message = sign.signature(data.clone(), secret_key)?;
 
     // Open the message
-    let opened_message = sign.open(signed_message, public_key)?;
+    let opened_message = sign.open(signed_message, public_key.to_owned())?;
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
@@ -235,7 +235,7 @@ fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let signature = sign.signature(data.clone(), secret_key)?;
 
     // Verify the detached signature
-    let is_valid = sign.verify(data, signature, public_key)?;
+    let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
     Ok(())
@@ -251,7 +251,7 @@ fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let signed_message = sign.signature(data.clone(), secret_key)?;
 
     // Open the message
-    let opened_message = sign.open(signed_message, public_key)?;
+    let opened_message = sign.open(signed_message, public_key.to_owned())?;
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
@@ -270,7 +270,7 @@ fn test_dilithium5_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let signature = sign.signature(data.clone(), secret_key)?;
 
     // Verify the detached signature
-    let is_valid = sign.verify(data, signature, public_key)?;
+    let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
     Ok(())

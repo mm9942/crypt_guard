@@ -24,7 +24,7 @@ fn encrypt_decrypt_msg_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::E
     let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.clone().to_vec(), passphrase, AES)?;
+    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES)?;
     
     // Decrypt message
     let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES);
@@ -45,7 +45,7 @@ fn encrypt_decrypt_msg_macro_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::er
     let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.clone().to_owned(), passphrase, XChaCha20);
+    let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_owned(), passphrase, XChaCha20);
 
     // Decrypt message
     let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce.clone()), XChaCha20);
@@ -96,12 +96,12 @@ fn encrypt_decrypt_file_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
     // Encrypt message
-    let (_encrypt_message, cipher) = EncryptFile!(public_key.clone(), 1024, enc_path.clone(), passphrase, AES)?;
+    let (_encrypt_message, cipher) = EncryptFile!(public_key.to_owned(), 1024, enc_path.clone(), passphrase, AES)?;
 
     fs::remove_file(enc_path.clone());
     
     // Decrypt message
-    let decrypt_message = DecryptFile!(secret_key, 1024, dec_path.clone(), passphrase, cipher.to_owned(), AES);
+    let decrypt_message = DecryptFile!(secret_key.to_owned(), 1024, dec_path.clone(), passphrase, cipher.to_owned(), AES);
 
     // Convert Vec<u8> to String for comparison
     let decrypted_text = String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string");
