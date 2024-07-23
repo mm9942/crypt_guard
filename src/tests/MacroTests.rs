@@ -1,5 +1,3 @@
-
-
 use crypt_guard_proc::*;
 use crate::{
     error::*,
@@ -129,8 +127,8 @@ fn test_concat_and_split_key() {
     let cipher_hex = hex::encode(cipher);
 
     // Concatenate and split
-    let concatenated = ConcatKey!((key_hex.clone(), cipher_hex.clone()));
-    let result = SplitKey!(concatenated);
+    let concatenated = ConcatCipher!((key_hex.clone(), cipher_hex.clone()));
+    let result = SplitCipher!(concatenated);
 
     // Ensure the result is okay
     assert!(result.is_ok(), "Splitting failed with error");

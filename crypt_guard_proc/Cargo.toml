@@ -1,6 +1,6 @@
 [package]
 name = "crypt_guard_proc"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "CryptGuardProc is the proc macro crate related to CryptGuardLib, which is a comprehensive Rust library designed for strong encryption and decryption, incorporating post-quantum cryptography to safeguard against quantum threats. It's geared towards developers who need to embed advanced cryptographic capabilities in their Rust applications."
 license = "MIT"

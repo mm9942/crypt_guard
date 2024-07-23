@@ -17,7 +17,8 @@ use aes::{
         generic_array::GenericArray,
         KeyInit
     },
-    Aes256
+    Aes256,
+    Aes128,
 };
 use std::{
     path::{PathBuf}, 
@@ -26,8 +27,13 @@ use std::{
     fs
 };
 
+use cbc::{cipher::{KeyIvInit, BlockDecryptMut, BlockEncryptMut}, Encryptor as CbcEncryptor, Decryptor as CbcDecryptor};
 
+use block_padding::Pkcs7;
+use rand::Rng;
 
+type Aes128CbcEnc = CbcEncryptor<Aes128>;
+type Aes128CbcDec = CbcDecryptor<Aes128>;
 
 /// Provides AES encryption functionality, handling cryptographic information and shared secrets.
 impl CipherAES {
@@ -141,6 +147,52 @@ impl CipherAES {
         }
 
         Ok(encrypted_data)
+    }
+
+    fn generate_cbc_iv(&mut self) -> Result<Vec<u8>, CryptError> {
+        let mut iv = vec![0u8; 16];
+        let mut rng = rand::thread_rng();
+        rng.try_fill(&mut iv[..]);
+        Ok(iv)
+    }
+
+    /// Encrypts the provided data using AES-256 in CBC mode.
+    /// This function securely generates an IV for each encryption operation.
+    pub fn aes_cbc_encrypt(&mut self) -> Result<Vec<u8>, CryptError> {
+        let data = self.get_data()?;
+        let key = GenericArray::from_slice(&self.sharedsecret);
+        let mut iv = vec![0u8; 16];  // AES block size
+        rand::thread_rng().fill(&mut iv[..]);
+        let iv_arr = GenericArray::from_slice(&iv);
+
+        let cipher = Aes128CbcEnc::new(key, iv_arr);
+        let mut buffer = data.clone(); // Clone the data to a mutable buffer
+        let ciphertext = cipher.encrypt_padded_mut::<Pkcs7>(&mut buffer, data.len())
+            .map_err(|_| CryptError::EncryptionFailed)?;
+
+        // Prepend IV to the ciphertext to use it during decryption
+        let mut result = iv;
+        result.extend_from_slice(&ciphertext);
+        Ok(result)
+    }
+
+    /// Decrypts data encrypted using AES-256 in CBC mode.
+    /// Assumes the IV is prepended to the ciphertext.
+    pub fn aes_cbc_decrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
+        if ciphertext.len() < 16 {
+            return Err(CryptError::InvalidDataLength);  // Ensure there's enough data for the IV
+        }
+
+        let (iv, encrypted_data) = ciphertext.split_at(16);
+        let key = GenericArray::from_slice(&self.sharedsecret);
+        let iv_arr = GenericArray::from_slice(iv);
+
+        let mut cipher = Aes128CbcDec::new(key, iv_arr);
+        let mut buffer = encrypted_data.to_vec();
+        cipher.decrypt_padded_mut::<Pkcs7>(&mut buffer)
+            .map_err(|_| CryptError::DecryptionFailed)?;
+
+        Ok(buffer)
     }
 
     /// Decrypts data using AES-256.

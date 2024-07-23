@@ -19,6 +19,17 @@ impl CryptographicMechanism {
     pub fn aes() -> Self {
         Self::AES
     }
+
+    /// Specifies AES as the cryptographic mechanism.
+    pub fn aes_gcm_siv() -> Self {
+        Self::AES_GCM_SIV
+    }
+
+    /// Specifies AES as the cryptographic mechanism.
+    pub fn aes_ctr() -> Self {
+        Self::AES_CTR
+    }
+
     /// Specifies XChaCha20 as the cryptographic mechanism.
     pub fn xchacha20() -> Self {
         Self::XChaCha20
@@ -70,6 +81,10 @@ impl ContentType {
     /// Specifies the content as a message.
     pub fn message() -> Self {
         Self::Message
+    }
+    /// Specifies the content as a RawData.
+    pub fn raw_data() -> Self {
+        Self::RawData
     }
 }
 

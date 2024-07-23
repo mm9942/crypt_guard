@@ -1,16 +1,17 @@
-
+#[cfg(test)]
+mod DevicesTests;
 
 #[cfg(test)]
-mod KyberKeyTest;
+mod KyberKeyTests;
 
 #[cfg(test)]
 mod KyberTests;
 
 #[cfg(test)]
-mod MacroTests;
+mod SignatureTests;
 
 #[cfg(test)]
-mod SignatureTests;
+mod MacroTests;
 
 #[cfg(test)]
 mod ze_end;

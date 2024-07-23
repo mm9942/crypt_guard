@@ -32,6 +32,7 @@ pub enum CryptError {
     InvalidKeyType, 
     FileNotFound,
     EncryptionFailed,
+    DecryptionFailed,
     CustomError(String),
 }
 
@@ -67,6 +68,7 @@ impl fmt::Display for CryptError {
             CryptError::InvalidKeyType => write!(f, "Invalid or unsupported key type"),
             CryptError::FileNotFound => write!(f, "The selected file was not found, either look in amother folder or check if you have correctly written the file name!"),
             CryptError::EncryptionFailed => write!(f, "There occurred an error for some reason, please chek the implementation again and make sure everything was used correctly, for more info use: RUST_BACKTRACE=[1 or full]!"),
+            CryptError::DecryptionFailed => write!(f, "There occurred an error for some reason, please chek the implementation again and make sure everything was used correctly, for more info use: RUST_BACKTRACE=[1 or full]!"),
             CryptError::CustomError(message) => write!(f, "{}", message),
         }
     }

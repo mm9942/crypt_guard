@@ -6,7 +6,6 @@ use crypt_guard::{
     Encryption, 
     Decryption, 
     Kyber1024, 
-    Message, 
     AES,
     Kyber,
     Data,

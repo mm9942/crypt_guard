@@ -1,11 +1,5 @@
 use crypt_guard::{*, error::*};
-use std::{
-	fs::{self, File}, 
-	marker::PhantomData,
-	path::{PathBuf, Path},
-	io::{Read, Write},
-
-};
+use std::fs::{self, File};
 use tempfile::{TempDir, Builder};
 
 
@@ -30,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
 
     // Encrypt message
-    let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
+    let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase)?;
 
     let nonce = encryptor.get_nonce();
 
@@ -38,9 +32,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
     // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-    let mut decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
+    let decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
     
     // Decrypt message
-    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
+    let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
     Ok(())
 }

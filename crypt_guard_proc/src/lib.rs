@@ -21,7 +21,7 @@ pub fn activate_log(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn ConcatKey(input: TokenStream) -> TokenStream {
+pub fn ConcatCipher(input: TokenStream) -> TokenStream {
     let inputs = parse_macro_input!(input as Expr);
 
     let output = quote! {
@@ -36,7 +36,7 @@ pub fn ConcatKey(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn SplitKey(input: TokenStream) -> TokenStream {
+pub fn SplitCipher(input: TokenStream) -> TokenStream {
     let expr = parse_macro_input!(input as Expr);
 
     let output = quote! {

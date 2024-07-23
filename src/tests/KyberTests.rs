@@ -1,18 +1,22 @@
-
-
-use tempfile::{TempDir, Builder};
-use std::fs::{self};
-
-
 use crate::{
     Encryption,
     Decryption,
     EncryptFile,
     DecryptFile,
-    Core::{kyber::{KyberFunctions, *}, *},
-    error::*
+    Core::{
+        kyber::{
+            KyberFunctions, 
+            *
+        }, 
+        *
+    },
+    error::*,
+    cryptography::*,
+    KyberKeypair,
 };
 
+use tempfile::{TempDir, Builder};
+use std::fs::{self};
 
 #[test]
 fn encrypt_decrypt_msg_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,39 +45,167 @@ fn encrypt_decrypt_msg_macro_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::er
     let passphrase = "Test Passphrase";
 
     // Generate key pair
-    let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
-    let key = &public_key;
+
+    let (public_key, secret_key) = KyberKeypair!(1024);
+    let mut key = public_key;
 
     // Encrypt message
     let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_owned(), passphrase, XChaCha20);
 
     // Decrypt message
     let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce.clone()), XChaCha20);
-
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message?, message);
 
     Ok(())
 }
 
+#[test]
+fn encrypt_decrypt_msg_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = "Hey, how are you doing?";
+    let passphrase = "Test Passphrase";
+
+    // Generate key pair
+    let (public_key, secret_key) = KyberKeypair!(1024);
+
+    // Encrypt message
+    let crypt_metadata = CryptographicMetadata {
+        process: Process::Encryption,
+        encryption_type: CryptographicMechanism::AES_GCM_SIV,
+        key_type: KeyEncapMechanism::kyber1024(),
+        content_type: ContentType::RawData, // Using File here for generic data
+    };
+
+    let infos = CryptographicInformation {
+        content: message.as_bytes().to_owned(),
+        passphrase: passphrase.as_bytes().to_vec(),
+        metadata: crypt_metadata,
+        safe: false,
+        location: None,
+    };
+
+    let mut aes_gcm_siv = CipherAES_GCM_SIV::new(infos, None);
+    let (encrypt_message, cipher) = aes_gcm_siv.encrypt(public_key)?;
+    let iv = aes_gcm_siv.iv();
+    println!("IV: {:?}", &iv);
+    println!("encrypt_message: {:?}", &encrypt_message);
+
+        // Encrypt message
+    let crypt_metadata = CryptographicMetadata {
+        process: Process::Decryption,
+        encryption_type: CryptographicMechanism::AES_GCM_SIV,
+        key_type: KeyEncapMechanism::kyber1024(),
+        content_type: ContentType::RawData, // Using File here for generic data
+    };
+
+    let infos = CryptographicInformation {
+        content: encrypt_message,
+        passphrase: passphrase.as_bytes().to_vec(),
+        metadata: crypt_metadata,
+        safe: false,
+        location: None,
+    };
+
+    let mut aes_gcm_siv_dec = CipherAES_GCM_SIV::new(infos, Some(hex::encode(iv)));
+    let decrypt_message = aes_gcm_siv_dec.decrypt(secret_key, cipher)?;
+
+    println!("{:?}", &decrypt_message);
+    for enc_b in decrypt_message.clone() {
+            print!("{:02x} ", enc_b);
+    }
+
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypt_message.clone(), message.as_bytes().to_owned());
+    Ok(())
+}
 
 #[test]
-fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
-    let data = "Hey, how are you doing?".as_bytes().to_owned();
+fn encrypt_decrypt_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = "Hey, how are you doing?".as_bytes().to_owned();
+    let passphrase = "Test Passphrase";
+
+    let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+    let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_GCM_SIV>::new(public_key.clone(), None)?;
+    let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), passphrase)?;
+
+    let nonce = encryptor.get_nonce();
+
+    let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_GCM_SIV>::new(secret_key, Some(nonce?.to_string()))?;
+    let decrypt_message = decryptor.decrypt_data(encrypt_message.clone(), passphrase, cipher.to_owned())?;
+
+    assert_eq!(decrypt_message, message);
+
+    Ok(())
+}
+
+#[test]
+fn encrypt_decrypt_data_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {    // Generate key pair    
+    let message = "Hey, how are you doing?".as_bytes();
+    let passphrase = "Test Passphrase";
+    
+    println!("{:?}", &message);
+   
+    // Generate key pair
+    let (public_key, secret_key) = KyberKeypair!(1024);
+    let key: &[u8] = &public_key;
+
+    // Encrypt message
+    let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);
+    println!("{:?}", encrypt_message);
+    // Decrypt message
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce), AES_GCM_SIV)?;
+    
+    println!("{:?}", &decrypt_message);
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypt_message, message.to_owned());
+
+    Ok(())
+}
+
+
+/*#[test]
+fn encrypt_decrypt_msg_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
     // Generate key pair
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
-    let key = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, data.clone(), passphrase, AES)?;
-
+    let (encrypt_message, cipher) = Encryption!(public_key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);
+    println!("{:?}", encrypt_message);
     // Decrypt message
-    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES);
-
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES_CTR)?;
+    
+    println!("{:?}", &decrypt_message);
     // Assert that the decrypted message matches the original message
-    assert_eq!(decrypt_message?, data);
+    assert_eq!(decrypt_message, message.to_owned());
+
+    Ok(())
+}
+*/
+
+#[test]
+fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {    // Generate key pair    
+    let message = "Hey, how are you doing?".as_bytes();
+    let passphrase = "Test Passphrase";
+    
+    println!("{:?}", &message);
+   
+    // Generate key pair
+    let (public_key, secret_key) = KyberKeypair!(1024);
+    let key: &[u8] = &public_key;
+
+    // Encrypt message
+    let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES)?;
+    println!("{:?}", encrypt_message);
+    // Decrypt message
+    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES)?;
+    
+    println!("{:?}", &decrypt_message);
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypt_message, message.to_owned());
 
     Ok(())
 }

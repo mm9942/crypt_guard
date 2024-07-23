@@ -12,6 +12,16 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
     let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Message);
     let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), Message);
     assert_eq!(data, verified);
+
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
+
     Ok(())
 }
 
@@ -23,6 +33,16 @@ fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::
     let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Detached);
     let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), data.clone(), Detached);
     assert!(verified);
+
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
+    
     Ok(())
 }
 
@@ -39,6 +59,14 @@ fn test_save_Falcon1024_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Falcon1024/key.sec").exists(), "File does not exist: {}", "./Falcon1024/key.sec");
     
     let _ = fs::remove_dir_all("./Falcon1024")?;
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 #[test]
@@ -54,8 +82,17 @@ fn test_save_Falcon512_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Falcon512/key.sec").exists(), "File does not exist: {}", "./Falcon512/key.sec");
 
     let _ = fs::remove_dir_all("./Falcon512")?;
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
+
 #[test]
 fn test_save_Dilithium2_keys() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Dilithium2::keypair().unwrap();
@@ -69,6 +106,14 @@ fn test_save_Dilithium2_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium2/key.sec").exists(), "File does not exist: {}", "./Dilithium2/key.sec");
 
     let _ = fs::remove_dir_all("./Dilithium2")?;
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 #[test]
@@ -84,6 +129,14 @@ fn test_save_Dilithium3_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium3/key.sec").exists(), "File does not exist: {}", "./Dilithium3/key.sec");
 
     let _ = fs::remove_dir_all("./Dilithium3")?;
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 #[test]
@@ -99,6 +152,14 @@ fn test_save_Dilithium5_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium5/key.sec").exists(), "File does not exist: {}", "./Dilithium5/key.sec");
     
     let _ = fs::remove_dir_all("./Dilithium5")?;
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 #[test]
@@ -114,6 +175,14 @@ fn test_falcon1024_signature_message() -> Result<(), Box<dyn std::error::Error>>
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -133,6 +202,14 @@ fn test_falcon1024_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -150,6 +227,14 @@ fn test_falcon512_signature_message() -> Result<(), Box<dyn std::error::Error>> 
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -168,6 +253,14 @@ fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>>
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -185,6 +278,14 @@ fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>>
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -203,6 +304,14 @@ fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -220,6 +329,14 @@ fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>>
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -238,6 +355,14 @@ fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -255,6 +380,14 @@ fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>>
 
     // Verify the opened message matches the original data
     assert_eq!(data, opened_message);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 
@@ -273,6 +406,14 @@ fn test_dilithium5_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
 
     assert!(is_valid);
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt");
+    let _ = fs::remove_file("log.txt");
+    let _ = fs::remove_file("crypt_tests.log");
+    let _ = fs::remove_file("message.txt.enc");
+    let _ = fs::remove_dir_all("./crypt_tests");
+    let _ = fs::remove_dir_all("./key");
+    let _ = fs::remove_dir_all("./log");
     Ok(())
 }
 

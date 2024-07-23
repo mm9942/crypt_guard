@@ -1,11 +1,8 @@
- /// The `hmac` module provides functionality for generating, managing, and verifying digital hmacs, supporting various algorithms including post-quantum secure schemes.
+/// The `hmac` module provides functionality for generating, managing, and verifying digital hmacs, supporting various algorithms including post-quantum secure schemes.
 pub mod hmac_sign;
 
 /// The `cryptographic` module encapsulates core cryptographic operations, including key management, encryption, decryption, and cryptographic utility functions.
 mod cryptographic; 
-
-//pub use cipher_aes::*;
-//pub use cipher_xchacha::*;
 
 use std::path::PathBuf;
 use crate::{error::CryptError, FileMetadata};
@@ -22,6 +19,32 @@ pub struct CipherAES {
 impl fmt::Display for CipherAES {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CipherAES with the following Cryptographic Informations: {}", self.infos.metadata)
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct CipherAES_GCM_SIV {
+    pub infos: CryptographicInformation,
+    pub sharedsecret: Vec<u8>,
+    pub iv: Vec<u8>,
+}
+
+impl fmt::Display for CipherAES_GCM_SIV {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherAES_GCM_SIV with the following Cryptographic Informations: {}", self.infos.metadata)
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct CipherAES_CTR {
+    pub infos: CryptographicInformation,
+    pub sharedsecret: Vec<u8>,
+    pub iv: Vec<u8>,
+}
+
+impl fmt::Display for CipherAES_CTR {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherAES_CTR with the following Cryptographic Informations: {}", self.infos.metadata)
     }
 }
 
@@ -44,6 +67,8 @@ impl fmt::Display for CipherChaCha {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CryptographicMechanism {
     AES,
+    AES_GCM_SIV,
+    AES_CTR,
     XChaCha20,
 }
 
@@ -51,6 +76,8 @@ impl fmt::Display for CryptographicMechanism {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mechanism = match self {
             CryptographicMechanism::AES => "AES",
+            CryptographicMechanism::AES_GCM_SIV => "AES-GCM-SIV",
+            CryptographicMechanism::AES_CTR => "AES-CTR",
             CryptographicMechanism::XChaCha20 => "XChaCha20",
         };
         write!(f, "{}", mechanism)
@@ -64,7 +91,6 @@ pub enum KeyEncapMechanism {
     Kyber768,
     Kyber512,
 }
-
 
 impl fmt::Display for KeyEncapMechanism {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -82,6 +108,8 @@ impl fmt::Display for KeyEncapMechanism {
 pub enum ContentType {
     Message,
     File,
+    RawData,
+    Device,
 }
 
 impl fmt::Display for ContentType {
@@ -89,6 +117,8 @@ impl fmt::Display for ContentType {
         let content_type = match self {
             ContentType::Message => "Message",
             ContentType::File => "File",
+            ContentType::RawData => "RawData",
+            ContentType::Device => "Device",
         };
         write!(f, "{}", content_type)
     }
@@ -148,3 +178,4 @@ impl fmt::Display for CryptographicInformation {
                    self.content.len())
     }
 }
+ 
