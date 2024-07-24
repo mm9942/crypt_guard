@@ -4,9 +4,10 @@ use crate::{cryptography::*, error::CryptError, cryptography::hmac_sign::*};
 pub mod KDF;
 /// Functions for usage of kyber for key generation
 pub mod kyber;
-
+/// The `cipher_aes_ctr` module implements the AEAD (Authenticated Encryption with Associated Data Algorithms: high-level encryption ciphers) AES-GCM-SIV for secure data encryption with the GCM-SIV block mode.
 pub mod cipher_aes_gcm_siv;
-//pub mod cipher_aes_ctr;
+/// The `cipher_aes_ctr` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption with the CTR block mode and decryption, providing a robust symmetric key cryptography solution.
+pub mod cipher_aes_ctr;
 /// Functions for device handling
 pub mod devices;
 
@@ -16,6 +17,8 @@ pub use kyber::KeyControler::*;
 pub mod cipher_aes; 
 /// The `cipher_xchacha` module offers encryption and decryption functionalities using the XChaCha20 algorithm, extending ChaCha for higher nonce sizes and additional security.
 pub mod cipher_xchacha; 
+/// The `cipher_xchacha_poly` module offers encryption and decryption functionalities using the XChaCha20Poly1305 algorithm, extending ChaCha for higher nonce sizes and additional security.
+pub mod cipher_xchacha_poly; 
 
 pub enum KeyControlVariant {
     Kyber1024(KeyControl<KeyControKyber1024>),

@@ -33,11 +33,22 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ### Newest Features
 
-**New AES mode:** We have implemented AES_GCM_SIV as a save variant since the AES variant manually implements an ECB block mode encryption, now using AES_GCM_SIV AEAD with the GCM_SIV block mode for encryption, with a randomly generated IV. We also added some functions for device lookup and are now implementing AES with the XTS block mode and system command device handling on Linux and Windows. It's also planned to implement the block modes: CBC and CTR. Use the AES_GCM_SIV implementation through the macro the same way you use XChaCha20.
+**New AES modes:** We have implemented the block modes AES_GCM_SIV and AES_CTR as save alternatives to the pure AES implementation based on the ECB block mode. The new GCM_SIV and CTR block mode implementations work with randomly generated IV's. We also added some functions for device lookup and are now implementing AES with the XTS block mode and system command device handling on Linux and Windows. It's also planned to implement the block modes: CBC and CTR. Use the AES_GCM_SIV implementation through the macro the same way you use XChaCha20.
 
 **Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);` 
 
 **Decryption Macro for AES_GCM_SIV:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_GCM_SIV)` 
+
+
+**Encryption Macro for AES_CTR:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);` 
+
+**Decryption Macro for AES_CTR:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_CTR)` 
+
+
+**Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);` 
+
+**Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)` 
+
 
 The macros now automatically zero out the used values to enhance data security during execution. For other execution methods, ensure data safety by manually addressing confidentiality. Developers using this crate are responsible for securely storing, hiding, and zeroing out keys in memory to protect encrypted information. As these values are generated, they fall outside my control for adding security measures. Note that the macros now require data ownership; to ensure safety, avoid cloning and instead use `.to_owned()`.
 
@@ -45,7 +56,7 @@ The macros now automatically zero out the used values to enhance data security d
 
 ### Current Release
 
-The present version, **1.3.0**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new Version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
+The present version, **1.3.3**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new Version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 

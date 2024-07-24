@@ -75,6 +75,15 @@
 //! 
 //! // Encrypt file function:
 //! let (mut encrypt_message, mut cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).expect("");
+//!
+//! let _ = fs::remove_file("crypt_tests.log");
+//! let _ = fs::remove_file("message.txt");
+//! let _ = fs::remove_file("log.txt");
+//! let _ = fs::remove_file("crypt_tests.log");
+//! let _ = fs::remove_file("message.txt.enc");
+//! let _ = fs::remove_dir_all("./crypt_tests");
+//! let _ = fs::remove_dir_all("./key");
+//! let _ = fs::remove_dir_all("./log");
 //! ```
 //!
 //! #### Infos about XChaCha20 differences
@@ -110,6 +119,15 @@
 //! 
 //! // Decrypt message
 //! let mut decrypt_message = decryptor.decrypt_file(PathBuf::from("message.txt.enc"), passphrase.clone(), cipher.clone()).expect("");
+//!
+//! let _ = fs::remove_file("crypt_tests.log");
+//! let _ = fs::remove_file("message.txt");
+//! let _ = fs::remove_file("log.txt");
+//! let _ = fs::remove_file("crypt_tests.log");
+//! let _ = fs::remove_file("message.txt.enc");
+//! let _ = fs::remove_dir_all("./crypt_tests");
+//! let _ = fs::remove_dir_all("./key");
+//! let _ = fs::remove_dir_all("./log");
 //! ```
 //!
 //! ### Using Encryption and Decryption macros
@@ -156,6 +174,16 @@
 //!     let mut decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
 //!     write_log!();
 //!     println!("{:?}", decrypted_text);
+//!
+//!     let _ = fs::remove_file("crypt_tests.log");
+//!     let _ = fs::remove_file("message.txt");
+//!     let _ = fs::remove_file("log.txt");
+//!     let _ = fs::remove_file("crypt_tests.log");
+//!     let _ = fs::remove_file("message.txt.enc");
+//!     let _ = fs::remove_dir_all("./crypt_tests");
+//!     let _ = fs::remove_dir_all("./key");
+//!     let _ = fs::remove_dir_all("./log");
+
 //!     Ok(())
 //! }  
 //! ```
@@ -453,6 +481,55 @@ macro_rules! Encryption {
         result
     }};
 
+    // AES_CTR
+    ($key:expr, 1024, $data:expr, $passphrase:expr, AES_CTR) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let passphrase = $passphrase;
+        
+        let result = {
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_CTR>::new($key, None).expect("");
+            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let nonce = encryptor.get_nonce().expect("");
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, AES_CTR) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        
+        let mut result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES_CTR>::new($key, None).expect("");
+            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let nonce = encryptor.get_nonce().expect("");
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, AES_CTR) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+
+        let mut result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES_CTR>::new($key, None).expect("");
+            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let nonce = encryptor.get_nonce().expect("");         
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
     // XChaCha20
     ($key:expr, 1024, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut key = $key;
@@ -493,6 +570,55 @@ macro_rules! Encryption {
 
         let mut result = {
             let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key, None).expect("");
+            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let mut nonce = encryptor.get_nonce().expect("");
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
+    // XChaCha20Poly1305
+    ($key:expr, 1024, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let passphrase = $passphrase;
+        
+        let result = {
+        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20Poly1305>::new($key, None).expect("");
+            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let nonce = encryptor.get_nonce().expect("");
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        
+        let mut result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20Poly1305>::new($key, None).expect("");
+            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
+            let mut nonce = encryptor.get_nonce().expect("");
+            (encrypt_message, cipher, nonce.to_string())
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        result
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+
+        let mut result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20Poly1305>::new($key, None).expect("");
             let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
             let mut nonce = encryptor.get_nonce().expect("");
             (encrypt_message, cipher, nonce.to_string())
@@ -657,6 +783,56 @@ macro_rules! Decryption {
         result
     }};
 
+    // AES_CTR
+    ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
+        let key = $key;
+        let mut data = $data;
+        let passphrase = $passphrase;
+        let mut cipher = $cipher;
+
+        let result = {        
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_CTR>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        $key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        result
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        let mut cipher = $cipher;
+
+        let mut result = {
+            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES_CTR>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        result
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        let mut cipher = $cipher;
+
+        let mut result = {
+            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES_CTR>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        result
+    }};
+
     // XChaCha20
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let key = $key;
@@ -703,6 +879,62 @@ macro_rules! Decryption {
 
         let mut result = {
             let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        nonce.zeroize();
+        result
+    }};
+
+    // XChaCha20Poly1305
+    ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
+        let key = $key;
+        let mut data = $data;
+        let passphrase = $passphrase;
+        let mut cipher = $cipher;
+        let mut nonce = $nonce;
+
+        let result = {        
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        $key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        nonce.zeroize();
+        result
+    }};
+    ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        let mut cipher = $cipher;
+        let mut nonce = $nonce;
+
+        let mut result = {
+            let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
+            decryptor.decrypt_data($data, $passphrase, $cipher)
+        };
+        key.zeroize();
+        data.zeroize();
+        passphrase.to_string().zeroize();
+        cipher.zeroize();
+        nonce.zeroize();
+        result
+    }};
+    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
+        let mut key = $key;
+        let mut data = $data;
+        let mut passphrase = $passphrase;
+        let mut cipher = $cipher;
+        let mut nonce = $nonce;
+
+        let mut result = {
+            let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
             decryptor.decrypt_data($data, $passphrase, $cipher)
         };
         key.zeroize();

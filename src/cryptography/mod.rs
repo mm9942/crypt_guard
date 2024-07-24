@@ -48,7 +48,7 @@ impl fmt::Display for CipherAES_CTR {
     }
 }
 
-/// Represents the ChaCha cipher for encryption and decryption processes.
+/// Represents the XChaCha20 cipher for encryption and decryption processes.
 /// It includes cryptographic information, a nonce for the operation, and a shared secret.
 #[derive(PartialEq, Debug, Clone)]
 pub struct CipherChaCha {
@@ -63,12 +63,28 @@ impl fmt::Display for CipherChaCha {
     }
 }
 
+/// Represents the XChaCha20Poly1305 cipher for encryption and decryption processes.
+/// It includes cryptographic information, a nonce for the operation, and a shared secret.
+#[derive(PartialEq, Debug, Clone)]
+pub struct CipherChaCha_Poly {
+    pub infos: CryptographicInformation,
+    pub nonce: [u8; 24],
+    pub sharedsecret: Vec<u8>,
+}
+
+impl fmt::Display for CipherChaCha_Poly {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherChaCha with the following Cryptographic Informations {}", self.infos.metadata)
+    }
+}
+
 /// Enumerates the cryptographic mechanisms supported, such as AES and XChaCha20.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CryptographicMechanism {
     AES,
     AES_GCM_SIV,
     AES_CTR,
+    XChaCha20Poly1305,
     XChaCha20,
 }
 
@@ -78,6 +94,7 @@ impl fmt::Display for CryptographicMechanism {
             CryptographicMechanism::AES => "AES",
             CryptographicMechanism::AES_GCM_SIV => "AES-GCM-SIV",
             CryptographicMechanism::AES_CTR => "AES-CTR",
+            CryptographicMechanism::XChaCha20Poly1305 => "XChaCha20Poly1305",
             CryptographicMechanism::XChaCha20 => "XChaCha20",
         };
         write!(f, "{}", mechanism)
