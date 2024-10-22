@@ -8,11 +8,11 @@
 
 [blog-badge]: https://img.shields.io/badge/blog-hashnode-lightblue.svg?style=for-the-badge
 [blog-url]: https://blog.mm29942.com/
-[crates-badge]: https://img.shields.io/badge/crates.io-v1.2-blue.svg?style=for-the-badge
+[crates-badge]: https://img.shields.io/badge/crates.io-v1.3-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
 [mit-url]: https://github.com/mm9942/crypt_guard/blob/main/LICENSE
-[doc-badge]: https://img.shields.io/badge/docs-v1.2-yellow.svg?style=for-the-badge
+[doc-badge]: https://img.shields.io/badge/docs-v1.3-yellow.svg?style=for-the-badge
 [doc-url]: https://docs.rs/crypt_guard/
 [lib-badge]: https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge
 [lib-link]: https://github.com/mm9942/crypt_guard
