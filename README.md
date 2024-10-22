@@ -436,8 +436,8 @@ let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_
 let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
 ```
 
-#### News regarding the CLI version[![Crates.io][cli-badge]][cli-link]
-[cli-badge]: https://img.shields.io/badge/github-cli-black.svg?style=for-the-badge
+#### News regarding the CLI version [![Crates.io][cli-badge]][cli-link]
+[cli-badge]: https://img.shields.io/badge/github-cli-black.svg
 [cli-link]: https://github.com/mm9942/crypt_guard_cli
 
 I have almost finished each subcommand, with only the verify subcommand remaining. After completing this, I will test signing and verification. The pre-release is now available on GitHub, and the finished product should be released within a few days or by the end of the month at the latest!
