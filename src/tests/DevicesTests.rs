@@ -12,7 +12,7 @@ use crate::{
 
 #[test]
 fn test_get_devices() {
-    let result = get_devices();
+    let result = device::SystemInfo::get_devices();
     assert!(result.is_ok());
     
     let devices = result.unwrap();
@@ -28,6 +28,6 @@ fn test_get_devices() {
 
 #[test]
 fn test_print_devices() {
-    let result = print_devices();
+    let result = device::SystemInfo::print_devices();
     assert!(result.is_ok());
 }

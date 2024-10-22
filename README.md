@@ -31,24 +31,51 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 ## Version Information
 
-### Newest Features
+### Latest Features
 
-**New AES modes:** We have implemented the block modes AES_GCM_SIV and AES_CTR as save alternatives to the pure AES implementation based on the ECB block mode. The new GCM_SIV and CTR block mode implementations work with randomly generated IV's. We also added some functions for device lookup and are now implementing AES with the XTS block mode and system command device handling on Linux and Windows. It's also planned to implement the block modes: CBC and CTR. Use the AES_GCM_SIV implementation through the macro the same way you use XChaCha20.
+**New AES Modes:** We have implemented the block modes AES_GCM_SIV and AES_CTR as secure alternatives to the pure AES implementation based on the ECB block mode. The new GCM_SIV and CTR block mode implementations work with randomly generated IVs. We also added functions for device lookup and implemented AES with the XTS block mode and system command device handling for Linux to handle device encryption. Device control is currently in a beta stage and may contain some bugs. Use the AES_GCM_SIV implementation via the macro in the same way you use XChaCha20.
 
-**Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);` 
+**AES Modes Overview:** We have implemented AES_GCM_SIV and AES_CTR as secure alternatives to AES in ECB mode. These new modes use randomly generated Initialization Vectors (IVs) for enhanced security. We are also planning to add AES_XTS, CBC, and other modes for greater versatility.
 
-**Decryption Macro for AES_GCM_SIV:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_GCM_SIV)` 
+#### Summary of AES Modes
 
+1. **AES_GCM_SIV**: A variant of Galois Counter Mode (GCM) that includes a Synthetic Initialization Vector (SIV) to mitigate misuse vulnerabilities. It ensures data security even if IVs are reused and provides authenticated encryption, combining confidentiality and integrity. Suitable for distributed systems with lower entropy.
 
-**Encryption Macro for AES_CTR:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);` 
+2. **AES_CTR**: Operates as a stream cipher using a counter for each block, making it efficient for parallel processing. It lacks inherent data authentication, so it is often paired with a MAC. AES_CTR is ideal for secure data transmission where speed and parallelizability are crucial.
 
-**Decryption Macro for AES_CTR:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_CTR)` 
+3. **AES_XTS**: Designed for encrypting data on disk, using two keys to resist attacks targeting ciphertext patterns. It ensures different encryption of identical blocks based on their locations, making it ideal for storage-based encryption.
 
+4. **XChaCha20Poly1305**: A variant of ChaCha20 with a 192-bit extended nonce, which provides increased security against nonce reuse. It is combined with the Poly1305 message authentication code to ensure data integrity and confidentiality. XChaCha20Poly1305 offers better performance than AES, especially in software-based implementations, and is highly secure due to the larger nonce size.
 
-**Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);` 
+#### Comparison with XChaCha20 and AES-ECB
 
-**Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)` 
+**XChaCha20**: A stream cipher that offers security equivalent to AES but with better performance and ease of use. It uses a 192-bit nonce to minimize nonce reuse risks and provides authenticated encryption. XChaCha20 is ideal for high-performance applications like encrypted messaging.
 
+**AES (ECB)**: Encrypts each plaintext block separately, making it insecure as identical blocks produce identical ciphertext. It reveals data patterns, which makes it unsuitable for most secure contexts.
+
+#### General Differences
+
+- **Security**: AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 mitigate the security flaws of AES-ECB by adding randomness and integrity checks, whereas ECB exposes data patterns.
+- **Performance**: AES_CTR and XChaCha20Poly1305 offer fast, parallelizable encryption, with XChaCha20Poly1305 being particularly resistant to nonce reuse issues. AES_GCM_SIV provides additional integrity checks.
+- **Complexity**: AES_GCM_SIV and XChaCha20Poly1305 are more complex to implement but offer significant security improvements over ECB.
+
+In summary, AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 provide better security than AES-ECB, with XChaCha20Poly1305 being an efficient alternative for scenarios where performance and nonce management are crucial.
+
+**Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);`
+
+**Decryption Macro for AES_GCM_SIV:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_GCM_SIV)`
+
+**Encryption Macro for AES_CTR:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);`
+
+**Decryption Macro for AES_CTR:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_CTR)`
+
+**Encryption Macro for AES_XTS:** `let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_XTS);`
+
+**Decryption Macro for AES_XTS:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, AES_XTS)`
+
+**Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);`
+
+**Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)`
 
 The macros now automatically zero out the used values to enhance data security during execution. For other execution methods, ensure data safety by manually addressing confidentiality. Developers using this crate are responsible for securely storing, hiding, and zeroing out keys in memory to protect encrypted information. As these values are generated, they fall outside my control for adding security measures. Note that the macros now require data ownership; to ensure safety, avoid cloning and instead use `.to_owned()`.
 
@@ -56,7 +83,7 @@ The macros now automatically zero out the used values to enhance data security d
 
 ### Current Release
 
-The present version, **1.3.4**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new Version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
+The current version, **1.3.5**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 

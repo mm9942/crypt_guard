@@ -8,7 +8,11 @@ pub mod kyber;
 pub mod cipher_aes_gcm_siv;
 /// The `cipher_aes_ctr` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption with the CTR block mode and decryption, providing a robust symmetric key cryptography solution.
 pub mod cipher_aes_ctr;
+/// The `cipher_aes_xts` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption with the XTS block mode and decryption, providing a robust symmetric key cryptography solution.
+pub mod cipher_aes_xts;
+
 /// Functions for device handling
+#[cfg(feature = "devices")]
 pub mod devices;
 
 pub use kyber::KeyControler::*;

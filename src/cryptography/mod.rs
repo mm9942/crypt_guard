@@ -48,6 +48,18 @@ impl fmt::Display for CipherAES_CTR {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct CipherAES_XTS {
+    pub infos: CryptographicInformation,
+    pub sharedsecret: Vec<u8>,
+}
+
+impl fmt::Display for CipherAES_XTS {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CipherAES_XTS with the following Cryptographic Informations: {}", self.infos.metadata)
+    }
+}
+
 /// Represents the XChaCha20 cipher for encryption and decryption processes.
 /// It includes cryptographic information, a nonce for the operation, and a shared secret.
 #[derive(PartialEq, Debug, Clone)]
@@ -84,6 +96,7 @@ pub enum CryptographicMechanism {
     AES,
     AES_GCM_SIV,
     AES_CTR,
+    AES_XTS,
     XChaCha20Poly1305,
     XChaCha20,
 }
@@ -94,6 +107,7 @@ impl fmt::Display for CryptographicMechanism {
             CryptographicMechanism::AES => "AES",
             CryptographicMechanism::AES_GCM_SIV => "AES-GCM-SIV",
             CryptographicMechanism::AES_CTR => "AES-CTR",
+            CryptographicMechanism::AES_XTS => "AES-XTS",
             CryptographicMechanism::XChaCha20Poly1305 => "XChaCha20Poly1305",
             CryptographicMechanism::XChaCha20 => "XChaCha20",
         };

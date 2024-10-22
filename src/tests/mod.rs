@@ -1,3 +1,4 @@
+#[cfg(feature = "devices")]
 #[cfg(test)]
 mod DevicesTests;
 

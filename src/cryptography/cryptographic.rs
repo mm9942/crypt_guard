@@ -31,6 +31,11 @@ impl CryptographicMechanism {
     }
 
     /// Specifies XChaCha20 as the cryptographic mechanism.
+    pub fn aes_xts() -> Self {
+        Self::AES_XTS
+    }
+
+    /// Specifies XChaCha20 as the cryptographic mechanism.
     pub fn xchacha20() -> Self {
         Self::XChaCha20
     }
