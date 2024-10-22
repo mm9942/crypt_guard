@@ -1,0 +1,79 @@
+//#[cfg(not(feature = "devices"))]
+//compile_error!("This example requires the `devices` feature to be enabled.");
+
+use std::collections::HashMap;
+use crypt_guard::{
+    Encryption,
+    Decryption,
+    EncryptFile,
+    DecryptFile,
+    error::*,
+    devices::*,
+    *,
+    KyberKeyFunctions,
+    KeyControlVariant,
+};
+use crypt_guard::cryptography::KeyEncapMechanism;
+use crypt_guard::devices::errors::DiskManagerError;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    sudo::escalate_if_needed()?;
+    let (public, secret) = KyberKeypair!(1024);
+    
+    let key = KeyControlVariant::new(KeyEncapMechanism::Kyber1024);
+    let (sharedsecret, ciphertext) = key.encap(&public)?;
+
+    // Handle the result and get the DiskIO object
+    let mut device = match disk_io::DiskIO::open("/dev/loop7") {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Failed to open the device: {:?}", e);
+            return Err(Box::new(e));
+        }
+    };
+    
+    // Now we have the device, so get the block size
+    let block_size = device.get_block_size();
+
+    // Read the first block
+    let block = match device.read_block(0) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("Failed to read the first block: {:?}", e);
+            return Err(Box::new(e));
+        }
+    };
+
+    let mut block_number = 0;
+    
+    // Loop to read blocks sequentially
+    loop {
+        match device.read_block(block_number) {
+            Ok(block) => {
+                // Successfully read a block, process the block as needed
+                println!("Read block number: {}", block_number);
+                block_number += 1;
+            },
+            Err(DiskManagerError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                // Reached the end of the disk
+                println!("Reached the end of the disk after reading {} blocks.", block_number);
+                break;
+            },
+            Err(e) => {
+                // Handle any other error
+                eprintln!("Error reading block {}: {:?}", block_number, e);
+                break;
+            }
+        }
+    }
+
+    let result = device::SystemInfo::get_devices();
+    assert!(result.is_ok());
+    
+    let devices = result.unwrap();
+    device::SystemInfo::print_devices();
+    println!("{:?}", devices);
+    println!("SharedSecret Length: {}\n Ciphertext Length: {}", sharedsecret.len(), ciphertext.len());
+
+    Ok(())
+}
