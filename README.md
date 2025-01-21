@@ -83,7 +83,7 @@ The macros now automatically zero out the used values to enhance data security d
 
 ### Current Release
 
-The current version, **1.3.5**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
+The current version, **1.3.9**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 
@@ -461,6 +461,192 @@ let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_
 
 // Decrypt message
 let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;
+```
+
+#### Zipping Files and Directories Using the ZipManager
+
+CryptGuard introduces the `ZipManager`, a utility for archiving multiple files and directories into a single ZIP archive. This tool simplifies the process of creating ZIP files by providing an easy-to-use API. Macros for zipping will be added later.
+
+##### Example 1: Zipping Both Files and Directories
+
+In this example, we'll demonstrate how to zip multiple files and directories into one ZIP archive.
+
+```rust
+use crypt_guard::zip_manager::*;
+use std::path::PathBuf;
+use std::fs;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Setting up sample files and directories
+    // Create a sample directory
+    fs::create_dir_all("sample_dir")?;
+    fs::create_dir_all("sample_dir/nested_dir")?;
+    
+    // Create sample files
+    fs::write("file1.txt", "This is the content of file1.")?;
+    fs::write("file2.txt", "This is the content of file2.")?;
+    fs::write("sample_dir/file3.txt", "This is the content of file3 in sample_dir.")?;
+    fs::write("sample_dir/nested_dir/file4.txt", "This is the content of file4 in nested_dir.")?;
+    
+    // Specify the output ZIP file path
+    let output_zip = "archive_with_dirs.zip";
+    
+    // Create a new ZipManager instance
+    let mut manager = ZipManager::new(output_zip);
+    
+    // Add individual files to the zip
+    manager.add_file("file1.txt");
+    manager.add_file("file2.txt");
+    
+    // Add directories to the zip
+    manager.add_directory("sample_dir");
+    
+    // Create the ZIP archive with Deflated compression
+    manager.create_zip(Compression::Deflated)?;
+    
+    println!("ZIP archive created at {}", output_zip);
+    
+    // Cleanup sample files and directories
+    fs::remove_file("file1.txt")?;
+    fs::remove_file("file2.txt")?;
+    fs::remove_dir_all("sample_dir")?;
+    
+    Ok(())
+}
+```
+
+##### Example 2: Zipping Multiple Files Only
+
+Here's how to zip multiple individual files into a single ZIP archive.
+
+```rust
+use crypt_guard::zip_manager::*;
+use std::fs;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Setting up sample files
+    fs::write("file1.txt", "Content of file1")?;
+    fs::write("file2.txt", "Content of file2")?;
+    fs::write("file3.txt", "Content of file3")?;
+    
+    // Specify the output ZIP file path
+    let output_zip = "archive_with_files.zip";
+    
+    // Create a new ZipManager instance
+    let mut manager = ZipManager::new(output_zip);
+    
+    // Add files to zip
+    manager.add_file("file1.txt");
+    manager.add_file("file2.txt");
+    manager.add_file("file3.txt");
+    
+    // Create the ZIP archive with Deflated compression
+    manager.create_zip(Compression::Deflated)?;
+    
+    println!("ZIP archive created at {}", output_zip);
+    
+    // Cleanup sample files
+    fs::remove_file("file1.txt")?;
+    fs::remove_file("file2.txt")?;
+    fs::remove_file("file3.txt")?;
+    
+    Ok(())
+}
+```
+
+##### Compression Methods
+
+The `ZipManager` allows you to choose from different compression methods depending on your needs. The available options are:
+
+- **`Compression::stored()`**: No compression is applied. Use this option for faster archiving when compression is unnecessary.
+- **`Compression::deflated()`**: Standard ZIP compression. Offers a good balance between compression ratio and speed.
+- **`Compression::zip2()`**: Uses Bzip2 compression. Provides higher compression ratios but may be slower.
+- **`Compression::zstd()`**: Uses Zstandard compression. Offers high compression ratios and speed. Note that to use Zstandard compression, you need to enable the `zstd` feature in the `zip` crate.
+
+### Archiving and Extracting with Macros
+
+##### 1. `archive!` Macro
+
+**Syntax:**
+```rust
+archive!(source_path, delete_dir);
+```
+
+- **`$source_path`**: The path to the directory or file you wish to archive. It can be provided as a `&str` or a `PathBuf`.
+- **`$delete_dir`**: A boolean flag indicating whether to delete the original directory or file after archiving (`true` to delete, `false` to retain).
+
+**Example:**
+```rust
+use crypt_guard::archive;
+use std::path::PathBuf;
+
+fn main() {
+    let source = PathBuf::from("/path/to/source_directory");
+    
+    // Archive the directory without deleting the source
+    archive!(source, false);
+    
+    // Archive the directory and delete the source after archiving
+    archive!(source, true);
+}
+```
+
+##### 2. `extract!` Macro
+
+**Syntax:**
+```rust
+extract!(archive_path, delete_archive);
+```
+
+- **`$archive_path`**: The path to the `.tar.xz` archive you intend to extract. It can be a `&str` or a `PathBuf`.
+- **`$delete_archive`**: A boolean flag indicating whether to delete the archive file after extraction (`true` to delete, `false` to retain).
+
+**Example:**
+```rust
+use crypt_guard::extract;
+use std::path::PathBuf;
+
+fn main() {
+    let archive = PathBuf::from("/path/to/archive.tar.xz");
+    
+    // Extract the archive without deleting the archive file
+    extract!(archive, false);
+    
+    // Extract the archive and delete the archive file after extraction
+    extract!(archive, true);
+}
+```
+
+##### 3. `ArchiveUtil!` Macro
+
+**Syntax:**
+```rust
+ArchiveUtil!(path, delete_flag, Variant);
+```
+
+- **`$path`**: The path to the directory/file to archive or the archive file to extract. Accepts a `&str` or a `PathBuf`.
+- **`$delete_flag`**: A boolean indicating whether to delete the original directory/file or the archive file after the operation.
+- **`Variant`**: Specifies the operation type. Use `Archive` to compress and `Extract` to decompress.
+
+**Variants:**
+- **`Archive`**: Compresses the specified directory or file.
+- **`Extract`**: Decompresses the specified archive file.
+
+**Example:**
+```rust
+use crypt_guard::ArchiveUtil;
+use std::path::PathBuf;
+
+fn main() {
+    let source = PathBuf::from("/path/to/source_directory");
+    let archive = PathBuf::from("/path/to/archive.tar.xz");
+    
+    // Using ArchiveUtil! to archive without deleting the source
+    ArchiveUtil!(source, false, Archive);
+    
+    // Using ArchiveUtil! to extract and delete the archive file after extraction
+    ArchiveUtil!(archive, true, Extract);
+}
 ```
 
 #### News regarding the CLI version [![Crates.io][cli-badge]][cli-link]

@@ -203,6 +203,8 @@ pub mod log;
 /// Error types
 pub mod error;
 
+pub mod Utils;
+
 #[cfg(test)]
 mod tests;
 
@@ -217,8 +219,11 @@ pub use crate::{
         KDF,
         kyber::*,
     },
+    Utils::{
+        archive,
+        zip_manager,
+    }
 };
-
 use std::{
     fmt::{*}
 };
@@ -273,6 +278,61 @@ macro_rules! DecryptOpen {
         content.zeroize();
         cipher.zeroize();
         result
+    }};
+}
+
+
+/// Macro to archive a directory or file.
+#[macro_export]
+macro_rules! archive {
+    ($source_path:expr, $delete_dir:expr) => {{
+        use crate::archive::{Archive, ArchiveOperation};
+        let source = $source_path.to_path_buf();
+        let archive_operation = ArchiveOperation::Archive;
+        let archive_instance = Archive::new(source, archive_operation);
+        archive_instance.execute($delete_dir).expect("Archiving failed");
+    }};
+}
+
+/// Macro to extract a `.tar.xz` archive.
+#[macro_export]
+macro_rules! extract {
+    ($archive_path:expr, $delete_archive:expr) => {{
+        use crate::archive::{Archive, ArchiveOperation};
+        let archive = $archive_path.to_path_buf();
+        let archive_operation = ArchiveOperation::Unarchive;
+        let extract_instance = Archive::new(archive, archive_operation);
+        extract_instance.execute($delete_archive).expect("Extraction failed");
+    }};
+}
+
+/// Macro for archiving and extracting directories or files.
+#[macro_export]
+macro_rules! ArchiveUtil {
+    // Variant for Archiving
+    ($path:expr, $delete_dir:expr, Archive) => {{
+        //use crate::archive::{Archive, ArchiveOperation};
+        // Convert the provided path to a PathBuf
+        let source = $path.to_path_buf();
+        // Specify the archive operation
+        let archive_operation = ArchiveOperation::Archive;
+        // Create a new Archive instance
+        let archive_instance = Archive::new(source, archive_operation);
+        // Execute the archiving process with the specified delete flag
+        archive_instance.execute($delete_dir).expect("Archiving failed");
+    }};
+    
+    // Variant for Extracting
+    ($archive_path:expr, $delete_archive:expr, Extract) => {{
+        use crate::archive::{Archive, ArchiveOperation};
+        // Convert the provided archive path to a PathBuf
+        let archive = $archive_path.to_path_buf();
+        // Specify the extraction operation
+        let archive_operation = ArchiveOperation::Unarchive;
+        // Create a new Archive instance
+        let extract_instance = Archive::new(archive, archive_operation);
+        // Execute the extraction process with the specified delete flag
+        extract_instance.execute($delete_archive).expect("Extraction failed");
     }};
 }
 

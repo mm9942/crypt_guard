@@ -11,6 +11,8 @@ pub mod cipher_aes_ctr;
 /// The `cipher_aes_xts` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption with the XTS block mode and decryption, providing a robust symmetric key cryptography solution.
 pub mod cipher_aes_xts;
 
+//pub mod archive;
+
 /// Functions for device handling
 #[cfg(feature = "devices")]
 pub mod devices;

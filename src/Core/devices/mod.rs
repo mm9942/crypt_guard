@@ -3,6 +3,7 @@
 pub mod device;
 pub mod disk_io;
 pub mod errors;
+mod virtual_disk;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 

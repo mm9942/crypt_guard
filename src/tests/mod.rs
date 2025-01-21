@@ -3,6 +3,9 @@
 mod DevicesTests;
 
 #[cfg(test)]
+mod ArchiveTests;
+
+#[cfg(test)]
 mod KyberKeyTests;
 
 #[cfg(test)]
