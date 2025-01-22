@@ -7,26 +7,8 @@ mod kyber_crypto_aes_ctr;
 mod kyber_crypto_aes_xts;
 mod kyber_crypto_xchacha_poly;
 
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
-use crate::{
-	*,
-    log_activity,
-	cryptography::*, 
-	error::CryptError, 
-	//hmac_sign::*,
-	FileTypes,
-	FileState,
-	FileMetadata,
-	KeyTypes,
-	Key,
-	Core::CryptographicFunctions,
-    write_log,
-};
-use std::{
-    path::{PathBuf, Path},
-    marker::PhantomData, 
-    result::Result,
-};
+use std::{marker::PhantomData, path::{Path, PathBuf}};
+use crate::error::CryptError;
 
 /// Trait for Kyber cryptographic functions.
 pub trait KyberFunctions {

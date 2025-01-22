@@ -1,4 +1,23 @@
-use super::*;
+use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
+use crate::{
+    *,
+    log_activity,
+    cryptography::*, 
+    error::CryptError, 
+    //hmac_sign::*,
+    FileTypes,
+    FileState,
+    FileMetadata,
+    KeyTypes,
+    Key,
+    Core::CryptographicFunctions,
+    write_log,
+};
+use std::{
+    path::{PathBuf, Path},
+    marker::PhantomData, 
+    result::Result,
+};
 
 /// Provides Kyber encryption functions for XChaCha20Poly1305 algorithm.
 impl<KyberSize, ContentStatus> KyberFunctions for Kyber<Encryption, KyberSize, ContentStatus, XChaCha20Poly1305>
@@ -32,7 +51,7 @@ where
         );
         let file = FileMetadata::from(path, FileTypes::other(), FileState::not_encrypted());
         let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
-        let mut xchacha = CipherChaCha_Poly::new(infos, None);
+        let mut xchacha = CipherChaCha_Poly::create(infos, None);
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
@@ -64,7 +83,7 @@ where
             ContentType::message(),
         );
         let infos = CryptographicInformation::from(message.as_bytes().to_owned(), passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
-        let mut xchacha = CipherChaCha_Poly::new(infos, None);
+        let mut xchacha = CipherChaCha_Poly::create(infos, None);
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
@@ -96,7 +115,7 @@ where
             ContentType::message(),
         );
         let infos = CryptographicInformation::from(data, passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
-        let mut xchacha = CipherChaCha_Poly::new(infos, None);
+        let mut xchacha = CipherChaCha_Poly::create(infos, None);
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
@@ -166,7 +185,7 @@ where
         );
         let file = FileMetadata::from(path, FileTypes::other(), FileState::encrypted());
         let infos = CryptographicInformation::from(Vec::new(), passphrase.as_bytes().to_vec(), crypt_metadata, true, Some(file));
-        let mut xchacha = CipherChaCha_Poly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha_Poly::create(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
@@ -196,7 +215,7 @@ where
             ContentType::message(),
         );
         let infos = CryptographicInformation::from(message, passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
-        let mut xchacha = CipherChaCha_Poly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha_Poly::create(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
@@ -227,7 +246,7 @@ where
             ContentType::message(),
         );
         let infos = CryptographicInformation::from(data, passphrase.as_bytes().to_vec(), crypt_metadata, false, None);
-        let mut xchacha = CipherChaCha_Poly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha_Poly::create(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();

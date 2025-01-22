@@ -1,13 +1,9 @@
-use super::*;
-
+use kyber::KeyControler::*;
 //use crypt_guard_proc::{*, log_actnonceity, write_log};
 use crate::{
     *,
-    cryptography::{
-        CryptographicInformation,
-        CipherChaCha, 
-    },
-    error::{*}, 
+    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
+    error::CryptError, 
     Core::{
         KyberKeyFunctions,
         KeyControlVariant,
@@ -46,7 +42,7 @@ impl CipherChaCha_Poly {
     ///
     /// # Returns
     /// A new CipherChaCha instance.
-    pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
+    pub fn create(infos: CryptographicInformation, nonce: Option<String>) -> Self {
         let nonce: [u8; 24] = match nonce {
             Some(nonce) => {
                 let mut array = [0u8; 24];

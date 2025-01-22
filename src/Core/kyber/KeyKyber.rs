@@ -1,4 +1,23 @@
-use super::*;
+use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
+use crate::{
+    *,
+    log_activity,
+    cryptography::*, 
+    error::CryptError, 
+    //hmac_sign::*,
+    FileTypes,
+    FileState,
+    FileMetadata,
+    KeyTypes,
+    Key,
+    Core::CryptographicFunctions,
+    write_log,
+};
+use std::{
+    path::{PathBuf, Path},
+    marker::PhantomData, 
+    result::Result,
+};
 
 /// Trait for implementing key management functions. This trait provides
 /// an interface for key pair generation, encapsulation/decapsulation of secrets,
