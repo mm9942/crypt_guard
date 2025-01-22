@@ -42,7 +42,7 @@ impl CipherChaCha_Poly {
     ///
     /// # Returns
     /// A new CipherChaCha instance.
-    pub fn create(infos: CryptographicInformation, nonce: Option<String>) -> Self {
+    pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
         let nonce: [u8; 24] = match nonce {
             Some(nonce) => {
                 let mut array = [0u8; 24];
