@@ -1,7 +1,7 @@
 workspace = { members = [ "crypt_guard_proc"] }
 [package]
 name = "crypt_guard"
-version = "1.3.9"
+version = "1.3.10"
 edition = "2021"
 description = "CryptGuard is a post-quantum cryptography library with support for Kyber, Falcon, Dilithium in combination with AES and XChaCha20."
 license = "MIT"
