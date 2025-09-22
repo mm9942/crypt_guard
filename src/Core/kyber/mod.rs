@@ -7,7 +7,7 @@ mod kyber_crypto_aes_ctr;
 mod kyber_crypto_aes_xts;
 mod kyber_crypto_xchacha_poly;
 
-use std::{marker::PhantomData, path::{Path, PathBuf}};
+use std::{marker::PhantomData, path::PathBuf};
 use crate::error::CryptError;
 
 /// Trait for Kyber cryptographic functions.

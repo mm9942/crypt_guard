@@ -1,4 +1,3 @@
-use kyber::KeyControler::*;
 //use crypt_guard_proc::{*, log_actnonceity, write_log};
 use crate::{
     *,
@@ -9,14 +8,11 @@ use crate::{
         KeyControlVariant,
     },
 };
-use std::{
-    result::Result, 
-    fs
-};
+use std::result::Result;
 use rand::{RngCore, rngs::OsRng};
 use hex;
 use chacha20poly1305::{
-    aead::{Aead, AeadCore, KeyInit},
+    aead::{Aead, KeyInit},
     XChaCha20Poly1305, XNonce
 };
 use aes::cipher::generic_array::GenericArray;

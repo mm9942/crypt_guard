@@ -10,17 +10,11 @@ use crate::{
         KeyControlVariant,
     },
 };
-use std::{
-    result::Result, 
-    fs
-};
+use std::result::Result;
 use rand::{RngCore, rngs::OsRng};
 use hex;
-use aes_gcm_siv::{
-    aead::{Aead, KeyInit},
-    Aes256GcmSiv, Nonce,
-};
-use aes::cipher::{KeyIvInit, StreamCipher, StreamCipherSeek, generic_array::GenericArray};
+use aes_gcm_siv::aead::KeyInit;
+use aes::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray};
 
 /// Generates a 16-byte iv using OS-level randomness.
 ///
@@ -112,7 +106,7 @@ impl CipherAES_CTR {
         let mut cipher = Aes256Ctr64LE::new(key, iv);
 
         let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
-        let mut data = hmac.hmac();
+        let data = hmac.hmac();
 
         let mut buf = data;
         let _ = cipher.apply_keystream(&mut buf);
@@ -123,7 +117,7 @@ impl CipherAES_CTR {
     }
 
     fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-        let mut ciphertext = self.infos.content()?;
+        let ciphertext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
         let key = GenericArray::from_slice(&self.sharedsecret);
         let iv = GenericArray::from_slice(&self.iv);

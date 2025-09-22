@@ -11,7 +11,7 @@ pub mod cipher_aes_xts;
 
 //pub mod archive;
 
-use crate::{cryptography::*, error::CryptError, cryptography::hmac_sign::*};
+use crate::{cryptography::*, error::CryptError};
 pub use kyber::KeyControler::*;
 
 /// The `cipher_aes` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption and decryption, providing a robust symmetric key cryptography solution.

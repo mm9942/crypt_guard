@@ -10,12 +10,7 @@ use crate::{
         KeyControlVariant,
     },
 };
-use std::{
-    result::Result, 
-    fs
-};
-use rand::{RngCore, rngs::OsRng};
-use hex;
+use std::result::Result;
 use aes::{Aes256, cipher::KeyInit, cipher::generic_array::GenericArray};
 use xts_mode::{Xts128, get_tweak_default};
 

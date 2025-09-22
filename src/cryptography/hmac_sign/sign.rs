@@ -1,7 +1,4 @@
-use crate::{
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation, SignatureData}},
-};
-use crate::error::SigningErr;
+use crate::cryptography::hmac_sign::{Sign, SignType, Operation, SignatureData};
 
 use hmac::{Hmac, Mac};
 use sha2::{Sha512, Sha256};

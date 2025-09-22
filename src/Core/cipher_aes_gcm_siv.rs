@@ -10,10 +10,7 @@ use crate::{
         KeyControlVariant,
     },
 };
-use std::{
-    result::Result, 
-    fs
-};
+use std::result::Result;
 use rand::{RngCore, rngs::OsRng};
 use hex;
 use aes_gcm_siv::{

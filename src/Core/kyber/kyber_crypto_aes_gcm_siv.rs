@@ -1,20 +1,15 @@
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 use crate::{
     *,
-    log_activity,
     cryptography::*, 
     error::CryptError, 
     //hmac_sign::*,
     FileTypes,
     FileState,
     FileMetadata,
-    KeyTypes,
-    Key,
     Core::CryptographicFunctions,
-    write_log,
 };
 use std::{
-    marker::PhantomData, 
     path::{Path, PathBuf},
     result::Result,
 };

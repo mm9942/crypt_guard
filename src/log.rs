@@ -6,7 +6,6 @@ use std::{
     sync::Arc
 };
 use chrono::Local;
-use tracing_subscriber::fmt::SubscriberBuilder;
 use tracing_subscriber::prelude::*;
 use crate::error::CryptError;
 use std::sync::Mutex;

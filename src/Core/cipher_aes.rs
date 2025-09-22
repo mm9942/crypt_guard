@@ -185,7 +185,7 @@ impl CipherAES {
         let key = GenericArray::from_slice(&self.sharedsecret);
         let iv_arr = GenericArray::from_slice(iv);
 
-        let mut cipher = Aes128CbcDec::new(key, iv_arr);
+        let cipher = Aes128CbcDec::new(key, iv_arr);
         let mut buffer = encrypted_data.to_vec();
         cipher.decrypt_padded_mut::<Pkcs7>(&mut buffer)
             .map_err(|_| CryptError::DecryptionFailed)?;

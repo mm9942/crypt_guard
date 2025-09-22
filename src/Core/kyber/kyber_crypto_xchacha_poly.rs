@@ -8,14 +8,11 @@ use crate::{
     FileTypes,
     FileState,
     FileMetadata,
-    KeyTypes,
-    Key,
     Core::CryptographicFunctions,
     write_log,
 };
 use std::{
-    path::{PathBuf, Path},
-    marker::PhantomData, 
+    path::{PathBuf, Path}, 
     result::Result,
 };
 

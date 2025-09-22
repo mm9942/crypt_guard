@@ -224,12 +224,8 @@ pub use crate::{
         zip_manager,
     }
 };
-use std::{
-    fmt::{*},
-    path::Path,
-};
+use std::path::Path;
 use hex;
-use zeroize::Zeroize;
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile
 pub fn activate_log<P: AsRef<Path>>(log_file: P) {
     // Initialize internal logger state and set up tracing to write to the same file
