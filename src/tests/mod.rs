@@ -1,7 +1,3 @@
-#[cfg(feature = "devices")]
-#[cfg(test)]
-mod DevicesTests;
-
 #[cfg(test)]
 mod ArchiveTests;
 
@@ -16,6 +12,9 @@ mod SignatureTests;
 
 #[cfg(test)]
 mod MacroTests;
+
+#[cfg(test)]
+mod LegacyCleanupTests;
 
 #[cfg(test)]
 mod ze_end;

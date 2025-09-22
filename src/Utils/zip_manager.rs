@@ -26,7 +26,7 @@
 //!
 //! ### Creating a ZIP Archive with Files and Directories
 //!
-//! ```rust
+//! ```rust,no_run
 //! use std::path::PathBuf;
 //! use crypt_guard::zip_manager::*;
 //!

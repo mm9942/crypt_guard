@@ -225,16 +225,16 @@ pub use crate::{
     }
 };
 use std::{
-    fmt::{*}
+    fmt::{*},
+    path::Path,
 };
 use hex;
 use zeroize::Zeroize;
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile
-/*pub fn activate_log<P: AsRef<Path>>(log_file: P) {
-    let mut logger = LOGGER.lock().unwrap();
-    logger.activated = true;
-    logger.location = Some(log_file.as_ref().to_path_buf());
-}*/
+pub fn activate_log<P: AsRef<Path>>(log_file: P) {
+    // Initialize internal logger state and set up tracing to write to the same file
+    crate::log::initialize_logger(log_file.as_ref().to_path_buf());
+}
 
 /// Macro for signing and encrypting data, a 1024 falcon secret key is required for signing
 #[macro_export]

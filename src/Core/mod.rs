@@ -11,10 +11,6 @@ pub mod cipher_aes_xts;
 
 //pub mod archive;
 
-/// Functions for device handling
-#[cfg(feature = "devices")]
-pub mod devices;
-
 use crate::{cryptography::*, error::CryptError, cryptography::hmac_sign::*};
 pub use kyber::KeyControler::*;
 

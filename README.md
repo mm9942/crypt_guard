@@ -23,19 +23,24 @@ CryptGuard is a comprehensive cryptographic library, offering robust encryption 
 
 ## Key Features and Capabilities
 
-This library supports AES-256 and XChaCha20 encryption algorithms, providing a secure means to protect data. To cater to a variety of security requirements and operational contexts, CryptGuard integrates seamlessly with Kyber512, Kyber768, and Kyber1024 for encryption, ensuring compatibility with post-quantum cryptography standards.
-
-For developers who require digital signing capabilities, CryptGuard incorporates Falcon and Dilithium algorithms, offering robust options for creating and verifying digital signatures. This feature is particularly crucial for applications that necessitate authenticity and integrity of data, ensuring that digital communications remain secure and verifiable.
-
-An additional layer of security is provided through the appending of a HMAC (Hash-Based Message Authentication Code) to encrypted data. This critical feature enables the authentication of encrypted information, ensuring that any tampering with the data can be reliably detected. This HMAC attachment underscores CryptGuard's commitment to comprehensive data integrity and security, offering developers and end-users peace of mind regarding the authenticity and safety of their data.
+ - **Symmetric Encryption:** AES-256 and XChaCha20 for robust data protection.
+ - **Post-Quantum Key Exchange:** Kyber512, Kyber768, and Kyber1024 for future-proof security.
+ - **Digital Signatures:** Falcon and Dilithium to ensure authenticity and integrity.
+ - **Data Integrity:** HMAC (Hash-Based Message Authentication Code) appended to encrypted data to detect tampering.
 
 ## Version Information
 
 ### Latest Features
 
-**New AES Modes:** We have implemented the block modes AES_GCM_SIV and AES_CTR as secure alternatives to the pure AES implementation based on the ECB block mode. The new GCM_SIV and CTR block mode implementations work with randomly generated IVs. We also added functions for device lookup and implemented AES with the XTS block mode and system command device handling for Linux to handle device encryption. Device control is currently in a beta stage and may contain some bugs. Use the AES_GCM_SIV implementation via the macro in the same way you use XChaCha20.
+**New AES Modes:** We added AES_GCM_SIV and AES_CTR as secure alternatives to the legacy AES (ECB) path. Both use securely generated nonces/IVs and integrate with the same macros you already use.
 
-**AES Modes Overview:** We have implemented AES_GCM_SIV and AES_CTR as secure alternatives to AES in ECB mode. These new modes use randomly generated Initialization Vectors (IVs) for enhanced security. We are also planning to add AES_XTS, CBC, and other modes for greater versatility.
+**Added AES_XTS:** AES-XTS is now available for data-at-rest scenarios. It derives two subkeys internally and provides sector-based encryption with HMAC authentication. Access it via the same `Encryption!`/`Decryption!` macros or by using `Kyber<..., AES_XTS>`.
+
+**Added XChaCha20Poly1305:** Alongside XChaCha20, the authenticated XChaCha20-Poly1305 variant is now supported. Nonces are generated automatically on encryption and required for decryption (returned by the macro and stored on the Kyber instance).
+
+**Removed Legacy Module:** The obsolete storage component has been eliminated to streamline the core library.
+
+**AES Modes Overview:** We now provide AES_GCM_SIV, AES_CTR, and AES_XTS as secure alternatives to AES-ECB. These modes use randomly generated Initialization Vectors (IVs) for enhanced security. We are also planning to add CBC and other modes for greater versatility.
 
 #### Summary of AES Modes
 
@@ -43,9 +48,7 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 2. **AES_CTR**: Operates as a stream cipher using a counter for each block, making it efficient for parallel processing. It lacks inherent data authentication, so it is often paired with a MAC. AES_CTR is ideal for secure data transmission where speed and parallelizability are crucial.
 
-3. **AES_XTS**: Designed for encrypting data on disk, using two keys to resist attacks targeting ciphertext patterns. It ensures different encryption of identical blocks based on their locations, making it ideal for storage-based encryption.
-
-4. **XChaCha20Poly1305**: A variant of ChaCha20 with a 192-bit extended nonce, which provides increased security against nonce reuse. It is combined with the Poly1305 message authentication code to ensure data integrity and confidentiality. XChaCha20Poly1305 offers better performance than AES, especially in software-based implementations, and is highly secure due to the larger nonce size.
+3. **XChaCha20Poly1305**: A variant of ChaCha20 with a 192-bit extended nonce, which provides increased security against nonce reuse. It is combined with the Poly1305 message authentication code to ensure data integrity and confidentiality. XChaCha20Poly1305 offers better performance than AES, especially in software-based implementations, and is highly secure due to the larger nonce size.
 
 #### Comparison with XChaCha20 and AES-ECB
 
@@ -55,11 +58,11 @@ An additional layer of security is provided through the appending of a HMAC (Has
 
 #### General Differences
 
-- **Security**: AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 mitigate the security flaws of AES-ECB by adding randomness and integrity checks, whereas ECB exposes data patterns.
+- **Security**: AES_GCM_SIV, AES_CTR, and XChaCha20Poly1305 mitigate the security flaws of AES-ECB by adding randomness and integrity checks, whereas ECB exposes data patterns.
 - **Performance**: AES_CTR and XChaCha20Poly1305 offer fast, parallelizable encryption, with XChaCha20Poly1305 being particularly resistant to nonce reuse issues. AES_GCM_SIV provides additional integrity checks.
 - **Complexity**: AES_GCM_SIV and XChaCha20Poly1305 are more complex to implement but offer significant security improvements over ECB.
 
-In summary, AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 provide better security than AES-ECB, with XChaCha20Poly1305 being an efficient alternative for scenarios where performance and nonce management are crucial.
+In summary, AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 provide stronger security properties than AES-ECB, with XChaCha20Poly1305 offering efficient AEAD for scenarios where performance and nonce management are crucial, and AES_XTS being suited for data-at-rest.
 
 **Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);`
 
@@ -73,6 +76,7 @@ In summary, AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 provide better 
 
 **Decryption Macro for AES_XTS:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, AES_XTS)`
 
+
 **Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);`
 
 **Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)`
@@ -83,7 +87,7 @@ The macros now automatically zero out the used values to enhance data security d
 
 ### Current Release
 
-The current version, **1.3.10**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
+The current version, **1.4.0**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 

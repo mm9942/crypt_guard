@@ -5,7 +5,9 @@ use std::{
     fs::{self, OpenOptions},
     sync::Arc
 };
-use chrono::{Local};
+use chrono::Local;
+use tracing_subscriber::fmt::SubscriberBuilder;
+use tracing_subscriber::prelude::*;
 use crate::error::CryptError;
 use std::sync::Mutex;
 
@@ -27,7 +29,24 @@ pub struct Log {
 pub fn initialize_logger(log_file: PathBuf) {
     let mut logger = LOGGER.lock().unwrap();
     logger.activated = true;
-    logger.location = Some(log_file);
+    logger.location = Some(log_file.clone());
+
+    // Set up tracing subscriber to write to the provided file path.
+    // We avoid printing time/level because our messages already contain the timestamp.
+    if let (Some(parent), Some(file_name)) = (log_file.parent(), log_file.file_name().and_then(|s| s.to_str())) {
+        let _ = std::fs::create_dir_all(parent);
+        let appender = tracing_appender::rolling::never(parent, file_name);
+        let fmt_layer = tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .without_time()
+            .with_level(false)
+            .with_writer(appender);
+
+        // Try setting as global subscriber; ignore error if already set.
+        let subscriber = tracing_subscriber::registry().with(fmt_layer);
+        let _ = tracing::subscriber::set_global_default(subscriber);
+    }
 }
 
 impl Log {
@@ -58,15 +77,8 @@ impl Log {
             };
 
             self.log.push_str(&log_entry);
-
-            if let Some(ref location) = self.location {
-                let mut file = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .append(true)
-                    .open(location)?;
-                writeln!(file, "{}", log_entry)?;
-            }
+            // Emit via tracing as the primary logging backend
+            tracing::info!(target: "crypt_guard", "{}", log_entry);
         }
         Ok(())
     }
