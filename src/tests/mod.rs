@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 #[cfg(test)]
 mod ArchiveTests;
 
@@ -18,3 +20,6 @@ mod LegacyCleanupTests;
 
 #[cfg(test)]
 mod ze_end;
+
+#[cfg(test)]
+mod BuilderPatternTests;

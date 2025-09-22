@@ -23,40 +23,40 @@ impl fmt::Display for CipherAES {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct CipherAES_GCM_SIV {
+pub struct CipherAesGcmSiv {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
     pub iv: Vec<u8>,
 }
 
-impl fmt::Display for CipherAES_GCM_SIV {
+impl fmt::Display for CipherAesGcmSiv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAES_GCM_SIV with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(f, "CipherAesGcmSiv with the following Cryptographic Informations: {}", self.infos.metadata)
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct CipherAES_CTR {
+pub struct CipherAesCtr {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
     pub iv: Vec<u8>,
 }
 
-impl fmt::Display for CipherAES_CTR {
+impl fmt::Display for CipherAesCtr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAES_CTR with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(f, "CipherAesCtr with the following Cryptographic Informations: {}", self.infos.metadata)
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct CipherAES_XTS {
+pub struct CipherAesXts {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
 }
 
-impl fmt::Display for CipherAES_XTS {
+impl fmt::Display for CipherAesXts {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAES_XTS with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(f, "CipherAesXts with the following Cryptographic Informations: {}", self.infos.metadata)
     }
 }
 
@@ -78,13 +78,13 @@ impl fmt::Display for CipherChaCha {
 /// Represents the XChaCha20Poly1305 cipher for encryption and decryption processes.
 /// It includes cryptographic information, a nonce for the operation, and a shared secret.
 #[derive(PartialEq, Debug, Clone)]
-pub struct CipherChaCha_Poly {
+pub struct CipherChaChaPoly {
     pub infos: CryptographicInformation,
     pub nonce: [u8; 24],
     pub sharedsecret: Vec<u8>,
 }
 
-impl fmt::Display for CipherChaCha_Poly {
+impl fmt::Display for CipherChaChaPoly {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CipherChaCha with the following Cryptographic Informations {}", self.infos.metadata)
     }
@@ -94,9 +94,9 @@ impl fmt::Display for CipherChaCha_Poly {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CryptographicMechanism {
     AES,
-    AES_GCM_SIV,
-    AES_CTR,
-    AES_XTS,
+    AesGcmSiv,
+    AesCtr,
+    AesXts,
     XChaCha20Poly1305,
     XChaCha20,
 }
@@ -105,9 +105,9 @@ impl fmt::Display for CryptographicMechanism {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mechanism = match self {
             CryptographicMechanism::AES => "AES",
-            CryptographicMechanism::AES_GCM_SIV => "AES-GCM-SIV",
-            CryptographicMechanism::AES_CTR => "AES-CTR",
-            CryptographicMechanism::AES_XTS => "AES-XTS",
+            CryptographicMechanism::AesGcmSiv => "AES-GCM-SIV",
+            CryptographicMechanism::AesCtr => "AES-CTR",
+            CryptographicMechanism::AesXts => "AES-XTS",
             CryptographicMechanism::XChaCha20Poly1305 => "XChaCha20Poly1305",
             CryptographicMechanism::XChaCha20 => "XChaCha20",
         };

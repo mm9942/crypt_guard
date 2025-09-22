@@ -12,7 +12,7 @@ use crate::{
     KeyControKyber1024, 
     KeyControKyber512, 
     KeyControKyber768,
-    Core::KeyControl,
+    core::KeyControl,
     KyberKeyFunctions,
     KeyTypes,
     FileTypes,

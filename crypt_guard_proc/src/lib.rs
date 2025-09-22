@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use proc_macro::{TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, ItemFn, Meta, Lit, LitStr, Expr};
+use syn::{parse_macro_input, ItemFn, LitStr, Expr};
 
 #[proc_macro_attribute]
 pub fn activate_log(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -21,7 +21,7 @@ pub fn activate_log(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn ConcatCipher(input: TokenStream) -> TokenStream {
+pub fn concat_cipher(input: TokenStream) -> TokenStream {
     let inputs = parse_macro_input!(input as Expr);
 
     let output = quote! {
@@ -36,7 +36,7 @@ pub fn ConcatCipher(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn SplitCipher(input: TokenStream) -> TokenStream {
+pub fn split_cipher(input: TokenStream) -> TokenStream {
     let expr = parse_macro_input!(input as Expr);
 
     let output = quote! {

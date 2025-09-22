@@ -8,11 +8,11 @@
 
 [blog-badge]: https://img.shields.io/badge/blog-hashnode-lightblue.svg?style=for-the-badge
 [blog-url]: https://blog.mm29942.com/
-[crates-badge]: https://img.shields.io/badge/crates.io-v1.3-blue.svg?style=for-the-badge
+[crates-badge]: https://img.shields.io/badge/crates.io-v1.4.1-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
 [mit-url]: https://github.com/mm9942/crypt_guard/blob/main/LICENSE
-[doc-badge]: https://img.shields.io/badge/docs-v1.3-yellow.svg?style=for-the-badge
+[doc-badge]: https://img.shields.io/badge/docs-v1.4.1-yellow.svg?style=for-the-badge
 [doc-url]: https://docs.rs/crypt_guard/
 [lib-badge]: https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge
 [lib-link]: https://github.com/mm9942/crypt_guard
@@ -30,11 +30,19 @@ CryptGuard is a comprehensive cryptographic library, offering robust encryption 
 
 ## Version Information
 
+### What’s New in v1.4.1
+
+- New builder API for encryption/decryption, key generation, and signatures.
+- Macros and examples now use snake_case names (e.g., `encryption!`, `decrypt_file!`).
+- Added AES_GCM_SIV and AES_CTR; AES_XTS for data-at-rest.
+- Added XChaCha20Poly1305 authenticated cipher.
+- Updated docs and examples to match the new API and naming.
+
 ### Latest Features
 
 **New AES Modes:** We added AES_GCM_SIV and AES_CTR as secure alternatives to the legacy AES (ECB) path. Both use securely generated nonces/IVs and integrate with the same macros you already use.
 
-**Added AES_XTS:** AES-XTS is now available for data-at-rest scenarios. It derives two subkeys internally and provides sector-based encryption with HMAC authentication. Access it via the same `Encryption!`/`Decryption!` macros or by using `Kyber<..., AES_XTS>`.
+**Added AES_XTS:** AES-XTS is now available for data-at-rest scenarios. It derives two subkeys internally and provides sector-based encryption with HMAC authentication. Access it via the same `encryption!`/`decryption!` macros or by using `Kyber<..., AES_XTS>`.
 
 **Added XChaCha20Poly1305:** Alongside XChaCha20, the authenticated XChaCha20-Poly1305 variant is now supported. Nonces are generated automatically on encryption and required for decryption (returned by the macro and stored on the Kyber instance).
 
@@ -64,22 +72,22 @@ CryptGuard is a comprehensive cryptographic library, offering robust encryption 
 
 In summary, AES_GCM_SIV, AES_CTR, AES_XTS, and XChaCha20Poly1305 provide stronger security properties than AES-ECB, with XChaCha20Poly1305 offering efficient AEAD for scenarios where performance and nonce management are crucial, and AES_XTS being suited for data-at-rest.
 
-**Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);`
+**Encryption Macro for AES_GCM_SIV:** `let (encrypt_message, cipher, iv) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);`
 
-**Decryption Macro for AES_GCM_SIV:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_GCM_SIV)`
+**Decryption Macro for AES_GCM_SIV:** `let decrypted_data = decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_GCM_SIV)`
 
-**Encryption Macro for AES_CTR:** `let (encrypt_message, cipher, iv) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);`
+**Encryption Macro for AES_CTR:** `let (encrypt_message, cipher, iv) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);`
 
-**Decryption Macro for AES_CTR:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_CTR)`
+**Decryption Macro for AES_CTR:** `let decrypted_data = decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(iv): Option<String>, AES_CTR)`
 
-**Encryption Macro for AES_XTS:** `let (encrypt_message, cipher) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_XTS);`
+**Encryption Macro for AES_XTS:** `let (encrypt_message, cipher) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_XTS);`
 
-**Decryption Macro for AES_XTS:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, AES_XTS)`
+**Decryption Macro for AES_XTS:** `let decrypted_data = decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, AES_XTS)`
 
 
-**Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = Encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);`
+**Encryption Macro for XChaCha20Poly1305:** `let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);`
 
-**Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)`
+**Decryption Macro for XChaCha20Poly1305:** `let decrypted_data = decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase: &str, cipher: Vec<u8>, Some(nonce): Option<String>, XChaCha20Poly1305)`
 
 The macros now automatically zero out the used values to enhance data security during execution. For other execution methods, ensure data safety by manually addressing confidentiality. Developers using this crate are responsible for securely storing, hiding, and zeroing out keys in memory to protect encrypted information. As these values are generated, they fall outside my control for adding security measures. Note that the macros now require data ownership; to ensure safety, avoid cloning and instead use `.to_owned()`.
 
@@ -87,38 +95,38 @@ The macros now automatically zero out the used values to enhance data security d
 
 ### Current Release
 
-The current version, **1.4.0**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
+The current version, **1.4.1**, focuses on detailed cryptographic operations with enhanced data handling through automated macros. These macros simplify execution by wrapping up the necessary steps of definition, leveraging generic types and trait definitions. This version avoids asynchronous code, which will be reintroduced as a feature in future updates. Users preferring async implementation should use version 1.0.3. Note that version 1.0.3 uses the old syntax and has indirect documentation through the README, lacking Cargo's auto-generated documentation due to missing comments. The new version offers user-friendly syntax, reducing the need for extensive struct definitions, and supports Kyber1024, Kyber768, and Kyber512, along with logging capabilities.
 
 ### Simplifying Encryption and Decryption with Macros
 
 We've introduced new macros to make the encryption and decryption processes more straightforward since we only separate into encryption of bytes and automated encryption of files, thus providing an alternative to the need of manually invoking specific functions such as `encrypt_msg`, `encrypt_file`, `encrypt_data`, and their decryption equivalents. Here’s a guide on how to effectively utilize these macros:
 
-- **Encryption Macro**: Use the `Encryption!` macro for seamless encryption tasks. Provide it with a Kyber public key and it's size, the data you want to encrypt (as a `Vec<u8>`), a passphrase (as a string slice `&str`), and finally declarate which encryption algorithm should be used.
+- **Encryption Macro**: Use the `encryption!` macro for seamless encryption tasks. Provide it with a Kyber public key and its size, the data you want to encrypt (as a `Vec<u8>`), a passphrase (as a string slice `&str`), and finally declare which encryption algorithm should be used.
 
   **Syntax**:
   ```rust
-  Encryption!(public_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase, [ AES | XChaCha20 ])
+  encryption!(public_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase, [ AES | XChaCha20 ])
   ```
 
-- **Decryption Macro**: The `Decryption!` macro simplifies the decryption process. Supply it with an secret_key of Kyber, the key size, the encrypted data (as `Vec<u8>`), the passphrase, the ciphertext, and finally declarate which encryption algorithm should be used.
+- **Decryption Macro**: The `decryption!` macro simplifies the decryption process. Supply it with a secret Kyber key, the key size, the encrypted data (as `Vec<u8>`), the passphrase, the ciphertext, and finally declare which encryption algorithm should be used.
 
   **Syntax**:
   ```rust
-  Decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase, cipher, | add nonce here, when using XChaCha20 | , [ AES | XChaCha20 ])
+  decryption!(secret_key, [ 1024 | 768 | 512 ], data: Vec<u8>, passphrase, cipher, | add nonce here, when using XChaCha20 | , [ AES | XChaCha20 ])
   ```
 
-- **File Encryption Macro**: We've also implemented a macro specifically for file encryption, `EncryptFile!()`. This macro is similar to `Encryption!` but takes a `PathBuf` for file paths instead of `Vec<u8>`.
+- **File Encryption Macro**: We've also implemented a macro specifically for file encryption, `encrypt_file!()`. This macro is similar to `encryption!` but takes a `PathBuf` for file paths instead of `Vec<u8>`.
 
   **Syntax**:
   ```rust
-  EncryptFile!(public_key, [ 1024 | 768 | 512 ], data: PathBuf, passphrase, [ AES | XChaCha20 ])
+  encrypt_file!(public_key, [ 1024 | 768 | 512 ], data: PathBuf, passphrase, [ AES | XChaCha20 ])
   ```
 
-- **File Decryption Macro**: Corresponding to the file encryption macro, the `DecryptFile!()` macro is designed for file decryption, accepting a `PathBuf` instead of `Vec<u8>`.
+- **File Decryption Macro**: Corresponding to the file encryption macro, the `decrypt_file!()` macro is designed for file decryption, accepting a `PathBuf` instead of `Vec<u8>`.
 
   **Syntax**:
   ```rust
-  DecryptFile!(secret_key, [ 1024 | 768 | 512 ], data: PathBuf, passphrase, cipher, | add nonce here, when using XChaCha20 | , [ AES | XChaCha20 ])
+  decrypt_file!(secret_key, [ 1024 | 768 | 512 ], data: PathBuf, passphrase, cipher, | add nonce here, when using XChaCha20 | , [ AES | XChaCha20 ])
   ```
 
 These macros are intended to make your cryptographic operations more intuitive and less prone to errors, by removing the complexities associated with selecting the appropriate function for different data types. Note that with these macros, it is necessary to convert messages into `Vec<u8>` before encryption.
@@ -133,41 +141,40 @@ These macros are intended to make your cryptographic operations more intuitive a
 
 - **Logging Functionality**: CryptGuard now includes a new logging feature designed to enhance operational transparency and assist in debugging processes. This logging functionality meticulously records every significant step in the cryptographic process without compromising security. Specifically, it logs the initiation and completion of key generation, message encryption, and decryption processes, including the cryptographic algorithm used (e.g., AES, XChaCha20) and the key encapsulation mechanism (e.g., Kyber1024). Importantly, to uphold the highest standards of security and privacy, CryptGuard's logging mechanism is carefully designed to exclude sensitive information such as encryption keys, unencrypted data, file paths, or any personally identifiable information. This ensures that while users benefit from detailed logs that can aid in troubleshooting and verifying cryptographic operations, there is no risk of exposing sensitive data.
 
-The logging functionality got restructured to be defined by a procedual macro, so it now gets activated using `#[crypt_guard::activate_log("LogFilename.txt")]`, it also requires the user to call `initialize_logger();`.
+The logging functionality can be activated via the attribute `#[activate_log("LogFilename.txt")]` and requires calling `initialize_logger();`.
+
+## Code Style
+
+Starting with v1.4.1, public macros and functions use snake_case:
+
+- Macros: `encryption!`, `decryption!`, `encrypt_file!`, `decrypt_file!`, `kyber_keypair!`, `falcon_keypair!`, `dilithium_keypair!`, `signature!`, `verify!`, `archive_util!`.
+- Methods: builder methods like `key`, `key_size`, `data`, `file`, `passphrase`, `algorithm`, `run` use snake_case.
+- Types remain CamelCase per Rust conventions (e.g., `Kyber`, `Encryption`, `Kyber1024`, `AES`).
 
 ## Usage Examples
 
-### New encrypt and signing as well as decrypt and open macros 
+### New encrypt-and-sign as well as decrypt-and-open macros 
 
 CryptGuard's newest release, introduced new macros for encryption and decryption with AES using a kyber1024 key as well as signing and opening of the data with falcon1024. Since these macros are provided for fast usage, the keysizes and the signing key type is already set by default. CryptGuard also introduced new macros for keypair generation.
 
 
 ```rust
-use crate::{
-    cryptography::{
-        CryptographicInformation,
-        CipherAES,
-        hmac_sign::*, 
-    },
-    Core::kyber::KyberFunctions,
-    KDF::*,
-    *
-}
+use crypt_guard::{*, kdf::*};
 
 let message = b"hey, how are you doing?".to_vec();
 
 // Generate falcon1024 keys, alternativly available is the keysize 512.
-// You can use for dilithium keypair generation DilithiumKeypair!( [ 2 | 3 | 5 ] )
-let (public, secret) = FalconKeypair!(1024);
+// You can use for dilithium keypair generation dilithium_keypair!( [ 2 | 3 | 5 ] )
+let (public, secret) = falcon_keypair!(1024);
 
 // Generate kyber1024 keys, alternativly available are the keysizes 768 and 512.
-let (public_key, secret_key) = KyberKeypair!(1024);
+let (public_key, secret_key) = kyber_keypair!(1024);
 
-// Encrypt and sign the data using the new EncryptSign macro, the first key is the public kyber key and the seccond is the secret falcon key.
-let (encrypt_message, cipher) = EncryptSign!(public_key, secret, message.clone(), "hey, how are you?").unwrap();
+// Encrypt and sign the data using the new encrypt_sign macro, the first key is the public kyber key and the second is the secret falcon key.
+let (encrypt_message, cipher) = encrypt_sign!(public_key, secret, message.clone(), "hey, how are you?").unwrap();
 
-// Decrypt and open the data using the new DecryptOpen macro, the first key is the secret kyber key and the seccond is the public falcon key.
-let decrypt_message = DecryptOpen!(secret_key, public, encrypt_message, "hey, how are you?", cipher);
+// Decrypt and open the data using the new decrypt_open macro, the first key is the secret kyber key and the second is the public falcon key.
+let decrypt_message = decrypt_open!(secret_key, public, encrypt_message, "hey, how are you?", cipher);
 ```
 
 ### New signature and verify macros
@@ -175,32 +182,24 @@ let decrypt_message = DecryptOpen!(secret_key, public, encrypt_message, "hey, ho
 ##### Detached Signature
 
 ```rust
-use crypt_guard::{
-    *,
-    KDF::*,
-    error::*,
-}
+use crypt_guard::{*, kdf::*, error::*};
     
 let data = b"hey, how are you?".to_vec();
-let (public_key, secret_key) = FalconKeypair!(1024);
-let sign = Signature!(Falcon, secret_key, 1024, data.clone(), Detached);
-let verified = Verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
+let (public_key, secret_key) = falcon_keypair!(1024);
+let sign = signature!(Falcon, secret_key, 1024, data.clone(), Detached);
+let verified = verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
 ```
 
 ##### Signed Message
 
 
 ```rust
-use crypt_guard::{
-    *,
-    KDF::*,
-    error::*,
-}
+use crypt_guard::{*, kdf::*, error::*};
     
 let data = b"hey, how are you?".to_vec();
-let (public_key, secret_key) = DilithiumKeypair!(5);
-let sign = Signature!(Dilithium, secret_key, 5, data.clone(), Message);
-let verified = Verify!(Dilithium, public_key, 5, sign.clone(), Message);
+let (public_key, secret_key) = dilithium_keypair!(5);
+let sign = signature!(Dilithium, secret_key, 5, data.clone(), Message);
+let verified = verify!(Dilithium, public_key, 5, sign.clone(), Message);
 ```
 
 ### New encryption and decryption macros
@@ -228,11 +227,11 @@ let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to g
 
 // Encrypt message with new encryption macro
 // Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and the declarator for the symmetric algorithm
-let (encrypt_message, cipher) = Encryption!(public_key.clone(), 1024, message, passphrase, AES)?;
+let (encrypt_message, cipher) = encryption!(public_key.clone(), 1024, message, passphrase, AES)?;
 
 // Decrypt message with new decryption macro
 // Provide it with a Kyber1024 secret_key for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and the declarator for the symmetric algorithm
-let decrypt_message = Decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
+let decrypt_message = decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
 println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
 Ok(())
 
@@ -263,11 +262,11 @@ let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to g
 
 // Encrypt message with new encryption macro
 // Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and boolean checking if it is a file
-let (encrypt_message, cipher) = EncryptFile!(public_key.clone(), 1024, PathBuf::from(&path), passphrase, AES)?;
+let (encrypt_message, cipher) = encrypt_file!(public_key.clone(), 1024, PathBuf::from(&path), passphrase, AES)?;
 
 // Decrypt message with new decryption macro
 // Provide it with an instance of Kyber configured for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and boolean checking if it is a file
-let decrypt_message = DecryptFile!(secret_key, 1024, PathBuf::from(format!("{}.enc", path)), passphrase, cipher, AES);
+let decrypt_message = decrypt_file!(secret_key, 1024, PathBuf::from(format!("{}.enc", path)), passphrase, cipher, AES);
 println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
 Ok(())
 
@@ -319,7 +318,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #### Signing and opening from "messages" with Falcon
 
 ```rust
-use crypt_guard::KDF::*;
+use crypt_guard::kdf::*;
 
 // Create a new keypair
 let (public_key, secret_key) = Falcon1024::keypair();
@@ -340,7 +339,7 @@ let opened_message = sign.open(signed_message, public_key);
 #### Creating and verifying detached signature with Dilithium 5
 
 ```rust
-use crypt_guard::KDF::*;
+use crypt_guard::kdf::*;
 
 // Load the public and secret dilithium 5 key
 let public_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.pub"))?;
@@ -621,11 +620,71 @@ fn main() {
 }
 ```
 
-##### 3. `ArchiveUtil!` Macro
+## Builder API (v1.4.1)
+
+Version 1.4.1 introduces a builder-style API for common workflows.
+
+- Encryption
+```rust
+use crypt_guard::{EncryptBuilder, SymmetricAlg, kyber_keypair};
+let (public, _secret) = kyber_keypair!(1024);
+let out = EncryptBuilder::new()
+    .key(public)
+    .key_size(1024)
+    .data(b"hello".to_vec())
+    .passphrase("pass")
+    .algorithm(SymmetricAlg::AesGcmSiv)
+    .run()?;
+// out.content, out.cipher, out.nonce (Some for AEAD/stream ciphers)
+```
+
+- Decryption
+```rust
+use crypt_guard::{DecryptBuilder, SymmetricAlg, kyber_keypair};
+let (_public, secret) = kyber_keypair!(1024);
+let plaintext = DecryptBuilder::new()
+    .key(secret)
+    .key_size(1024)
+    .data(out.content)
+    .passphrase("pass")
+    .cipher(out.cipher)
+    .nonce(out.nonce.unwrap()) // required for AES_GCM_SIV, AES_CTR, XChaCha20, XChaCha20Poly1305
+    .algorithm(SymmetricAlg::AesGcmSiv)
+    .run()?;
+```
+
+- Key generation
+```rust
+use crypt_guard::KyberKeygenBuilder;
+let (public, secret) = KyberKeygenBuilder::new().size(1024).generate()?;
+```
+
+- Sign and verify
+```rust
+use crypt_guard::{SignBuilder, VerifyBuilder, SignAlgorithm, SignMode};
+let data = b"hello".to_vec();
+let secret = /* load/generate secret key */ vec![0u8; 1];
+let signed = SignBuilder::new()
+    .algorithm(SignAlgorithm::Falcon1024)
+    .mode(SignMode::Message)
+    .key(secret)
+    .data(data.clone())
+    .sign()?;
+
+let public = /* load/generate public key */ vec![0u8; 1];
+let opened = VerifyBuilder::new()
+    .algorithm(SignAlgorithm::Falcon1024)
+    .mode(SignMode::Message)
+    .key(public)
+    .signed_message(signed)
+    .open()?;
+```
+
+##### 3. `archive_util!` Macro
 
 **Syntax:**
 ```rust
-ArchiveUtil!(path, delete_flag, Variant);
+archive_util!(path, delete_flag, Variant);
 ```
 
 - **`$path`**: The path to the directory/file to archive or the archive file to extract. Accepts a `&str` or a `PathBuf`.
@@ -638,18 +697,18 @@ ArchiveUtil!(path, delete_flag, Variant);
 
 **Example:**
 ```rust
-use crypt_guard::ArchiveUtil;
+use crypt_guard::archive_util;
 use std::path::PathBuf;
 
 fn main() {
     let source = PathBuf::from("/path/to/source_directory");
     let archive = PathBuf::from("/path/to/archive.tar.xz");
     
-    // Using ArchiveUtil! to archive without deleting the source
-    ArchiveUtil!(source, false, Archive);
+    // Using archive_util! to archive without deleting the source
+    archive_util!(source, false, Archive);
     
-    // Using ArchiveUtil! to extract and delete the archive file after extraction
-    ArchiveUtil!(archive, true, Extract);
+    // Using archive_util! to extract and delete the archive file after extraction
+    archive_util!(archive, true, Extract);
 }
 ```
 

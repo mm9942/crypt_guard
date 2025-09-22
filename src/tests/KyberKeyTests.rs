@@ -10,7 +10,7 @@ use crate::{
     KeyControKyber1024, 
     KeyControKyber512, 
     KeyControKyber768,
-    Core::KeyControl,
+    core::KeyControl,
     KyberKeyFunctions,
     KeyTypes,
     FileTypes,
@@ -77,11 +77,11 @@ fn key_control_functionality() {
     let _base_path = PathBuf::from("/tmp"); // Example path, adjust as needed
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("");
     let mut key_control = KeyControl::<KeyControKyber1024>::new();
-    let _ = key_control.set_public_key(public_key).unwrap();
+    key_control.set_public_key(public_key).unwrap();
 
     // Use the public key from KeyControl to encapsulate
     let (shared_secret, ciphertext) = key_control.encap(key_control.public_key().unwrap().as_slice()).unwrap();
-    let _ = key_control.set_ciphertext(ciphertext).unwrap();
+    key_control.set_ciphertext(ciphertext).unwrap();
     // Use the secret key from KeyControl to decapsulate
     let decrypted_shared_secret = key_control.decap(&secret_key, key_control.ciphertext().unwrap().as_slice()).unwrap();
 
@@ -129,7 +129,7 @@ fn test_key_control_safe_functionality() -> Result<(), Box<dyn std::error::Error
     assert_eq!(secret_key, seck?, "Secret keys do not match");
     assert_eq!(ciphertext, cipher?, "Ciphertexts do not match");
 
-    let _ = fs::remove_dir_all("./key")?;
+    fs::remove_dir_all("./key")?;
     Ok(())
 }
 
@@ -154,8 +154,8 @@ fn test_key() {
     let _ = pubkey_file.save(&public_key);
     let _ = seckey_file.save(&secret_key);
     
-    let public_key2 = keycontrol.load(KeyTypes::PublicKey, &Path::new("key.pub")).unwrap();
-    let secret_key2 = keycontrol.load(KeyTypes::SecretKey, &Path::new("key.sec")).unwrap();
+    let public_key2 = keycontrol.load(KeyTypes::PublicKey, Path::new("key.pub")).unwrap();
+    let secret_key2 = keycontrol.load(KeyTypes::SecretKey, Path::new("key.sec")).unwrap();
 
     assert_eq!(public_key2, public_key);
     assert_eq!(secret_key2, secret_key);

@@ -1,4 +1,4 @@
-use crypt_guard::KeyControler::KeyControl;
+use crypt_guard::KeyControl;
 use crypt_guard::*;
 use std::fs::{File};
 

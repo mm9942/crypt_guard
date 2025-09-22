@@ -1,0 +1,121 @@
+
+running 80 tests
+test tests::ArchiveTests::test_archive_subdirectory ... ok
+test tests::ArchiveTests::test_archive_macro_without_delete ... ok
+test tests::ArchiveTests::test_archive_and_extract ... ok
+test tests::ArchiveTests::test_archive_util_archive_without_deletion ... ok
+test tests::ArchiveTests::test_zip_creation ... ok
+test tests::ArchiveTests::test_archive_util_extract_without_deletion ... ok
+test tests::ArchiveTests::test_archive_and_extract_with_delete_dir ... ok
+test tests::KyberKeyTests::begin ... ok
+test tests::ArchiveTests::test_archive_util_extract_with_deletion ... ok
+test tests::KyberKeyTests::keypair_generation_kyber1024 ... ok
+test tests::ArchiveTests::test_extract_macro_with_delete ... ok
+test tests::KyberKeyTests::encap_decap_kyber512 ... ok
+test tests::KyberKeyTests::encap_decap_kyber1024 ... ok
+test tests::ArchiveTests::test_archive_util_archive_with_deletion ... ok
+test tests::KyberKeyTests::encap_decap_kyber768 ... ok
+test tests::KyberKeyTests::keypair_generation_kyber512 ... ok
+test tests::KyberKeyTests::key_control_functionality ... ok
+test tests::ArchiveTests::test_zip_folder ... ok
+test tests::KyberKeyTests::keypair_generation_kyber768 ... ok
+test tests::KyberKeyTests::test_key ... ok
+test tests::KyberKeyTests::test_key_control_safe_functionality ... ok
+test tests::KyberTests::encrypt_decrypt_AES_GCM_SIV_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_AES_CTR_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_XChaCha20Poly1305_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_data_macro_AES_CTR_Kyber1024 ... ok
+test tests::KyberTests::encrypt_data_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_data_macro_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_AES_CTR_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_data_macro_AES_GCM_SIV_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_AES_XTS_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_file_macro_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_AES_GCM_SIV_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_AES_XTS_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_XChaCha20_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_data_macro_XChaCha20Poly1305_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_XChaCha20Poly1305_Kyber1024 ... ok
+test tests::KyberTests::encrypt_decrypt_msg_macro_AES_XTS_Kyber1024 ... ok
+test tests::KyberTests::encrypt_file_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_file_AES_Kyber512 ... ok
+test tests::KyberTests::encrypt_file_AES_Kyber768 ... ok
+test tests::KyberTests::encrypt_file_XChaCha20_Kyber768 ... ok
+test tests::KyberTests::encrypt_file_XChaCha20_Kyber1024 ... ok
+test tests::KyberTests::encrypt_message_AES_Kyber1024 ... ok
+test tests::KyberTests::encrypt_file_XChaCha20_Kyber512 ... ok
+test tests::MacroTests::test_concat_and_split_key ... ok
+test tests::KyberTests::encrypt_message_AES_Kyber768 ... ok
+test tests::KyberTests::encrypt_message_XChaCha20_Kyber768 ... ok
+test tests::MacroTests::test_dilithium_keypair_2 ... ok
+test tests::MacroTests::test_dilithium_keypair_3 ... ok
+test tests::MacroTests::test_dilithium_keypair_5 ... ok
+test tests::KyberTests::encrypt_message_XChaCha20_Kyber512 ... ok
+test tests::KyberTests::encrypt_message_XChaCha20_Kyber1024 ... ok
+test tests::MacroTests::test_kyber_keypair_1024 ... ok
+test tests::MacroTests::test_kyber_keypair_768 ... ok
+test tests::SignatureTests::end2 ... ok
+test tests::MacroTests::test_kyber_keypair_512 ... ok
+test tests::SignatureTests::test_dilithium2_signature_message ... ok
+test tests::SignatureTests::test_dilithium2_detached_signature ... ok
+test tests::SignatureTests::test_dilithium5_detached_signature ... ok
+test tests::SignatureTests::test_dilithium3_signature_message ... ok
+test tests::SignatureTests::test_dilithium3_detached_signature ... ok
+test tests::SignatureTests::test_dilithium5_signature_message ... ok
+test tests::LegacyCleanupTests::test_no_diskmanagement_or_storage_references ... ok
+test tests::MacroTests::test_falcon_keypair_512 ... ok
+test tests::MacroTests::sign_encrypt_decrypt_open ... ok
+test tests::SignatureTests::test_falcon512_detached_signature ... ok
+test tests::SignatureTests::test_save_Dilithium2_keys ... ok
+test tests::SignatureTests::test_falcon1024_detached_signature ... ok
+test tests::SignatureTests::test_save_Dilithium3_keys ... ok
+test tests::SignatureTests::test_save_Dilithium5_keys ... ok
+test tests::SignatureTests::test_falcon1024_signature_detached_macro ... ok
+test tests::MacroTests::test_falcon_keypair_1024 ... ok
+test tests::ze_end::end ... ok
+test tests::MacroTests::sign_encrypt ... ok
+test tests::SignatureTests::test_falcon1024_signature_message_macro ... ok
+test tests::SignatureTests::test_falcon512_signature_message ... ok
+test tests::SignatureTests::test_save_Falcon512_keys ... ok
+test tests::SignatureTests::test_falcon1024_signature_message ... ok
+test tests::SignatureTests::test_save_Falcon1024_keys ... ok
+
+test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test src/utils/zip_manager.rs - utils::zip_manager (line 29) - compile ... ok
+test src/lib.rs - (line 38) ... FAILED
+test src/lib.rs - (line 93) ... ok
+test src/lib.rs - (line 137) ... ok
+
+failures:
+
+---- src/lib.rs - (line 38) stdout ----
+error[E0599]: no method named `expect` found for tuple `(Vec<u8>, Vec<u8>)` in the current scope
+  --> src/lib.rs:75:136
+   |
+40 | ...m("message.txt"), passphrase.clone(), AES).expect("");
+   |                                               ^^^^^^ method not found in `(Vec<u8>, Vec<u8>)`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0599`.
+Couldn't compile the test.
+
+failures:
+    src/lib.rs - (line 38)
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

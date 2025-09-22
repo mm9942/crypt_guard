@@ -9,7 +9,7 @@ use crate::{
     decrypt,
     encrypt_file,
     decrypt_file,
-    Core::{kyber::{KyberFunctions, *}, *},
+    core::{kyber::{KyberFunctions, *}, *},
     error::*
 };
 
@@ -153,13 +153,13 @@ fn encrypt_data_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
     // Instantiate Kyber for encryption with Kyber1024
-    let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_XTS>::new(public_key.clone(), None)?;
+    let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesXts>::new(public_key.clone(), None)?;
     
     // Encrypt message
     let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), passphrase.clone())?;
 
     // Instantiate Kyber for decryption with Kyber1024
-    let mut decryptor = Kyber::<Decryption, Kyber1024, Data, AES_XTS>::new(secret_key, None)?;
+    let mut decryptor = Kyber::<Decryption, Kyber1024, Data, AesXts>::new(secret_key, None)?;
     
     // Decrypt message
     let decrypt_message = decryptor.decrypt_data(encrypt_message.clone(), passphrase.clone(), cipher)?;
@@ -272,7 +272,7 @@ fn encrypt_file_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
     // Instantiate Kyber for encryption with Kyber1024
-    let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES_XTS>::new(public_key.clone(), None)?;
+    let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AesXts>::new(public_key.clone(), None)?;
     
     // Encrypt message
     let (encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase.clone())?;
@@ -280,7 +280,7 @@ fn encrypt_file_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     fs::remove_file(enc_path.clone());
 
     // Instantiate Kyber for decryption with Kyber1024
-    let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES_XTS>::new(secret_key, None)?;
+    let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AesXts>::new(secret_key, None)?;
     
     // Decrypt message
     let decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase.clone(), cipher)?;

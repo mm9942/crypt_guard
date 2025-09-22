@@ -35,15 +35,8 @@ impl Sign {
     /// HMAC as a `Vec<u8>` for signing or the verified data for verification.
     pub fn hmac(&mut self) -> Vec<u8> {
         match &self.status {
-            Operation::Sign => {
-                let data = self.generate_hmac();
-                data
-            },
-            Operation::Verify => {
-                let data = self.verify_hmac();
-                data.unwrap()
-            },
-            _ => vec![],
+            Operation::Sign => self.generate_hmac(),
+            Operation::Verify => self.verify_hmac().unwrap(),
         }
     }
 
@@ -57,7 +50,7 @@ impl Sign {
             SignType::Sha512 => {
                 let mut mac = <Hmac<Sha512> as Mac>::new_from_slice(&self.data.passphrase)
                     .expect("HMAC can take key of any size");
-                mac.update(&data);
+                mac.update(data);
                 let hmac = mac.finalize().into_bytes().to_vec();
                 //println!("HMAC: {:?}", hmac);
                 let concat_data = [&self.data.data, hmac.as_slice()].concat();
@@ -67,7 +60,7 @@ impl Sign {
             SignType::Sha256 => {
                 let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&self.data.passphrase)
                     .expect("HMAC can take key of any size");
-                mac.update(&data);
+                mac.update(data);
                 let hmac = mac.finalize().into_bytes().to_vec();
                 // println!("HMAC: {:?}", hmac);
                 let concat_data = [&self.data.data, hmac.as_slice()].concat();
