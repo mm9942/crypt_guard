@@ -10,8 +10,8 @@ use std::{
 fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Message);
-    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), Message);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Message);
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.to_owned(), Message);
     assert_eq!(data, verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -31,8 +31,8 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
 fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Detached);
-    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), data.clone(), Detached);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Detached);
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.to_owned(), data.to_owned(), Detached);
     assert!(verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -169,7 +169,7 @@ fn test_falcon1024_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Falcon1024, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -197,7 +197,7 @@ fn test_falcon1024_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Falcon1024, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -221,7 +221,7 @@ fn test_falcon512_signature_message() -> Result<(), Box<dyn std::error::Error>> 
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Falcon512, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -248,7 +248,7 @@ fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>>
     let sign = Signature::<Falcon512, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -272,7 +272,7 @@ fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium2, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -299,7 +299,7 @@ fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium2, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -323,7 +323,7 @@ fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium3, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -350,7 +350,7 @@ fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium3, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -374,7 +374,7 @@ fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium5, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -401,7 +401,7 @@ fn test_dilithium5_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium5, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
