@@ -153,28 +153,30 @@ Starting with v1.4.1, public macros and functions use snake_case:
 
 ## Usage Examples
 
-### New encrypt-and-sign as well as decrypt-and-open macros 
+### Encrypt+Sign and Decrypt+Open (macros)
 
-CryptGuard's newest release, introduced new macros for encryption and decryption with AES using a kyber1024 key as well as signing and opening of the data with falcon1024. Since these macros are provided for fast usage, the keysizes and the signing key type is already set by default. CryptGuard also introduced new macros for keypair generation.
-
+The `encrypt_sign!` and `decrypt_open!` macros combine Kyber encryption with Falcon signing. They expect Kyber-1024 for KEM and Falcon-1024 for signatures by default.
 
 ```rust
 use crypt_guard::{*, kdf::*};
 
-let message = b"hey, how are you doing?".to_vec();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let message = b"hey, how are you doing?".to_vec();
 
-// Generate falcon1024 keys, alternativly available is the keysize 512.
-// You can use for dilithium keypair generation dilithium_keypair!( [ 2 | 3 | 5 ] )
-let (public, secret) = falcon_keypair!(1024);
+    // Falcon-1024 (512 also available)
+    let (falcon_pub, falcon_sec) = falcon_keypair!(1024);
 
-// Generate kyber1024 keys, alternativly available are the keysizes 768 and 512.
-let (public_key, secret_key) = kyber_keypair!(1024);
+    // Kyber-1024 (768 and 512 also available)
+    let (kyber_pub, kyber_sec) = kyber_keypair!(1024);
 
-// Encrypt and sign the data using the new encrypt_sign macro, the first key is the public kyber key and the second is the secret falcon key.
-let (encrypt_message, cipher) = encrypt_sign!(public_key, secret, message.clone(), "hey, how are you?").unwrap();
+    // Encrypt and sign (returns Result<(content, cipher), CryptError>)
+    let (ciphertext, cipher) = encrypt_sign!(kyber_pub, falcon_sec, message.clone(), "passphrase")?;
 
-// Decrypt and open the data using the new decrypt_open macro, the first key is the secret kyber key and the second is the public falcon key.
-let decrypt_message = decrypt_open!(secret_key, public, encrypt_message, "hey, how are you?", cipher);
+    // Decrypt and open (returns the verified plaintext directly)
+    let plaintext = decrypt_open!(kyber_sec, falcon_pub, ciphertext, "passphrase", cipher);
+    assert_eq!(plaintext, message);
+    Ok(())
+}
 ```
 
 ### New signature and verify macros
@@ -182,97 +184,105 @@ let decrypt_message = decrypt_open!(secret_key, public, encrypt_message, "hey, h
 ##### Detached Signature
 
 ```rust
-use crypt_guard::{*, kdf::*, error::*};
-    
-let data = b"hey, how are you?".to_vec();
-let (public_key, secret_key) = falcon_keypair!(1024);
-let sign = signature!(Falcon, secret_key, 1024, data.clone(), Detached);
-let verified = verify!(Falcon, public_key, 1024, sign.clone(), data.clone(), Detached);
+use crypt_guard::{*, kdf::*};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hey, how are you?".to_vec();
+    let (public_key, secret_key) = falcon_keypair!(1024);
+
+    let sig = signature!(Falcon, secret_key, 1024, data.clone(), Detached)?;
+    let ok = verify!(Falcon, public_key, 1024, sig, data.clone(), Detached)?;
+    assert!(ok);
+    Ok(())
+}
 ```
 
 ##### Signed Message
 
-
 ```rust
-use crypt_guard::{*, kdf::*, error::*};
-    
-let data = b"hey, how are you?".to_vec();
-let (public_key, secret_key) = dilithium_keypair!(5);
-let sign = signature!(Dilithium, secret_key, 5, data.clone(), Message);
-let verified = verify!(Dilithium, public_key, 5, sign.clone(), Message);
+use crypt_guard::{*, kdf::*};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hey, how are you?".to_vec();
+    let (public_key, secret_key) = dilithium_keypair!(5);
+
+    let signed = signature!(Dilithium, secret_key, 5, data.clone(), Message)?;
+    let opened = verify!(Dilithium, public_key, 5, signed, Message)?;
+    assert_eq!(opened, data);
+    Ok(())
+}
 ```
 
-### New encryption and decryption macros
+### Encryption and decryption (macros)
+
+Data (Vec<u8>) with AES-256 using Kyber-1024:
 
 ```rust
-use crypt_guard::{
-    KyberFunctions,
-    KeyControKyber1024,
-    KyberKeyFunctions,
-    error::*,
-    Encryption, 
-    Decryption, 
-    Kyber1024, 
-    Message, 
-    AES,
-    Kyber,
-};
+use crypt_guard::*;
 
-// Since we only allow encryption/ decryption of Vec<u8> or files through selecting a path as &str, please use 
-let message = "Hey, how are you doing?".as_bytes().to_owned();
-let passphrase = "Test Passphrase";
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let msg = b"Hey, how are you?".to_vec();
+    let pass = "Test Passphrase";
+    let (pk, sk) = kyber_keypair!(1024);
 
-// Generate key pair
-let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
-
-// Encrypt message with new encryption macro
-// Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and the declarator for the symmetric algorithm
-let (encrypt_message, cipher) = encryption!(public_key.clone(), 1024, message, passphrase, AES)?;
-
-// Decrypt message with new decryption macro
-// Provide it with a Kyber1024 secret_key for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and the declarator for the symmetric algorithm
-let decrypt_message = decryption!(secret_key, 1024, encrypt_message, passphrase, cipher, AES);
-println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
-Ok(())
-
+    let (enc, cipher) = encryption!(pk, 1024, msg.clone(), pass, AES)?;
+    let dec = decryption!(sk, 1024, enc, pass, cipher, AES)?;
+    assert_eq!(dec, msg);
+    Ok(())
+}
 ```
 
-#### Usage of the new macros with a file
+#### File encryption/decryption (macros)
 
 ```rust
-use crypt_guard::{
-    KyberFunctions,
-    KeyControKyber1024,
-    KyberKeyFunctions,
-    error::*,
-    Encryption, 
-    Decryption, 
-    Kyber1024, 
-    Message, 
-    AES,
-    Kyber,
-};
+use crypt_guard::*;
+use std::fs;
+use std::path::PathBuf;
 
-// Since we only allow encryption/ decryption of Vec<u8> or files through selecting a path as &str
-let path = "./message.txt";
-let passphrase = "Test Passphrase";
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pass = "Test Passphrase";
+    let (pk, sk) = kyber_keypair!(1024);
 
-// Generate key pair
-let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
+    // Prepare a file to encrypt
+    let path = PathBuf::from("./message.txt");
+    fs::write(&path, b"Hello file!")?;
 
-// Encrypt message with new encryption macro
-// Provide it with an instance of Kyber configured for encryption, the data you want to encrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) and boolean checking if it is a file
-let (encrypt_message, cipher) = encrypt_file!(public_key.clone(), 1024, PathBuf::from(&path), passphrase, AES)?;
+    // Encrypt file with AES
+    let (_content, cipher) = encrypt_file!(pk, 1024, path.clone(), pass, AES)?;
 
-// Decrypt message with new decryption macro
-// Provide it with an instance of Kyber configured for decryption, the data you want to decrypt (this can be a `PathBuf`, a string slice `&str`, or a byte vector `Vec<u8>`), a passphrase (as a string slice `&str`) as well as a ciphertext and boolean checking if it is a file
-let decrypt_message = decrypt_file!(secret_key, 1024, PathBuf::from(format!("{}.enc", path)), passphrase, cipher, AES);
-println!("{}", String::from_utf8(decrypt_message?).expect("Failed to convert decrypted message to string"));
-Ok(())
-
+    // Decrypt file back; input is the generated .enc file
+    let dec = decrypt_file!(sk, 1024, PathBuf::from("./message.txt.enc"), pass, cipher, AES)?;
+    assert_eq!(String::from_utf8(dec)?, "Hello file!");
+    Ok(())
+}
 ```
 
-### The Logging feature
+XChaCha20 requires handling a nonce (returned by the encrypt macro and required on decrypt):
+
+```rust
+use crypt_guard::*;
+use std::fs;
+use std::path::PathBuf;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pass = "Test Passphrase";
+    let (pk, sk) = kyber_keypair!(768);
+
+    let p = PathBuf::from("./note.txt");
+    fs::write(&p, b"XC20!")?;
+
+    let (_enc, cipher, nonce) = encrypt_file!(pk, 768, p.clone(), pass, XChaCha20)?;
+
+    // remove plaintext to mimic typical flow
+    let _ = fs::remove_file(&p);
+
+    let dec = decrypt_file!(sk, 768, PathBuf::from("./note.txt.enc"), pass, cipher, Some(nonce), XChaCha20)?;
+    assert_eq!(String::from_utf8(dec)?, "XC20!");
+    Ok(())
+}
+```
+
+### Logging
 
 CryptGuard recently introduced a new logging feature, meticulously designed to offer comprehensive insights into cryptographic operations while prioritizing security and privacy.
 
@@ -285,75 +295,59 @@ use crypt_guard::*;
 
 #[activate_log("log.txt")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize the logger struct which in the lib is defined through lazzy_static!
-    let _ = initialize_logger(); 
+    // Make the helper from the proc-macro available
+    let _ = initialize_logger();
 
-    // Define message and passphrase
     let message = "Hey, how are you doing?";
     let passphrase = "Test Passphrase";
 
-    // Generate key pair
-    let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
-
-    // Instantiate Kyber for encryption with Kyber1024
+    let (public_key, secret_key) = kyber_keypair!(1024);
     let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.clone(), None)?;
+    let (encrypted, cipher) = encryptor.encrypt_msg(message, passphrase)?;
 
-    // Encrypt message
-    let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
-
-    // Instantiate Kyber for decryption with Kyber1024
-    let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
-
-    // Decrypt message
-    let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
-
-    // Convert Vec<u8> to String for comparison
-    let decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
-    println!("{}", decrypted_text);
+    let decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
+    let decrypted = decryptor.decrypt_msg(encrypted, passphrase, cipher)?;
+    assert_eq!(String::from_utf8(decrypted)?, message);
+    Ok(())
 }
 ```
 
 ### New signature syntax for dilithium and falcon
 
-#### Signing and opening from "messages" with Falcon
+#### Signing and opening (Falcon)
 
 ```rust
 use crypt_guard::kdf::*;
 
-// Create a new keypair
-let (public_key, secret_key) = Falcon1024::keypair();
-
-// Save the keys, in the case of Falcon1024, they are saved in the folder ./Falcon1024/key(.pub & .sec)
-let _ = Falcon1024::save_public(&public_key);
-let _ = Falcon1024::save_secret(&secret_key);
-
-let data = b"Hello, world!".to_vec();
-let sign = Signature::<Falcon1024, Message>::new();
-// Sign the message
-let signed_message = sign.signature(data.clone(), secret_key);
-
-// Open the message
-let opened_message = sign.open(signed_message, public_key);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (public_key, secret_key) = Falcon1024::keypair()?;
+    let data = b"Hello, world!".to_vec();
+    let sign = Signature::<Falcon1024, Message>::new();
+    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let opened_message = sign.open(signed_message, public_key)?;
+    assert_eq!(opened_message, data);
+    Ok(())
+}
 ```
 
 #### Creating and verifying detached signature with Dilithium 5
 
 ```rust
 use crypt_guard::kdf::*;
+use std::path::PathBuf;
 
-// Load the public and secret dilithium 5 key
-let public_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.pub"))?;
-let secret_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.sec"))?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load previously-saved keys
+    let public_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.pub"))?;
+    let secret_key = Dilithium5::load(&PathBuf::from("./Dilithium5/key.sec"))?;
 
-let data = b"Hello, world!".to_vec();
-
-let sign = Signature::<Dilithium5, Detached>::new();
-
-// Create a detached signature
-let signature = sign.signature(data.clone(), secret_key);
-
-// Verify the detached signature
-let is_valid = sign.verify(data, signature, public_key);
+    let data = b"Hello, world!".to_vec();
+    let sign = Signature::<Dilithium5, Detached>::new();
+    let sig = sign.signature(data.clone(), secret_key)?;
+    let ok = sign.verify(data, sig, public_key)?;
+    assert!(ok);
+    Ok(())
+}
 ```
 
 ### Cryptographic Operations
@@ -378,55 +372,64 @@ keycontrol.save(KeyTypes::SecretKey, "./key".into()).unwrap();
 
 ### Encryption of a Message using AES
 
+For the low-level API, instantiate the correct `Kyber<...>` type and call the method that matches your content shape.
+
 ```rust
-let message = "Hey, how are you doing?";
-let passphrase = "Test Passphrase";
+use crypt_guard::*;
 
-// Instantiate Kyber for encryption of a message with Kyber1024 and AES
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (public_key, secret_key) = kyber_keypair!(1024);
+    let message = "Hey, how are you doing?";
+    let passphrase = "Test Passphrase";
 
-// Encrypt message
-let (encrypt_message, cipher) = encryptor.encrypt_msg(message.clone(), passphrase.clone())?;
+    // Encrypt a message string
+    let mut enc = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None)?;
+    let (encrypted, cipher) = enc.encrypt_msg(message, passphrase)?;
 
-// Save the ciphertext for decryption in folder ./key
-key_control.set_ciphertext(cipher.clone()).unwrap();
-key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
+    // Decrypt back
+    let dec = Kyber::<Decryption, Kyber1024, Message, AES>::new(secret_key, None)?
+        .decrypt_msg(encrypted, passphrase, cipher)?;
+    assert_eq!(String::from_utf8(dec)?, message);
+    Ok(())
+}
 ```
 
-### Encryption of a Data using AES
+### Encryption of Data (bytes) using AES
 
 ```rust
-let message = "Hey, how are you doing?".as_bytes().to_owned();
-let passphrase = "Test Passphrase";
+use crypt_guard::*;
 
-// Instantiate Kyber for encryption of a message with Kyber1024 and AES
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (public_key, secret_key) = kyber_keypair!(1024);
+    let data = b"Hey, how are you doing?".to_vec();
+    let passphrase = "Test Passphrase";
 
-// Encrypt message
-let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), passphrase.clone())?;
+    let mut enc = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None)?;
+    let (encrypted, cipher) = enc.encrypt_data(data.clone(), passphrase)?;
 
-// Save the ciphertext for decryption in folder ./key
-key_control.set_ciphertext(cipher.clone()).unwrap();
-key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
+    let dec = Kyber::<Decryption, Kyber1024, Data, AES>::new(secret_key, None)?
+        .decrypt_data(encrypted, passphrase, cipher)?;
+    assert_eq!(dec, data);
+    Ok(())
+}
 ```
 
 ### Decryption of a File using AES
 
 ```rust
-let cipher = key_control.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"));
-let secret_key = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"));
+use crypt_guard::*;
+use std::path::{Path, PathBuf};
 
-// Instantiate Kyber for decryption of a message with Kyber1024 and AES
-// Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-let mut decryptor = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let kc = KeyControl::<KeyControKyber1024>::new();
+    let cipher = kc.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"))?;
+    let secret_key = kc.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"))?;
 
-// Decrypt message
-let decrypt_message = decryptor.decrypt_msg(encrypt_message.clone(), passphrase.clone(), cipher)?;
-
-// Print the decrypted text
-println!("{:?}", String::from_utf8(decrypt_message));
+    let dec = Kyber::<Decryption, Kyber1024, Files, AES>::new(secret_key, None)?
+        .decrypt_file(PathBuf::from("./message.txt.enc"), "pass", cipher)?;
+    println!("{}", String::from_utf8(dec)?);
+    Ok(())
+}
 ```
 
 #### Encryption and decryption of a message written into a file with XChaCha20
@@ -476,44 +479,24 @@ In this example, we'll demonstrate how to zip multiple files and directories int
 
 ```rust
 use crypt_guard::zip_manager::*;
-use std::path::PathBuf;
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Setting up sample files and directories
-    // Create a sample directory
-    fs::create_dir_all("sample_dir")?;
     fs::create_dir_all("sample_dir/nested_dir")?;
-    
-    // Create sample files
-    fs::write("file1.txt", "This is the content of file1.")?;
-    fs::write("file2.txt", "This is the content of file2.")?;
-    fs::write("sample_dir/file3.txt", "This is the content of file3 in sample_dir.")?;
-    fs::write("sample_dir/nested_dir/file4.txt", "This is the content of file4 in nested_dir.")?;
-    
-    // Specify the output ZIP file path
+    fs::write("file1.txt", "content1")?;
+    fs::write("sample_dir/file2.txt", "content2")?;
+
     let output_zip = "archive_with_dirs.zip";
-    
-    // Create a new ZipManager instance
     let mut manager = ZipManager::new(output_zip);
-    
-    // Add individual files to the zip
     manager.add_file("file1.txt");
-    manager.add_file("file2.txt");
-    
-    // Add directories to the zip
     manager.add_directory("sample_dir");
-    
-    // Create the ZIP archive with Deflated compression
     manager.create_zip(Compression::Deflated)?;
-    
     println!("ZIP archive created at {}", output_zip);
-    
-    // Cleanup sample files and directories
+
+    // cleanup
     fs::remove_file("file1.txt")?;
-    fs::remove_file("file2.txt")?;
     fs::remove_dir_all("sample_dir")?;
-    
+    fs::remove_file(output_zip)?;
     Ok(())
 }
 ```
@@ -622,62 +605,92 @@ fn main() {
 
 ## Builder API (v1.4.1)
 
-Version 1.4.1 introduces a builder-style API for common workflows.
+The builder-style API simplifies common workflows. End-to-end example for data with AES:
 
-- Encryption
 ```rust
-use crypt_guard::{EncryptBuilder, SymmetricAlg, kyber_keypair};
-let (public, _secret) = kyber_keypair!(1024);
-let out = EncryptBuilder::new()
-    .key(public)
-    .key_size(1024)
-    .data(b"hello".to_vec())
-    .passphrase("pass")
-    .algorithm(SymmetricAlg::AesGcmSiv)
-    .run()?;
-// out.content, out.cipher, out.nonce (Some for AEAD/stream ciphers)
+use crypt_guard::{EncryptBuilder, DecryptBuilder, KyberKeygenBuilder, SymmetricAlg};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (public, secret) = KyberKeygenBuilder::new().size(1024).generate()?;
+    let enc = EncryptBuilder::new()
+        .key(public)
+        .key_size(1024)
+        .data(b"hello".to_vec())
+        .passphrase("pass")
+        .algorithm(SymmetricAlg::Aes)
+        .run()?;
+
+    let dec = DecryptBuilder::new()
+        .key(secret)
+        .key_size(1024)
+        .data(enc.content)
+        .passphrase("pass")
+        .cipher(enc.cipher)
+        .algorithm(SymmetricAlg::Aes)
+        .run()?;
+
+    assert_eq!(dec, b"hello".to_vec());
+    Ok(())
+}
 ```
 
-- Decryption
+Using XChaCha20 (note the nonce handling):
+
 ```rust
-use crypt_guard::{DecryptBuilder, SymmetricAlg, kyber_keypair};
-let (_public, secret) = kyber_keypair!(1024);
-let plaintext = DecryptBuilder::new()
-    .key(secret)
-    .key_size(1024)
-    .data(out.content)
-    .passphrase("pass")
-    .cipher(out.cipher)
-    .nonce(out.nonce.unwrap()) // required for AES_GCM_SIV, AES_CTR, XChaCha20, XChaCha20Poly1305
-    .algorithm(SymmetricAlg::AesGcmSiv)
-    .run()?;
+use crypt_guard::{EncryptBuilder, DecryptBuilder, KyberKeygenBuilder, SymmetricAlg};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (public, secret) = KyberKeygenBuilder::new().size(1024).generate()?;
+    let enc = EncryptBuilder::new()
+        .key(public)
+        .key_size(1024)
+        .data(b"hello".to_vec())
+        .passphrase("pass")
+        .algorithm(SymmetricAlg::XChaCha20)
+        .run()?;
+
+    let nonce = enc.nonce.expect("nonce required for XChaCha20");
+    let dec = DecryptBuilder::new()
+        .key(secret)
+        .key_size(1024)
+        .data(enc.content)
+        .passphrase("pass")
+        .cipher(enc.cipher)
+        .nonce(nonce)
+        .algorithm(SymmetricAlg::XChaCha20)
+        .run()?;
+
+    assert_eq!(dec, b"hello".to_vec());
+    Ok(())
+}
 ```
 
-- Key generation
-```rust
-use crypt_guard::KyberKeygenBuilder;
-let (public, secret) = KyberKeygenBuilder::new().size(1024).generate()?;
-```
+Signing and verification via builders:
 
-- Sign and verify
 ```rust
 use crypt_guard::{SignBuilder, VerifyBuilder, SignAlgorithm, SignMode};
-let data = b"hello".to_vec();
-let secret = /* load/generate secret key */ vec![0u8; 1];
-let signed = SignBuilder::new()
-    .algorithm(SignAlgorithm::Falcon1024)
-    .mode(SignMode::Message)
-    .key(secret)
-    .data(data.clone())
-    .sign()?;
 
-let public = /* load/generate public key */ vec![0u8; 1];
-let opened = VerifyBuilder::new()
-    .algorithm(SignAlgorithm::Falcon1024)
-    .mode(SignMode::Message)
-    .key(public)
-    .signed_message(signed)
-    .open()?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hello".to_vec();
+    let (public, secret) = crypt_guard::kdf::Falcon1024::keypair()?;
+
+    let signed = SignBuilder::new()
+        .algorithm(SignAlgorithm::Falcon1024)
+        .mode(SignMode::Message)
+        .key(secret)
+        .data(data.clone())
+        .sign()?;
+
+    let opened = VerifyBuilder::new()
+        .algorithm(SignAlgorithm::Falcon1024)
+        .mode(SignMode::Message)
+        .key(public)
+        .signed_message(signed)
+        .open()?;
+
+    assert_eq!(opened, data);
+    Ok(())
+}
 ```
 
 ##### 3. `archive_util!` Macro
