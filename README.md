@@ -3,11 +3,8 @@
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Documentation][doc-badge]][doc-url]
-[![Hashnode Blog][blog-badge]][blog-url]
 [![GitHub Library][lib-badge]][lib-link]
 
-[blog-badge]: https://img.shields.io/badge/blog-hashnode-lightblue.svg?style=for-the-badge
-[blog-url]: https://blog.mm29942.com/
 [crates-badge]: https://img.shields.io/badge/crates.io-v1.4.1-blue.svg?style=for-the-badge
 [crates-url]: https://crates.io/crates/crypt_guard
 [mit-badge]: https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge
@@ -30,7 +27,7 @@ CryptGuard is a comprehensive cryptographic library, offering robust encryption 
 
 ## Version Information
 
-### What’s New in v1.4.1
+### What’s New in v1.4.2
 
 - New builder API for encryption/decryption, key generation, and signatures.
 - Macros and examples now use snake_case names (e.g., `encryption!`, `decrypt_file!`).
