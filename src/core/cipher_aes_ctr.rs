@@ -112,7 +112,7 @@ impl CipherAesCtr {
 
         //let encrypted = cipher.encrypt(iv, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
         let iv = self.iv();
-        Ok((buf.to_owned(), iv.clone()))
+        Ok((buf.to_owned(), iv.to_owned()))
     }
 
     fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
@@ -131,7 +131,7 @@ impl CipherAesCtr {
 
         //println!("Verified: {:?}", &data);
         let iv = self.iv();
-        Ok((data, iv.clone()))
+        Ok((data, iv.to_owned()))
     }
 }
 

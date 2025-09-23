@@ -109,7 +109,7 @@ impl CipherAesGcmSiv {
         let data = hmac.hmac();
         let encrypted = cipher.encrypt(iv, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
         let iv = self.iv();
-        Ok((encrypted, iv.clone()))
+        Ok((encrypted, iv.to_owned()))
     }
 
     fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
@@ -124,7 +124,7 @@ impl CipherAesGcmSiv {
         let data = hmac.hmac();
         //println!("Verified: {:?}", &data);
         let iv = self.iv();
-        Ok((data, iv.clone()))
+        Ok((data, iv.to_owned()))
     }
 }
 

@@ -163,7 +163,7 @@ impl CipherAES {
         let iv_arr = GenericArray::from_slice(&iv);
 
         let cipher = Aes128CbcEnc::new(key, iv_arr);
-        let mut buffer = data.clone(); // Clone the data to a mutable buffer
+        let mut buffer = data.to_owned(); // Use to_owned() to duplicate data
         let ciphertext = cipher.encrypt_padded_mut::<Pkcs7>(&mut buffer, data.len())
             .map_err(|_| CryptError::EncryptionFailed)?;
 

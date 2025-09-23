@@ -27,7 +27,7 @@ pub struct Log {
 pub fn initialize_logger(log_file: PathBuf) {
     let Ok(mut logger) = LOGGER.lock() else { return; };
     logger.activated = true;
-    logger.location = Some(log_file.clone());
+    logger.location = Some(log_file.to_owned());
 
     // Set up tracing subscriber to write to the provided file path.
     // We avoid printing time/level because our messages already contain the timestamp.

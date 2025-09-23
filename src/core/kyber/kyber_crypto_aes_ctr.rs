@@ -41,7 +41,7 @@ where
             content_type: ContentType::File,
         };
 
-        let file = FileMetadata::from(path.clone(), FileTypes::Other, FileState::NotEncrypted);
+        let file = FileMetadata::from(path.to_owned(), FileTypes::Other, FileState::NotEncrypted);
 
         let infos = CryptographicInformation {
             content: Vec::new(),
@@ -193,7 +193,7 @@ where
             content_type: ContentType::File,
         };
 
-        let file = FileMetadata::from(path.clone(), FileTypes::Other, FileState::Encrypted);
+        let file = FileMetadata::from(path.to_owned(), FileTypes::Other, FileState::Encrypted);
 
         let infos = CryptographicInformation {
             content: Vec::new(),

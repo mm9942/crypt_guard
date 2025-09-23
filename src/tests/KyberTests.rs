@@ -72,7 +72,7 @@ fn encrypt_decrypt_msg_macro_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::er
     let mut key = public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_owned(), passphrase, XChaCha20);
+    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_owned(), passphrase, XChaCha20)?;
 
     // Decrypt message
     let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce.clone()), XChaCha20);
@@ -194,7 +194,7 @@ fn encrypt_decrypt_data_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std:
     let key: &[u8] = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV);
+    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_GCM_SIV)?;
     println!("{:?}", encrypt_message);
     // Decrypt message
     let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce), AES_GCM_SIV)?;
@@ -375,7 +375,7 @@ fn encrypt_decrypt_data_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::err
     let key: &[u8] = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR);
+    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, AES_CTR)?;
     println!("{:?}", encrypt_message);
     // Decrypt message
     let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce), AES_CTR)?;
@@ -459,7 +459,7 @@ fn encrypt_decrypt_data_macro_XChaCha20Poly1305_Kyber1024() -> Result<(), Box<dy
     let key: &[u8] = &public_key;
 
     // Encrypt message
-    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305);
+    let (encrypt_message, cipher, nonce) = encryption!(key.to_owned(), 1024, message.to_vec(), passphrase, XChaCha20Poly1305)?;
     println!("{:?}", encrypt_message);
     // Decrypt message
     let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), Some(nonce.to_owned()), XChaCha20Poly1305)?;
@@ -533,7 +533,7 @@ fn encrypt_decrypt_file_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
 
     // Encrypt message
-    let (_encrypt_message, cipher) = encrypt_file!(public_key.to_owned(), 1024, enc_path.clone(), passphrase, AES);
+    let (_encrypt_message, cipher) = encrypt_file!(public_key.to_owned(), 1024, enc_path.clone(), passphrase, AES)?;
 
     let _ = fs::remove_file(enc_path.clone());
     

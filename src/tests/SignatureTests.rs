@@ -10,8 +10,8 @@ use std::{
 fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Message);
-    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.to_owned(), Message);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Message)?;
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, Message)?;
     assert_eq!(data, verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -31,8 +31,8 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
 fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Detached);
-    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign.to_owned(), data.to_owned(), Detached);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Detached)?;
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, data.to_owned(), Detached)?;
     assert!(verified);
 
     let _ = fs::remove_file("crypt_tests.log");

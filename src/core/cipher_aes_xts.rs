@@ -119,8 +119,8 @@ impl CryptographicFunctions for CipherAesXts {
          let (sharedsecret2, ciphertext2) = key.encap(&public_key)?;
          
          // Concatenate both shared secrets and ciphertexts
-         let sharedsecret = [sharedsecret1.clone(), sharedsecret2.clone()].concat();
-         let ciphertext = [ciphertext1.clone(), ciphertext2.clone()].concat();
+         let sharedsecret = [sharedsecret1.to_owned(), sharedsecret2.to_owned()].concat();
+         let ciphertext = [ciphertext1.to_owned(), ciphertext2.to_owned()].concat();
         
         let _ = self.set_shared_secret(sharedsecret);
         let encrypted_data = self.encryption()?;
@@ -145,7 +145,7 @@ impl CryptographicFunctions for CipherAesXts {
         let sharedsecret1 = key.decap(&secret_key, &ciphertext1)?;
         let sharedsecret2 = key.decap(&secret_key, &ciphertext2)?;
 
-        let sharedsecret = [sharedsecret1.clone(), sharedsecret2.clone()].concat();
+        let sharedsecret = [sharedsecret1.to_owned(), sharedsecret2.to_owned()].concat();
 
         let _ = self.set_shared_secret(sharedsecret);
         let decrypted_data = self.decryption()?;
