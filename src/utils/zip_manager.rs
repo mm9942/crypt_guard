@@ -41,7 +41,7 @@
 //!     zip_manager.add_file("/home/mm29942/Desktop/crypt_guard-main/Cargo.toml");
 //!
 //!     // Add an entire directory to the archive
-//!     zip_manager.add_directory("/home/mm29942/Desktop/crypt_guard-main/src/Core");
+//!     zip_manager.add_directory("/home/mm29942/Desktop/crypt_guard-main/src/core");
 //!
 //!     // Create the ZIP archive with the desired compression method
 //!     zip_manager.create_zip(Compression::Deflated).expect("Failed to create ZIP archive");
@@ -227,7 +227,7 @@ impl ZipManager {
     {
         let relative_path = file_path.strip_prefix(base_path).unwrap_or(file_path);
         let zip_path = relative_path.to_string_lossy().replace("\\", "/");
-        zip_writer.start_file(&zip_path, options.clone())?;
+        zip_writer.start_file(&zip_path, options.to_owned())?;
         let mut f = File::open(file_path)?;
         std::io::copy(&mut f, zip_writer)?;
         Ok(())
@@ -256,7 +256,7 @@ impl ZipManager {
                 } else {
                     format!("{}/", zip_path)
                 };
-                zip_writer.add_directory(dir_name, options.clone())?;
+                zip_writer.add_directory(dir_name, options.to_owned())?;
             }
         }
 

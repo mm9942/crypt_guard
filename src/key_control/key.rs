@@ -2,7 +2,7 @@ use crate::error::CryptError;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_kyber::kyber1024::*;
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
-use crate::KeyControl::*;
+use crate::key_control::*;
 use std::{
     path::{PathBuf},
 };

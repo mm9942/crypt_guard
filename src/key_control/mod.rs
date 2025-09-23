@@ -1,7 +1,7 @@
 
 
 
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
+// removed unused kem imports per clippy
 
 /// A module defining the cryptographic key functionality.
 mod key;
@@ -39,7 +39,7 @@ impl KeyTypes {
     pub fn secret_key()  -> Self {
         Self::SecretKey
     }
-    pub fn Ciphertext()  -> Self {
+    pub fn ciphertext()  -> Self {
         Self::Ciphertext
     }
     pub fn shared_secret()  -> Self {

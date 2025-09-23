@@ -260,7 +260,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypt_guard"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "aes",
  "aes-gcm-siv",
@@ -276,7 +276,7 @@ dependencies = [
  "generic-array 1.2.0",
  "hex",
  "hmac",
- "lazy_static",
+ "once_cell",
  "pqcrypto-dilithium",
  "pqcrypto-falcon",
  "pqcrypto-kyber",

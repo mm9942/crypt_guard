@@ -1,5 +1,5 @@
 use crate::{
-    KeyControl::*,
+    key_control::*,
     cryptography::{
         *,
     },
@@ -22,23 +22,27 @@ impl CryptographicMechanism {
 
     /// Specifies AES as the cryptographic mechanism.
     pub fn aes_gcm_siv() -> Self {
-        Self::AES_GCM_SIV
+        Self::AesGcmSiv
     }
 
     /// Specifies AES as the cryptographic mechanism.
     pub fn aes_ctr() -> Self {
-        Self::AES_CTR
+        Self::AesCtr
     }
 
     /// Specifies XChaCha20 as the cryptographic mechanism.
     pub fn aes_xts() -> Self {
-        Self::AES_XTS
+        Self::AesXts
     }
 
     /// Specifies XChaCha20 as the cryptographic mechanism.
     pub fn xchacha20() -> Self {
         Self::XChaCha20
     }
+}
+
+impl Default for CryptographicMechanism {
+    fn default() -> Self { Self::new() }
 }
 
 /// Enum defining the process type (encryption or decryption).
@@ -73,6 +77,10 @@ impl KeyEncapMechanism {
     }
 }
 
+impl Default for KeyEncapMechanism {
+    fn default() -> Self { Self::new() }
+}
+
 /// Enum defining the type of content being encrypted or decrypted.
 impl ContentType {
     /// Creates a new instance defaulting to file.
@@ -91,6 +99,10 @@ impl ContentType {
     pub fn raw_data() -> Self {
         Self::RawData
     }
+}
+
+impl Default for ContentType {
+    fn default() -> Self { Self::new() }
 }
 
 /// Stores cryptographic settings for an operation.
@@ -141,6 +153,10 @@ impl CryptographicMetadata {
 	}
 }
 
+impl Default for CryptographicMetadata {
+    fn default() -> Self { Self::new() }
+}
+
 /// Holds all cryptographic information for an encryption/decryption operation.
 impl CryptographicInformation {
     /// Constructs a new instance with empty values and default metadata.
@@ -155,13 +171,9 @@ impl CryptographicInformation {
 	}
 
     /// Checks if the cryptographic information contains a file.
-	pub fn contains_file(&self) -> Result<bool, CryptError> {
-		let contains_file = match &self.location {
-			Some(_) => true,
-			None => false
-		};
-		Ok(contains_file)
-	}
+    pub fn contains_file(&self) -> Result<bool, CryptError> {
+        Ok(self.location.is_some())
+    }
 
     /// Sets the content to be encrypted or decrypted.
 	pub fn set_data(&mut self, data: &[u8]) -> Result<(), CryptError> {
@@ -171,8 +183,8 @@ impl CryptographicInformation {
 	}
 
     /// Prepares a file name for saving, considering its extension.
-	fn prepare_file_name_for_saving(&self, file_path: &PathBuf) -> Result<PathBuf, CryptError> {
-        let mut new_file_path = file_path.clone();
+    fn prepare_file_name_for_saving(&self, file_path: &std::path::Path) -> Result<PathBuf, CryptError> {
+        let mut new_file_path = file_path.to_path_buf();
         
         // Check if the file extension is .enc
         if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
@@ -219,11 +231,10 @@ impl CryptographicInformation {
 
     /// Returns the file location.
 	pub fn location(&self) -> Result<PathBuf, CryptError> {
-		let file = match &self.location {
-			Some(path) => Ok(path.location()?),
-			_ => Err(CryptError::PathError)
-		};
-		file
+        match &self.location {
+            Some(path) => Ok(path.location()?),
+            _ => Err(CryptError::PathError)
+        }
 	}
 
     /// Constructs a new instance with specified values.

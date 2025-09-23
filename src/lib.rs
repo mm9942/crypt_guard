@@ -43,16 +43,16 @@
 //! };
 //!
 //! let mut message = "Hey, how are you doing?";
-//! let mut passphrase = "Test Passphrase";
+//! let passphrase= "Test Passphrase";
 //! 
-//! let (mut public_key, mut secret_key) = KyberKeypair!(1024);
+//! let (mut public_key, mut secret_key) = kyber_keypair!(1024);
 //! 
 //! // Creating new Kyber AES message instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.clone(), None).expect("");
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Message, AES>::new(public_key.to_owned(), None).expect("");
 //! 
 //! // Now are multiple options available:
 //! // Using the Macro
-//! let (mut encrypt_message, mut cipher) = Encryption!(public_key.clone(), 1024, message.clone().as_bytes().to_owned(), passphrase.clone(), AES).expect("");
+//! let (mut encrypt_message, mut cipher) = encryption!(public_key.to_owned(), 1024, message.clone().as_bytes().to_owned(), passphrase.clone(), AES).expect("");
 //! 
 //! // Using the encrypt_ functions:
 //! 
@@ -61,17 +61,17 @@
 //! 
 //! // Data:
 //! // Creating new Kyber AES data instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.clone(), None).expect("");
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(public_key.to_owned(), None).expect("");
 //! let (mut encrypt_message, mut cipher) = encryptor.encrypt_data(message.clone().as_bytes().to_owned(), passphrase.clone()).expect("");
 //! 
 //! // Last but not least the encryption function for files:
 //! fs::write(PathBuf::from("message.txt"), message.clone().as_bytes()).expect("");
 //! 
 //! // Creating new Kyber AES file instance
-//! let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.clone(), None).expect("");
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Files, AES>::new(public_key.to_owned(), None).expect("");
 //! 
 //! // Encrypt file macro:
-//! let (mut encrypt_message, mut cipher) = EncryptFile!(public_key.clone(), 1024, PathBuf::from("message.txt"), passphrase.clone(), AES).expect("");
+//! let (mut encrypt_message, mut cipher) = encrypt_file!(public_key.to_owned(), 1024, PathBuf::from("message.txt"), passphrase.clone(), AES).expect("");
 //! 
 //! // Encrypt file function:
 //! let (mut encrypt_message, mut cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).expect("");
@@ -91,34 +91,34 @@
 //! XChaCha20, unlike AES, requires handling of a nonce (number used once) which must be generated during encryption and subsequently used during decryption. This introduces additional steps in the cryptographic process when using XChaCha20 compared to AES, which does not explicitly require nonce management by the user.
 //!
 //! ```rust
-//! use crypt_guard::{*, error::*, KDF::*};
+//! use crypt_guard::{*, error::*, kdf::*};
 //! use std::{
 //!     path::{Path, PathBuf},
 //!     fs,
 //! };
 //!
-//! let (mut public_key, mut secret_key) = KyberKeypair!(768);
+//! let (mut public_key, mut secret_key) = kyber_keypair!(768);
 //!
 //! let mut message = "Hey, how are you doing?";
-//! let mut passphrase = "Test Passphrase";
+//! let passphrase= "Test Passphrase";
 //! 
 //! fs::write(PathBuf::from("message.txt"), message.clone().as_bytes()).expect("");
 //!
 //! // You need to save the nonce when not using AES but XChaCha20 instead:
 //! // Creating new Kyber XChaCha20 file encryption instance
-//! let mut encryptor = Kyber::<Encryption, Kyber768, Files, XChaCha20>::new(public_key.clone(), None).expect("");
+//! let mut encryptor = Kyber::<Encryption, Kyber768, Files, XChaCha20>::new(public_key.to_owned(), None).expect("");
 //! 
 //! // Encrypt file
 //! let (mut encrypt_message, mut cipher) = encryptor.encrypt_file(PathBuf::from("message.txt"), passphrase.clone()).expect("");
 //!
 //! // Should be executed after encryption is already done, since doing it before that would trigger an error.
-//! let mut nonce = encryptor.get_nonce().expect("").to_string(); 
+//! let nonce = encryptor.get_nonce().expect("").to_string(); 
 //! 
 //! // Creating new Kyber XChaCha20 file decryption instance (this time also adding the nonce beside the key)
-//! let mut decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key.clone(), Some(nonce)).expect("");
+//! let decryptor = Kyber::<Decryption, Kyber768, Files, XChaCha20>::new(secret_key.to_owned(), Some(nonce)).expect("");
 //! 
 //! // Decrypt message
-//! let mut decrypt_message = decryptor.decrypt_file(PathBuf::from("message.txt.enc"), passphrase.clone(), cipher.clone()).expect("");
+//! let mut decrypt_message = decryptor.decrypt_file(PathBuf::from("message.txt.enc"), passphrase.clone(), cipher.to_owned()).expect("");
 //!
 //! let _ = fs::remove_file("crypt_tests.log");
 //! let _ = fs::remove_file("message.txt");
@@ -132,7 +132,7 @@
 //!
 //! ### Using Encryption and Decryption macros
 //!
-//! Beside the main macros encrypt, decrypt, encrypt_file, decrypt_file, I've added the Encryption and Decryption macros. Instead of linking the encryption/ decryption instance, we define the macro by using Encryption!(public_key, keysize [ 1024 | 768 | 512 ] contents_bytes_vec, passphrase_as_str, [ AES | XChaCha20 ]) and get the content and ciphertext returned, or additionally when using XChaCha20, we also get the nonce.
+//! Beside the main macros encrypt, decrypt, encrypt_file, decrypt_file, I've added the `encryption` and `decryption` macros. Instead of linking the encryption/ decryption instance, we define the macro by using `encryption!(public_key, keysize [ 1024 | 768 | 512 ] contents_bytes_vec, passphrase_as_str, [ AES | XChaCha20 ])` and get the content and ciphertext returned, or additionally when using XChaCha20, we also get the nonce.
 //!
 //! ```rust
 //! use crypt_guard::{*, error::*};
@@ -145,31 +145,31 @@
 //! };
 //! //use crypt_guard_proc::{*, log_activity, write_log};
 //! use tempfile::{TempDir, Builder};
-//! use crypt_guard::KeyControler::KeyControl;
+//! use crypt_guard::KeyControl;
 //! 
 //! //#[crypt_guard_proc]
 //! #[activate_log("log.txt")]
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let _ = initialize_logger(); 
 //!     let mut message = "Hey, how are you doing?";
-//!     let mut passphrase = "Test Passphrase";
+//!     let passphrase= "Test Passphrase";
 //! 
 //!     let mut key_control = KeyControl::<KeyControKyber1024>::new();
 //!     let _ = log_activity!("Starting with signing of the message.", "Test");
 //! 
 //!     // Generate key pair
-//!     let (mut public_key, mut secret_key) = KyberKeypair!(1024);
+//!     let (mut public_key, mut secret_key) = kyber_keypair!(1024);
 //! 
 //!     // Instantiate Kyber for encryption of a message with Kyber1024 and AES
 //!     // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!    
 //!     // Encrypt message
-//!     let (mut encrypt_message, mut cipher) = Encryption!(public_key.to_owned(), 1024, message.as_bytes().to_owned(), passphrase.clone(), AES)?;
+//!     let (mut encrypt_message, mut cipher) = encryption!(public_key.to_owned(), 1024, message.as_bytes().to_owned(), passphrase.clone(), AES)?;
 //! 
-//!     key_control.set_ciphertext(cipher.clone()).unwrap();
+//!     key_control.set_ciphertext(cipher.to_owned()).unwrap();
 //!     key_control.save(KeyTypes::Ciphertext, "./key".into()).unwrap();
 //! 
 //!     // Decrypt message
-//!     let mut decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase.clone(), cipher.to_owned(), AES)?;
+//!     let mut decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase.clone(), cipher.to_owned(), AES)?;
 //! 
 //!     let mut decrypted_text = String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
 //!     write_log!();
@@ -188,44 +188,44 @@
 //! }  
 //! ```
 
-#[macro_use]
-extern crate lazy_static;
 pub use crypt_guard_proc::*;
 
 /// Core functionalitys for control of Kyber keys as well as encryption and decryption
-mod Core;
+mod core;
 /// Cryptographic related functionalitys, enums structs and modules
 pub mod cryptography;
 /// File and Key related functionalitys, enums structs and modules
-pub mod KeyControl;
+pub mod key_control;
 /// Logging related functionalitys
 pub mod log;
 /// Error types
 pub mod error;
 
-pub mod Utils;
+pub mod utils;
+/// Builder-style API for encryption/decryption, keygen, and signature flows
+pub mod builder;
 
 #[cfg(test)]
 mod tests;
 
 pub use crate::{
     log::*,
-    KeyControl::{
+    key_control::{
         *,
         file, 
     },
-    Core::{
+    core::{
         *,
-        KDF,
+        kdf,
         kyber::*,
     },
-    Utils::{
+    utils::{
         archive,
         zip_manager,
     }
 };
+pub use builder::*;
 use std::path::Path;
-use hex;
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile
 pub fn activate_log<P: AsRef<Path>>(log_file: P) {
     // Initialize internal logger state and set up tracing to write to the same file
@@ -234,18 +234,18 @@ pub fn activate_log<P: AsRef<Path>>(log_file: P) {
 
 /// Macro for signing and encrypting data, a 1024 falcon secret key is required for signing
 #[macro_export]
-macro_rules! EncryptSign {
+macro_rules! encrypt_sign {
     ($key:expr, $sign:expr, $content:expr, $passphrase:expr)  => {{
         let mut key = $key;
         let mut sign = $sign;
         let mut content = $content;
         let passphrase = $passphrase;
-        let result = {
-            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key.clone(), None).unwrap();
-            let sign = Signature::<Falcon1024, Message>::new();
-            let signed_message = sign.signature($content.clone(), $sign.clone()).unwrap();
-            encryptor.encrypt_data(signed_message, $passphrase.clone())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            let mut signer = Signature::<Falcon1024, Message>::new();
+            let mut signed_message = signer.signature(content.to_owned(), sign.to_owned()).map_err($crate::error::CryptError::from)?;
+            encryptor.encrypt_data(signed_message, &passphrase)
+        })();
         key.zeroize();
         sign.zeroize();
         content.zeroize();
@@ -255,25 +255,25 @@ macro_rules! EncryptSign {
 
 /// Macro for decrypting and opening data, a 1024 falcon public key is required
 #[macro_export]
-macro_rules! DecryptOpen {
+macro_rules! decrypt_open {
     ($key:expr, $sign:expr, $content:expr, $passphrase:expr, $cipher:expr)  => {{
         let mut key = $key;
         let mut sign = $sign;
         let mut content = $content;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
-        let result = {
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key, None).unwrap();
-            let data = decryptor.decrypt_data($content, $passphrase, $cipher).unwrap();
-            let sign = Signature::<Falcon1024, Message>::new();
-            sign.open(data, $sign).unwrap()
-        };
+        let out = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            let data = decryptor.decrypt_data(content.to_owned(), &passphrase, cipher.to_owned())?;
+            let mut signer = Signature::<Falcon1024, Message>::new();
+            signer.open(data, sign.to_owned()).map_err($crate::error::CryptError::from)
+        })().expect("decrypt_open failed");
 
         key.zeroize();
         sign.zeroize();
         content.zeroize();
         cipher.zeroize();
-        result
+        out
     }};
 }
 
@@ -282,11 +282,11 @@ macro_rules! DecryptOpen {
 #[macro_export]
 macro_rules! archive {
     ($source_path:expr, $delete_dir:expr) => {{
-        use crate::archive::{Archive, ArchiveOperation};
+        use $crate::archive::{Archive, ArchiveOperation};
         let source = $source_path.to_path_buf();
         let archive_operation = ArchiveOperation::Archive;
         let archive_instance = Archive::new(source, archive_operation);
-        archive_instance.execute($delete_dir).expect("Archiving failed");
+        let _ = archive_instance.execute($delete_dir);
     }};
 }
 
@@ -294,20 +294,20 @@ macro_rules! archive {
 #[macro_export]
 macro_rules! extract {
     ($archive_path:expr, $delete_archive:expr) => {{
-        use crate::archive::{Archive, ArchiveOperation};
+        use $crate::archive::{Archive, ArchiveOperation};
         let archive = $archive_path.to_path_buf();
         let archive_operation = ArchiveOperation::Unarchive;
         let extract_instance = Archive::new(archive, archive_operation);
-        extract_instance.execute($delete_archive).expect("Extraction failed");
+        let _ = extract_instance.execute($delete_archive);
     }};
 }
 
 /// Macro for archiving and extracting directories or files.
 #[macro_export]
-macro_rules! ArchiveUtil {
+macro_rules! archive_util {
     // Variant for Archiving
     ($path:expr, $delete_dir:expr, Archive) => {{
-        //use crate::archive::{Archive, ArchiveOperation};
+        use $crate::archive::{Archive, ArchiveOperation};
         // Convert the provided path to a PathBuf
         let source = $path.to_path_buf();
         // Specify the archive operation
@@ -315,12 +315,12 @@ macro_rules! ArchiveUtil {
         // Create a new Archive instance
         let archive_instance = Archive::new(source, archive_operation);
         // Execute the archiving process with the specified delete flag
-        archive_instance.execute($delete_dir).expect("Archiving failed");
+        let _ = archive_instance.execute($delete_dir);
     }};
     
     // Variant for Extracting
     ($archive_path:expr, $delete_archive:expr, Extract) => {{
-        use crate::archive::{Archive, ArchiveOperation};
+        use $crate::archive::{Archive, ArchiveOperation};
         // Convert the provided archive path to a PathBuf
         let archive = $archive_path.to_path_buf();
         // Specify the extraction operation
@@ -328,85 +328,60 @@ macro_rules! ArchiveUtil {
         // Create a new Archive instance
         let extract_instance = Archive::new(archive, archive_operation);
         // Execute the extraction process with the specified delete flag
-        extract_instance.execute($delete_archive).expect("Extraction failed");
+        let _ = extract_instance.execute($delete_archive);
     }};
 }
 
 /// Macro for kyber keypair generation
 #[macro_export]
-macro_rules! KyberKeypair {
+macro_rules! kyber_keypair {
     ($size:expr) => {{
-        let (public_key, secret_key) = match $size {
-            1024 => {
-                KeyControKyber1024::keypair().expect("Failed to generate keypair")
-            },
-            768 => {
-                KeyControKyber768::keypair().expect("Failed to generate keypair")
-            },
-            512 => {
-                KeyControKyber512::keypair().expect("Failed to generate keypair")
-            },
-            _ => {
-                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
-            }.unwrap()
-        };
-        (public_key, secret_key)
+        match $size {
+            1024 => KeyControKyber1024::keypair().expect("Failed to generate keypair"),
+            768 => KeyControKyber768::keypair().expect("Failed to generate keypair"),
+            512 => KeyControKyber512::keypair().expect("Failed to generate keypair"),
+            _ => panic!("Wrong key size!"),
+        }
     }};
 }
 
 /// Macro for falcon keypair generation
 #[macro_export]
-macro_rules! FalconKeypair {
+macro_rules! falcon_keypair {
     ($size:expr) => {{
-        let (public_key, secret_key) = match $size {
-            1024 => {
-                Falcon1024::keypair().expect("Failed to generate keypair")
-            },
-            512 => {
-                Falcon512::keypair().expect("Failed to generate keypair")
-            },
-            _ => {
-                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
-            }.unwrap()
-        };
-        (public_key, secret_key)
+        match $size {
+            1024 => Falcon1024::keypair().expect("Failed to generate Falcon keypair"),
+            512 => Falcon512::keypair().expect("Failed to generate Falcon keypair"),
+            _ => panic!("Wrong key size!"),
+        }
     }};
 }
 
 /// Macro for dilithium keypair generation
 #[macro_export]
-macro_rules! DilithiumKeypair {
+macro_rules! dilithium_keypair {
     ($version:expr) => {{
-        let (public_key, secret_key) = match $version {
-            5 => {
-                Dilithium5::keypair().expect("Failed to generate keypair")
-            },
-            3 => {
-                Dilithium3::keypair().expect("Failed to generate keypair")
-            },
-            2 => {
-                Dilithium2::keypair().expect("Failed to generate keypair")
-            },
-            _ => {
-                Err(Box::new(CryptError::new("Wrong key size!")) as Box<dyn std::error::Error>)
-            }.unwrap()
-        };
-        (public_key, secret_key)
+        match $version {
+            5 => Dilithium5::keypair().expect("Failed to generate Dilithium keypair"),
+            3 => Dilithium3::keypair().expect("Failed to generate Dilithium keypair"),
+            2 => Dilithium2::keypair().expect("Failed to generate Dilithium keypair"),
+            _ => panic!("Wrong key size!"),
+        }
     }};
 }
 
 #[macro_export]
-macro_rules! Encryption {
+macro_rules! encryption {
     // AES      
     ($key:expr, 1024, $data:expr, $passphrase:expr, AES) => {{
         let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
 
-        let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -415,12 +390,12 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, AES) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -429,12 +404,12 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, AES) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-        let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -446,10 +421,10 @@ macro_rules! Encryption {
         let mut data = $data;
         let passphrase = $passphrase;
 
-        let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_XTS>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesXts>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -458,12 +433,12 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_XTS) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES_XTS>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AesXts>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -472,12 +447,12 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_XTS) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-        let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES_XTS>::new($key, None).expect("");
-            encryptor.encrypt_data($data, $passphrase)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AesXts>::new(key.to_owned(), None)?;
+            encryptor.encrypt_data(data.to_owned(), &passphrase)
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -491,9 +466,9 @@ macro_rules! Encryption {
         let passphrase = $passphrase;
         
         let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_CBC>::new($key, None).expect("");
-            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect(""); 
-            (encrypt_message, cipher)
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?; 
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher))
         };
         key.zeroize();
         data.zeroize();
@@ -503,12 +478,12 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_CBC) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES_CBC>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            (encrypt_message, cipher)
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher))
         };
         key.zeroize();
         data.zeroize();
@@ -518,12 +493,12 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_CBC) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES_CBC>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            (encrypt_message, cipher)
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher))
         };
         key.zeroize();
         data.zeroize();
@@ -537,10 +512,10 @@ macro_rules! Encryption {
         let passphrase = $passphrase;
         
         let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_GCM_SIV>::new($key, None).expect("");
-            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesGcmSiv>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -550,13 +525,13 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_GCM_SIV) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES_GCM_SIV>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AesGcmSiv>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -566,13 +541,13 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_GCM_SIV) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES_GCM_SIV>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");         
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AesGcmSiv>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;         
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -587,10 +562,10 @@ macro_rules! Encryption {
         let passphrase = $passphrase;
         
         let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES_CTR>::new($key, None).expect("");
-            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesCtr>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -600,13 +575,13 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_CTR) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES_CTR>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AesCtr>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -616,13 +591,13 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_CTR) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES_CTR>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");         
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AesCtr>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;         
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -636,10 +611,10 @@ macro_rules! Encryption {
         let passphrase = $passphrase;
         
         let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new($key, None).expect("");
-            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -649,13 +624,13 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let mut nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -665,13 +640,13 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let mut nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
+        let result = {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, $crate::error::CryptError>((encrypt_message, cipher, nonce.to_string()))
         };
         key.zeroize();
         data.zeroize();
@@ -684,12 +659,12 @@ macro_rules! Encryption {
         let mut data = $data;
         let passphrase = $passphrase;
         
-        let result = {
-        let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20Poly1305>::new($key, None).expect("");
-            let (encrypt_message, cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20Poly1305>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -698,14 +673,14 @@ macro_rules! Encryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20Poly1305>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let mut nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20Poly1305>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -714,14 +689,14 @@ macro_rules! Encryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20Poly1305>::new($key, None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_data($data, $passphrase).expect("");
-            let mut nonce = encryptor.get_nonce().expect("");
-            (encrypt_message, cipher, nonce.to_string())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20Poly1305>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_data(data.to_owned(), &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -730,7 +705,7 @@ macro_rules! Encryption {
 }
 
 #[macro_export]
-macro_rules! Decryption {
+macro_rules! decryption {
     // AES
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
@@ -738,10 +713,10 @@ macro_rules! Decryption {
         let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -751,29 +726,29 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
-    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
+    ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, AES_XTS) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AesXts>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -788,10 +763,10 @@ macro_rules! Decryption {
         let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_XTS>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {        
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AesXts>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -801,13 +776,13 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, AES_XTS) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES_XTS>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AesXts>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -817,13 +792,13 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -834,16 +809,16 @@ macro_rules! Decryption {
 
     // AES_CBC
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, AES_CBC) => {{
-        let key = $key;
+        let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_CBC>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
-        $key.zeroize();
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
+        key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -852,13 +827,13 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, AES_CBC) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES_CBC>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -868,13 +843,13 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, AES_CBC) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES_CBC>::new($key, None).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -884,16 +859,17 @@ macro_rules! Decryption {
 
     // AES_GCM_SIV
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_GCM_SIV) => {{
-        let key = $key;
+        let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_GCM_SIV>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
-        $key.zeroize();
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AesGcmSiv>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
+        key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -902,13 +878,14 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_GCM_SIV) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES_GCM_SIV>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AesGcmSiv>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -918,13 +895,14 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_GCM_SIV) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES_GCM_SIV>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AesGcmSiv>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -934,16 +912,17 @@ macro_rules! Decryption {
 
     // AES_CTR
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
-        let key = $key;
+        let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES_CTR>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
-        $key.zeroize();
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AesCtr>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
+        key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -952,13 +931,14 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES_CTR>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AesCtr>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -968,13 +948,14 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, AES_CTR) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
+        let nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES_CTR>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AesCtr>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -984,17 +965,17 @@ macro_rules! Decryption {
 
     // XChaCha20
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
-        let key = $key;
+        let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
-        $key.zeroize();
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
+        key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1004,14 +985,14 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -1022,14 +1003,14 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -1040,17 +1021,17 @@ macro_rules! Decryption {
 
     // XChaCha20Poly1305
     ($key:expr, 1024, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
-        let key = $key;
+        let mut key = $key;
         let mut data = $data;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let result = {        
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
-        $key.zeroize();
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20Poly1305>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
+        key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1060,14 +1041,14 @@ macro_rules! Decryption {
     ($key:expr, 768, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20Poly1305>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -1078,14 +1059,14 @@ macro_rules! Decryption {
     ($key:expr, 512, $data:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20Poly1305) => {{
         let mut key = $key;
         let mut data = $data;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20Poly1305>::new($key, $nonce).expect("");
-            decryptor.decrypt_data($data, $passphrase, $cipher)
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20Poly1305>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
+        })();
         key.zeroize();
         data.zeroize();
         passphrase.to_string().zeroize();
@@ -1097,17 +1078,16 @@ macro_rules! Decryption {
 
 /// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
 #[macro_export]
-macro_rules! EncryptFile {
+macro_rules! encrypt_file {
     // AES
     ($key:expr, 1024, $path:expr, $passphrase:expr, AES) => {{
         
         let mut key = $key;
         let passphrase = $passphrase;
-
-        let result = {
-            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new($key.clone(), None).expect("");
-            encryptor.encrypt_file($path.clone(), $passphrase.clone())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_file($path, &passphrase)
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
@@ -1115,12 +1095,12 @@ macro_rules! EncryptFile {
     ($key:expr, 768, $path:expr, $passphrase:expr, AES) => {{
         
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new($key.clone(), None).expect("");
-            encryptor.encrypt_file($path.clone(), $passphrase.clone())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_file($path, &passphrase)
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
@@ -1128,12 +1108,12 @@ macro_rules! EncryptFile {
     ($key:expr, 512, $path:expr, $passphrase:expr, AES) => {{
         
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new($key.clone(), None).expect("");
-            encryptor.encrypt_file($path.clone(), $passphrase.clone())
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            encryptor.encrypt_file($path, &passphrase)
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
@@ -1142,14 +1122,14 @@ macro_rules! EncryptFile {
     ($key:expr, 1024, $path:expr, $passphrase:expr, XChaCha20) => {{
         
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new($key.clone(), None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_file($path.clone(), $passphrase.clone());
-            let mut nonce = encryptor.get_nonce();
-            (encrypt_message, cipher, nonce)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_file($path, &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
@@ -1157,29 +1137,29 @@ macro_rules! EncryptFile {
     ($key:expr, 768, $path:expr, $passphrase:expr, XChaCha20) => {{
         
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new($key.clone(), None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_file($path.clone(), $passphrase.clone());
-            let mut nonce = encryptor.get_nonce();
-            (encrypt_message, cipher, nonce)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber768, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_file($path, &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $path:expr, $passphrase:expr, XChaCha20) => {{
-    
+        
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
 
-        let mut result = {
-            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new($key.clone(), None).expect("");
-            let (mut encrypt_message, mut cipher) = encryptor.encrypt_file($path.clone(), $passphrase.clone());
-            let mut nonce = encryptor.get_nonce();
-            (encrypt_message, cipher, nonce)
-        };
+        let result = (|| {
+            let mut encryptor = Kyber::<Encryption, Kyber512, Data, XChaCha20>::new(key.to_owned(), None)?;
+            let (encrypt_message, cipher) = encryptor.encrypt_file($path, &passphrase)?;
+            let nonce = encryptor.get_nonce()?;
+            Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         result
@@ -1189,17 +1169,17 @@ macro_rules! EncryptFile {
 
 /// Macro for encryption of a file, taking a Kyber decryption instance, a `PathBuf` as well as a passphrase and ciphertext as arguments
 #[macro_export]
-macro_rules! DecryptFile {
+macro_rules! decrypt_file {
     // AES
     ($key:expr, 1024, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let result = {
-            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new($key.clone(), None).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1207,13 +1187,13 @@ macro_rules! DecryptFile {
     }};
     ($key:expr, 768, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new($key.clone(), None).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1221,13 +1201,13 @@ macro_rules! DecryptFile {
     }};
     ($key:expr, 512, $path:expr, $passphrase:expr, $cipher:expr, AES) => {{
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase = $passphrase;
         let mut cipher = $cipher;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new($key.clone(), None).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1236,14 +1216,14 @@ macro_rules! DecryptFile {
     // XChaCha20
     ($key:expr, 1024, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new($key.clone(), Some($nonce.clone())).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber1024, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1252,14 +1232,14 @@ macro_rules! DecryptFile {
     }};
     ($key:expr, 768, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new($key.clone(), Some($nonce.clone())).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber768, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1268,14 +1248,14 @@ macro_rules! DecryptFile {
     }};
     ($key:expr, 512, $path:expr, $passphrase:expr, $cipher:expr, $nonce:expr, XChaCha20) => {{
         let mut key = $key;
-        let mut passphrase = $passphrase;
+        let passphrase= $passphrase;
         let mut cipher = $cipher;
         let mut nonce = $nonce;
 
-        let mut result = {
-            let mut decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new($key.clone(), Some($nonce.clone())).expect("");
-            decryptor.decrypt_file($path.clone(), $passphrase.clone(), $cipher.clone())
-        };
+        let result = (|| {
+            let decryptor = Kyber::<Decryption, Kyber512, Data, XChaCha20>::new(key.to_owned(), nonce.to_owned())?;
+            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+        })();
         key.zeroize();
         passphrase.to_string().zeroize();
         cipher.zeroize();
@@ -1287,29 +1267,29 @@ macro_rules! DecryptFile {
 
 
 #[macro_export]
-macro_rules! Signature {
+macro_rules! signature {
     // Falcon
     // 1024
     (Falcon, $key:expr, 1024, $content:expr, Message) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let result = {
-            let sign = Signature::<Falcon1024, Message>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+        let result = (|| {
+            let mut sign = Signature::<Falcon1024, Message>::new();
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
     }};
     (Falcon, $key:expr, 1024, $content:expr, Detached) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let result = {
-            let sign = Signature::<Falcon1024, Detached>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+        let result = (|| {
+            let mut sign = Signature::<Falcon1024, Detached>::new();
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1317,25 +1297,25 @@ macro_rules! Signature {
 
     // 512
     (Falcon, $key:expr, 512, $content:expr, Message) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Falcon512, Message>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
     }};
     (Falcon, $key:expr, 512, $content:expr, Detached) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Falcon512, Detached>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1344,25 +1324,25 @@ macro_rules! Signature {
     // Dilithium
     // 5
     (Dilithium, $key:expr, 5, $content:expr, Message) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium5, Message>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
     }};
     (Dilithium, $key:expr, 5, $content:expr, Detached) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium5, Detached>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1370,25 +1350,25 @@ macro_rules! Signature {
 
     // 3
     (Dilithium, $key:expr, 3, $content:expr, Message) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium3, Message>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
     }};
     (Dilithium, $key:expr, 3, $content:expr, Detached) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium3, Detached>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1396,25 +1376,25 @@ macro_rules! Signature {
 
     // 2
     (Dilithium, $key:expr, 2, $content:expr, Message) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium2, Message>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
     }};
     (Dilithium, $key:expr, 2, $content:expr, Detached) => {{
-        let mut key = $key;;
-        let mut content = $content;;
+        let mut key = $key;
+        let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium2, Detached>::new();
-            sign.signature($content.clone(), $key.clone()).unwrap()
-        };
+            sign.signature(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1422,17 +1402,17 @@ macro_rules! Signature {
 }
 
 #[macro_export]
-macro_rules! Verify {
+macro_rules! verify {
     // Falcon
     // 1024
     (Falcon, $key:expr, 1024, $content:expr, Message) => {{
         let mut key = $key;
         let mut content = $content;
 
-        let result = {
-            let sign = Signature::<Falcon1024, Message>::new();
-            sign.open($content.clone(), $key.clone()).unwrap()
-        };
+        let result = (|| {
+            let mut sign = Signature::<Falcon1024, Message>::new();
+            sign.open(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1442,10 +1422,10 @@ macro_rules! Verify {
         let mut signature = $signature;
         let mut content = $content; 
 
-        let result = {
-            let sign = Signature::<Falcon1024, Detached>::new();
-            sign.verify($content.clone(), $signature.clone(), $key.clone()).unwrap()
-        };
+        let result = (|| {
+            let mut sign = Signature::<Falcon1024, Detached>::new();
+            sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1457,10 +1437,10 @@ macro_rules! Verify {
         let mut key = $key;
         let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Falcon512, Message>::new();
-            sign.open($content.clone(), $key.clone()).unwrap()
-        };
+            sign.open(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1470,10 +1450,10 @@ macro_rules! Verify {
         let mut signature = $signature;
         let mut content = $content; 
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Falcon512, Detached>::new();
-            sign.verify($content.clone(), $signature.clone(), $key.clone()).unwrap()
-        };
+            sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1486,10 +1466,10 @@ macro_rules! Verify {
         let mut key = $key;
         let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium5, Message>::new();
-            sign.open($content.clone(), $key.clone()).unwrap()
-        };
+            sign.open(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1498,10 +1478,10 @@ macro_rules! Verify {
         let mut key = $key;
         let mut signature = $signature;
         let mut content = $content; 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium5, Detached>::new();
-            sign.verify($content.clone(), $signature.clone(), $key.clone()).unwrap()
-        };
+            sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1513,10 +1493,10 @@ macro_rules! Verify {
         let mut key = $key;
         let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium3, Message>::new();
-            sign.open($content.clone(), $key.clone()).unwrap()
-        };
+            sign.open(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1526,10 +1506,10 @@ macro_rules! Verify {
         let mut signature = $signature;
         let mut content = $content; 
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium3, Detached>::new();
-            sign.verify($content.clone(), $signature.clone(), $key.clone()).unwrap()
-        };
+            sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1541,10 +1521,10 @@ macro_rules! Verify {
         let mut key = $key;
         let mut content = $content;
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium2, Message>::new();
-            sign.open($content.clone(), $key.clone()).unwrap()
-        };
+            sign.open(content.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         content.zeroize();
         result
@@ -1554,10 +1534,10 @@ macro_rules! Verify {
         let mut signature = $signature;
         let mut content = $content; 
 
-        let mut result = {
+        let result = (|| {
             let mut sign = Signature::<Dilithium2, Detached>::new();
-            sign.verify($content.clone(), $signature.clone(), $key.clone()).unwrap()
-        };
+            sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
+        })();
         key.zeroize();
         signature.zeroize();
         content.zeroize();

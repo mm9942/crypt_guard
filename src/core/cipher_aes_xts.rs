@@ -5,48 +5,28 @@ use crate::{
     *,
     cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
     error::{*}, 
-    Core::{
-        KyberKeyFunctions,
+    core::{
+        // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     },
 };
 use std::result::Result;
-use rand::{RngCore, rngs::OsRng};
-use hex;
-use aes_gcm_siv::{
-    aead::{Aead, KeyInit},
-    Aes256GcmSiv, Nonce,
-};
-use aes::cipher::generic_array::GenericArray;
-
-/// Generates a 12-byte iv using OS-level randomness.
-///
-/// # Returns
-/// A 24-byte array filled with secure random bytes.
-pub fn generate_iv() -> [u8; 12] {
-    let mut iv = [0u8; 12];
-    OsRng.fill_bytes(&mut iv);
-    iv
-}
+use aes::{Aes256, cipher::KeyInit, cipher::generic_array::GenericArray};
+use xts_mode::{Xts128, get_tweak_default};
 
 /// The main struct for handling cryptographic operations with ChaCha20 algorithm.
-/// It encapsulates the cryptographic information, shared secret, and iv required for encryption and decryption.
-impl CipherAES_GCM_SIV {
-    /// Constructs a new CipherChaCha instance with specified cryptographic information and an optional iv.
+/// It encapsulates the cryptographic information and shared secret required for encryption and decryption.
+impl CipherAesXts {
+    /// Constructs a new CipherChaCha instance with specified cryptographic information.
     ///
     /// # Parameters
     /// - infos: Cryptographic information including content, passphrase, metadata, and location for encryption or decryption.
-    /// - iv: Optional hexadecimal string representation of the iv. If not provided, a iv will be generated.
     ///
     /// # Returns
     /// A new CipherChaCha instance.
-    pub fn new(infos: CryptographicInformation, iv: Option<String>) -> Self {
-        let iv: Vec<u8> = match iv {
-            Some(iv) => hex::decode(iv).expect("An error occoured while decoding hex!"),
-            None => generate_iv().to_vec(),
-        };
+    pub fn new(infos: CryptographicInformation) -> Self {
         // println!("infos: {:?}", infos);
-        CipherAES_GCM_SIV { infos, sharedsecret: Vec::new(), iv }
+        CipherAesXts { infos, sharedsecret: Vec::new() }
     }
 
     /// Retrieves the encrypted or decrypted data stored within the CryptographicInformation.
@@ -79,56 +59,49 @@ impl CipherAES_GCM_SIV {
         Ok(&self.sharedsecret)
     }
 
-    /// Sets the iv for cryptographic operations.
-    ///
-    /// # Parameters
-    /// - iv: A vector of bytes representing the iv.
-    ///
-    /// # Returns
-    /// A reference to the set iv (&Vec<u8>).
-    pub fn set_iv(&mut self, iv: Vec<u8>) -> &Vec<u8> {
-        self.iv = iv;
-        &self.iv
-    }
-
-    /// Retrieves the iv.
-    ///
-    /// # Returns
-    /// A reference to the current iv (&Vec<u8>).
-    pub fn iv(&self) -> &Vec<u8> {
-        &self.iv
-    }
-
-    fn encryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encryption(&self) -> Result<Vec<u8>, CryptError> {
         let plaintext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
-        let cipher = Aes256GcmSiv::new(key);
-        let iv = Nonce::from_slice(&self.iv);
+
+        let cipher_1 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[..32]));
+        let cipher_2 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[32..]));
+
+        let cipher = Xts128::<Aes256>::new(cipher_1, cipher_2);
+
         let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
-        let data = hmac.hmac();
-        let encrypted = cipher.encrypt(iv, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
-        let iv = self.iv();
-        Ok((encrypted, iv.clone()))
+        let mut data = hmac.hmac();
+
+        let sector_size = 0x200;
+        let first_sector_index = 0;
+        
+        cipher.encrypt_area(&mut data, sector_size, first_sector_index, get_tweak_default);
+
+        Ok(data)
     }
 
-    fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
-        let ciphertext = self.infos.content()?;
+    fn decryption(&self) -> Result<Vec<u8>, CryptError> {
+        let mut buffer = self.infos.content()?.to_owned();
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
-        let cipher = Aes256GcmSiv::new(key);
-        let iv = Nonce::from_slice(&self.iv);
-        let decrypted = cipher.decrypt(iv, &*ciphertext.to_vec()).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        
+        let cipher_1 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[..32]));
+        let cipher_2 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[32..]));
+
+        let cipher = Xts128::<Aes256>::new(cipher_1, cipher_2);
+        
+        let sector_size = 0x200;
+        let first_sector_index = 0;
+        
+        cipher.decrypt_area(&mut buffer, sector_size, first_sector_index, get_tweak_default)/*.map_err(|e| CryptError::new(e.to_string().as_str()))?*/;
+
         //println!("decrypted: {:?}", &decrypted);
-        let mut hmac = Sign::new(decrypted.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
+        let mut hmac = Sign::new(buffer.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
         let data = hmac.hmac();
         //println!("Verified: {:?}", &data);
-        let iv = self.iv();
-        Ok((data, iv.clone()))
+        Ok(data)
     }
 }
 
-impl CryptographicFunctions for CipherAES_GCM_SIV {
+impl CryptographicFunctions for CipherAesXts {
     /// Encrypts the provided data using the public key.
     ///
     /// # Parameters
@@ -136,13 +109,21 @@ impl CryptographicFunctions for CipherAES_GCM_SIV {
     ///
     /// # Returns
     /// A result containing a tuple of the encrypted data (Vec<u8>) and the key used, or a CryptError.
-    /// Additionally, prints a message to stdout with the iv for user reference.
     fn encrypt(&mut self, public_key: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
-        let (sharedsecret, ciphertext) = key.encap(&public_key)?;
+
+         // Generate the first shared secret and ciphertext
+         let (sharedsecret1, ciphertext1) = key.encap(&public_key)?;
+        
+         // Generate the second shared secret and ciphertext
+         let (sharedsecret2, ciphertext2) = key.encap(&public_key)?;
+         
+         // Concatenate both shared secrets and ciphertexts
+         let sharedsecret = [sharedsecret1.to_owned(), sharedsecret2.to_owned()].concat();
+         let ciphertext = [ciphertext1.to_owned(), ciphertext2.to_owned()].concat();
+        
         let _ = self.set_shared_secret(sharedsecret);
-        let (encrypted_data, iv) = self.encryption()?;
-        println!("Please write down this iv: {}", hex::encode(iv));
+        let encrypted_data = self.encryption()?;
         Ok((encrypted_data, ciphertext))
     }
 
@@ -156,9 +137,18 @@ impl CryptographicFunctions for CipherAES_GCM_SIV {
     /// A result containing the decrypted data (Vec<u8>), or a CryptError.
     fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
-        let sharedsecret = key.decap(&secret_key, &ciphertext)?;
+
+        let ciphertext_len = ciphertext.len() / 2;
+        let ciphertext1 = ciphertext[..ciphertext_len].to_vec();
+        let ciphertext2 = ciphertext[ciphertext_len..].to_vec();
+
+        let sharedsecret1 = key.decap(&secret_key, &ciphertext1)?;
+        let sharedsecret2 = key.decap(&secret_key, &ciphertext2)?;
+
+        let sharedsecret = [sharedsecret1.to_owned(), sharedsecret2.to_owned()].concat();
+
         let _ = self.set_shared_secret(sharedsecret);
-        let (decrypted_data, _iv) = self.decryption()?;
+        let decrypted_data = self.decryption()?;
         Ok(decrypted_data)
     }
 }

@@ -1,4 +1,4 @@
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
+// removed unused kem imports per clippy
 use crate::{
     *,
     log_activity,
@@ -8,7 +8,7 @@ use crate::{
     FileTypes,
     FileState,
     FileMetadata,
-    Core::CryptographicFunctions,
+    core::CryptographicFunctions,
     write_log,
 };
 use std::{

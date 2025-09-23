@@ -5,8 +5,8 @@ use crate::{
     *,
     cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
     error::*, 
-    Core::{
-        KyberKeyFunctions,
+    core::{
+        // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     },
 };
@@ -52,7 +52,7 @@ impl CipherChaCha {
             None => generate_nonce(),
         };
         // println!("infos: {:?}", infos);
-		CipherChaCha { infos, sharedsecret: Vec::new(), nonce: nonce }
+		CipherChaCha { infos, sharedsecret: Vec::new(), nonce }
 	}
 
     /// Retrieves the encrypted or decrypted data stored within the `CryptographicInformation`.
@@ -119,42 +119,29 @@ impl CipherChaCha {
             self.infos.set_data(&content)?;
         }
         
-        let mut encrypted_data: Vec<u8> = Vec::new();
-        let mut nonce_vec: Vec<u8> = Vec::new();
-        
-        let process_result = match self.infos.metadata.process()? {
+        match self.infos.metadata.process()? {
             Process::Encryption => {
-                let process_data_result = self.process_data()?;
-                encrypted_data = process_data_result.0;
-                nonce_vec = process_data_result.1;
-                
+                let (encrypted_data, nonce_vec) = self.process_data()?;
                 let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
                 let data = hmac.hmac();
-
                 if self.infos.safe()? {
-                    let _ = self.infos.set_data(&data)?;
-                    let _ = self.infos.safe_file()?;
+                    self.infos.set_data(&data)?;
+                    self.infos.safe_file()?;
                 }
                 Ok((data, nonce_vec))
-            },
+            }
             Process::Decryption => {
-                let mut verifier = Sign::new((&self.infos.content()?).to_vec(), passphrase, Operation::Verify, SignType::Sha512);
+                let mut verifier = Sign::new(self.infos.content()?.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
                 let data = verifier.hmac();
-
                 self.infos.set_data(&data)?;
-                let process_data_result = self.process_data()?;
-                encrypted_data = process_data_result.0;
-                nonce_vec = process_data_result.1;
+                let (decrypted, nonce_vec) = self.process_data()?;
                 if self.infos.safe()? {
-                    let _ = self.infos.set_data(&encrypted_data)?;
-                    let _ = self.infos.safe_file()?;
+                    self.infos.set_data(&decrypted)?;
+                    self.infos.safe_file()?;
                 }
-                Ok((encrypted_data, nonce_vec))
-            },
-            _ => Err(|e| CryptError::IOError(e)),
-        };
-        let result = process_result.map_err(|_| CryptError::EncryptionFailed)?;
-        Ok(result)
+                Ok((decrypted, nonce_vec))
+            }
+        }
     }
 
     /// Helper function to perform the encryption or decryption process based on the current settings.

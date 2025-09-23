@@ -97,6 +97,12 @@ impl From<io::Error> for CryptError {
     }
 }
 
+impl From<SigningErr> for CryptError {
+    fn from(err: SigningErr) -> Self {
+        CryptError::CustomError(err.to_string())
+    }
+}
+
 impl Error for CryptError {}
 
 impl From<hex::FromHexError> for CryptError {

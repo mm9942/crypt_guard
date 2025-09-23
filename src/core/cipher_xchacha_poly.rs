@@ -1,51 +1,54 @@
-//use super::*;
-
-//use crypt_guard_proc::{*, log_activity, write_log};
+//use crypt_guard_proc::{*, log_actnonceity, write_log};
 use crate::{
     *,
     cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    error::{*}, 
-    Core::{
-        KyberKeyFunctions,
+    error::CryptError, 
+    core::{
+        // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     },
 };
 use std::result::Result;
 use rand::{RngCore, rngs::OsRng};
 use hex;
-use aes_gcm_siv::aead::KeyInit;
-use aes::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray};
+use chacha20poly1305::{
+    aead::{Aead, KeyInit},
+    XChaCha20Poly1305, XNonce
+};
+use aes::cipher::generic_array::GenericArray;
 
-/// Generates a 16-byte iv using OS-level randomness.
+/// Generates a 24-byte nonce using OS-level randomness.
 ///
 /// # Returns
 /// A 24-byte array filled with secure random bytes.
-pub fn generate_iv() -> [u8; 16] {
-    let mut iv = [0u8; 16];
-    OsRng.fill_bytes(&mut iv);
-    iv
+pub fn generate_nonce() -> [u8; 24] {
+    let mut nonce = [0u8; 24];
+    OsRng.fill_bytes(&mut nonce);
+    nonce
 }
 
-type Aes256Ctr64LE = ctr::Ctr64LE<aes::Aes256>;
-
 /// The main struct for handling cryptographic operations with ChaCha20 algorithm.
-/// It encapsulates the cryptographic information, shared secret, and iv required for encryption and decryption.
-impl CipherAES_CTR {
-    /// Constructs a new CipherAES_CTR instance with specified cryptographic information and an optional iv.
+/// It encapsulates the cryptographic information, shared secret, and nonce required for encryption and decryption.
+impl CipherChaChaPoly {
+    /// Constructs a new CipherChaCha instance with specified cryptographic information and an optional nonce.
     ///
     /// # Parameters
     /// - infos: Cryptographic information including content, passphrase, metadata, and location for encryption or decryption.
-    /// - iv: Optional hexadecimal string representation of the iv. If not provided, a iv will be generated.
+    /// - nonce: Optional hexadecimal string representation of the nonce. If not provided, a nonce will be generated.
     ///
     /// # Returns
-    /// A new CipherAES_CTR instance.
-    pub fn new(infos: CryptographicInformation, iv: Option<String>) -> Self {
-        let iv: Vec<u8> = match iv {
-            Some(iv) => hex::decode(iv).expect("An error occoured while decoding hex!"),
-            None => generate_iv().to_vec(),
+    /// A new CipherChaCha instance.
+    pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
+        let nonce: [u8; 24] = match nonce {
+            Some(nonce) => {
+                let mut array = [0u8; 24];
+                let decoded = hex::decode(nonce).expect("An error occurred while decoding hex!");
+                array.copy_from_slice(&decoded);
+                array
+            },
+            None => generate_nonce(),
         };
-        // println!("infos: {:?}", infos);
-        CipherAES_CTR { infos, sharedsecret: Vec::new(), iv }
+        CipherChaChaPoly { infos, sharedsecret: Vec::new(), nonce }
     }
 
     /// Retrieves the encrypted or decrypted data stored within the CryptographicInformation.
@@ -58,13 +61,14 @@ impl CipherAES_CTR {
 
         Ok(data)
     }
+
     /// Sets the shared secret for the cryptographic operation.
     ///
     /// # Parameters
     /// - sharedsecret: A vector of bytes (Vec<u8>) representing the shared secret.
     ///
     /// # Returns
-    /// A reference to the CipherAES_CTR instance to allow method chaining.
+    /// A reference to the CipherChaCha instance to allow method chaining.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
         self.sharedsecret = sharedsecret;
         self
@@ -78,65 +82,54 @@ impl CipherAES_CTR {
         Ok(&self.sharedsecret)
     }
 
-    /// Sets the iv for cryptographic operations.
+    /// Sets the nonce for cryptographic operations.
     ///
     /// # Parameters
-    /// - iv: A vector of bytes representing the iv.
+    /// - nonce: A fixed-size array of bytes representing the nonce.
     ///
     /// # Returns
-    /// A reference to the set iv (&Vec<u8>).
-    pub fn set_iv(&mut self, iv: Vec<u8>) -> &Vec<u8> {
-        self.iv = iv;
-        &self.iv
+    /// A reference to the set nonce (&[u8; 24]).
+    pub fn set_nonce(&mut self, nonce: [u8; 24]) -> &[u8; 24] {
+        self.nonce = nonce;
+        &self.nonce
     }
 
-    /// Retrieves the iv.
+    /// Retrieves the nonce.
     ///
     /// # Returns
-    /// A reference to the current iv (&Vec<u8>).
-    pub fn iv(&self) -> &Vec<u8> {
-        &self.iv
+    /// A reference to the current nonce (&[u8; 24]).
+    pub fn nonce(&self) -> &[u8; 24] {
+        &self.nonce
     }
 
-    fn encryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encryption(&self) -> Result<(Vec<u8>, [u8; 24]), CryptError> {
         let plaintext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
         let key = GenericArray::from_slice(&self.sharedsecret);
-        let iv = GenericArray::from_slice(&self.iv);
-        let mut cipher = Aes256Ctr64LE::new(key, iv);
-
+        let cipher = XChaCha20Poly1305::new(key);
+        let nonce = XNonce::from_slice(&self.nonce);
         let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
         let data = hmac.hmac();
-
-        let mut buf = data;
-        let _ = cipher.apply_keystream(&mut buf);
-
-        //let encrypted = cipher.encrypt(iv, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
-        let iv = self.iv();
-        Ok((buf.to_owned(), iv.clone()))
+        let encrypted = cipher.encrypt(nonce, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let nonce = *self.nonce();
+        Ok((encrypted, nonce))
     }
 
-    fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn decryption(&self) -> Result<(Vec<u8>, [u8; 24]), CryptError> {
         let ciphertext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
         let key = GenericArray::from_slice(&self.sharedsecret);
-        let iv = GenericArray::from_slice(&self.iv);
-        let mut cipher = Aes256Ctr64LE::new(key, iv);
-
-        let mut buf = ciphertext.to_owned();
-        let _ = cipher.apply_keystream(&mut buf);
-
-        //println!("decrypted: {:?}", &decrypted);
-        let mut hmac = Sign::new(buf.to_owned(), passphrase, Operation::Verify, SignType::Sha512);
+        let cipher = XChaCha20Poly1305::new(key);
+        let nonce = XNonce::from_slice(&self.nonce);
+        let decrypted = cipher.decrypt(nonce, &*ciphertext.to_vec()).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let mut hmac = Sign::new(decrypted.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
         let data = hmac.hmac();
-
-        //println!("Verified: {:?}", &data);
-        let iv = self.iv();
-        Ok((data, iv.clone()))
+        let nonce = *self.nonce();
+        Ok((data, nonce))
     }
 }
 
-impl CryptographicFunctions for CipherAES_CTR {
+impl CryptographicFunctions for CipherChaChaPoly {
     /// Encrypts the provided data using the public key.
     ///
     /// # Parameters
@@ -144,13 +137,13 @@ impl CryptographicFunctions for CipherAES_CTR {
     ///
     /// # Returns
     /// A result containing a tuple of the encrypted data (Vec<u8>) and the key used, or a CryptError.
-    /// Additionally, prints a message to stdout with the iv for user reference.
+    /// Additionally, prints a message to stdout with the nonce for user reference.
     fn encrypt(&mut self, public_key: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let (sharedsecret, ciphertext) = key.encap(&public_key)?;
         let _ = self.set_shared_secret(sharedsecret);
-        let (encrypted_data, iv) = self.encryption()?;
-        println!("Please write down this iv: {}", hex::encode(iv));
+        let (encrypted_data, nonce) = self.encryption()?;
+        println!("Please write down this nonce: {}", hex::encode(nonce));
         Ok((encrypted_data, ciphertext))
     }
 
@@ -162,11 +155,11 @@ impl CryptographicFunctions for CipherAES_CTR {
     ///
     /// # Returns
     /// A result containing the decrypted data (Vec<u8>), or a CryptError.
-    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
+    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);
-        let (decrypted_data, _iv) = self.decryption()?;
+        let (decrypted_data, _nonce) = self.decryption()?;
         Ok(decrypted_data)
     }
 }

@@ -1,5 +1,5 @@
 /// Functions for usage of falcon and dilithium
-pub mod KDF;
+pub mod kdf;
 /// Functions for usage of kyber for key generation
 pub mod kyber;
 /// The `cipher_aes_ctr` module implements the AEAD (Authenticated Encryption with Associated Data Algorithms: high-level encryption ciphers) AES-GCM-SIV for secure data encryption with the GCM-SIV block mode.
@@ -12,7 +12,7 @@ pub mod cipher_aes_xts;
 //pub mod archive;
 
 use crate::{cryptography::*, error::CryptError};
-pub use kyber::KeyControler::*;
+pub use kyber::key_controler::*;
 
 /// The `cipher_aes` module implements the AES (Advanced Encryption Standard) algorithm for secure data encryption and decryption, providing a robust symmetric key cryptography solution.
 pub mod cipher_aes; 

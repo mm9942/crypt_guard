@@ -3,8 +3,8 @@ use crate::{
     *,
     error::CryptError,
     cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    Core::{
-        KyberKeyFunctions,
+    core::{
+        // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     }
 };
@@ -19,9 +19,8 @@ use aes::{
     Aes128,
 };
 use std::{
-    path::{PathBuf}, 
+    path::PathBuf, 
     result::Result, 
-    io::{Write}, 
     fs
 };
 
@@ -92,8 +91,8 @@ impl CipherAES {
         let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
         let data = hmac.hmac();
         if self.infos.safe()? {
-        	let _ = self.infos.set_data(&data)?;
-        	let _ = self.infos.safe_file()?;
+            self.infos.set_data(&data)?;
+            self.infos.safe_file()?;
         }
         Ok(data)
 	}
@@ -150,7 +149,7 @@ impl CipherAES {
     fn generate_cbc_iv(&mut self) -> Result<Vec<u8>, CryptError> {
         let mut iv = vec![0u8; 16];
         let mut rng = rand::thread_rng();
-        rng.try_fill(&mut iv[..]);
+        let _ = rng.try_fill(&mut iv[..]);
         Ok(iv)
     }
 
@@ -164,7 +163,7 @@ impl CipherAES {
         let iv_arr = GenericArray::from_slice(&iv);
 
         let cipher = Aes128CbcEnc::new(key, iv_arr);
-        let mut buffer = data.clone(); // Clone the data to a mutable buffer
+        let mut buffer = data.to_owned(); // Use to_owned() to duplicate data
         let ciphertext = cipher.encrypt_padded_mut::<Pkcs7>(&mut buffer, data.len())
             .map_err(|_| CryptError::EncryptionFailed)?;
 
@@ -215,8 +214,8 @@ impl CipherAES {
         // println!("{:?}", verified_data);
         let data = self.decrypt_aes()?;
         if self.infos.safe()? {
-        	let _ = self.infos.set_data(&data)?;
-        	let _ = self.infos.safe_file()?;
+            self.infos.set_data(&data)?;
+            self.infos.safe_file()?;
         }
         // println!("Decrypted Data: {:?}", data);
         Ok(data)
@@ -285,6 +284,6 @@ impl CryptographicFunctions for CipherAES {
         // println!("shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());
         let _ = self.set_shared_secret(sharedsecret);
 
-        Ok(self.decryption()?)
+        self.decryption()
     }
 }

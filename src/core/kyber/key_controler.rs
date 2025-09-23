@@ -1,8 +1,7 @@
 use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
 use crate::{
     *,
-    log_activity,
-    cryptography::*, 
+    log_activity, 
     error::CryptError, 
     //hmac_sign::*,
     FileTypes,
@@ -10,8 +9,6 @@ use crate::{
     FileMetadata,
     KeyTypes,
     Key,
-    Core::CryptographicFunctions,
-    write_log,
 };
 use std::{
     path::{PathBuf, Path},
@@ -30,6 +27,7 @@ pub trait KyberKeyFunctions {
     /// Decapsulates a secret using a secret key and a ciphertext.
     fn decap(secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError>;
 }
+
 /// Implementation for Kyber 1024 variant.
 pub struct KeyControKyber1024;
 impl KyberKeyFunctions for KeyControKyber1024{
@@ -51,7 +49,7 @@ impl KyberKeyFunctions for KeyControKyber1024{
 		use pqcrypto_kyber::kyber1024::*;
 		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
-		let pk = PublicKey::from_bytes(&public).unwrap();
+        let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
 		let ciphertext = ct.as_bytes().to_vec();
@@ -67,14 +65,27 @@ impl KyberKeyFunctions for KeyControKyber1024{
 		use pqcrypto_kyber::kyber1024::*;
 		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
-        let ct = Ciphertext::from_bytes(&cipher).unwrap();        
-        let sk = SecretKey::from_bytes(&sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+        let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
 
 		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 		Ok(shared_secret)
 	}
+}
+
+// Provide inherent methods so call sites can use `KeyControKyber1024::keypair()` etc.
+impl KeyControKyber1024 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::keypair()
+    }
+    pub fn encap(public_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::encap(public_key)
+    }
+    pub fn decap(secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
+        <Self as KyberKeyFunctions>::decap(secret_key, ciphertext)
+    }
 }
 
 /// Implementation for Kyber 768 variant.
@@ -98,7 +109,7 @@ impl KyberKeyFunctions for KeyControKyber768 {
 		use pqcrypto_kyber::kyber768::*;
 		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
-		let pk = PublicKey::from_bytes(&public).unwrap();
+        let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
 		let ciphertext = ct.as_bytes().to_vec();
@@ -113,14 +124,27 @@ impl KyberKeyFunctions for KeyControKyber768 {
 		use pqcrypto_kyber::kyber768::*;
 		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
-        let ct = Ciphertext::from_bytes(&cipher).unwrap();        
-        let sk = SecretKey::from_bytes(&sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+        let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
 		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
 		Ok(shared_secret)
 	}
+}
+
+// Provide inherent methods so call sites can use `KeyControKyber768::keypair()` etc.
+impl KeyControKyber768 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::keypair()
+    }
+    pub fn encap(public_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::encap(public_key)
+    }
+    pub fn decap(secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
+        <Self as KyberKeyFunctions>::decap(secret_key, ciphertext)
+    }
 }
 
 /// Implementation for Kyber 512 variant.
@@ -144,7 +168,7 @@ impl KyberKeyFunctions for KeyControKyber512 {
 		use pqcrypto_kyber::kyber512::*;
 		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
-		let pk = PublicKey::from_bytes(&public).unwrap();
+        let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
 		let ciphertext = ct.as_bytes().to_vec();
@@ -159,14 +183,27 @@ impl KyberKeyFunctions for KeyControKyber512 {
 		use pqcrypto_kyber::kyber512::*;
 		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 		
-        let ct = Ciphertext::from_bytes(&cipher).unwrap();        
-        let sk = SecretKey::from_bytes(&sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+        let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
 		let shared_secret = ss2.as_bytes().to_vec();
 		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
 		Ok(shared_secret)
 	}
+}
+
+// Provide inherent methods so call sites can use `KeyControKyber512::keypair()` etc.
+impl KeyControKyber512 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::keypair()
+    }
+    pub fn encap(public_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        <Self as KyberKeyFunctions>::encap(public_key)
+    }
+    pub fn decap(secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
+        <Self as KyberKeyFunctions>::decap(secret_key, ciphertext)
+    }
 }
 
 /// A structure to manage cryptographic keys and operations for the Kyber algorithm.
@@ -191,21 +228,22 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
         }
     }
     /// Sets the ciphertext for the `KeyControl` instance.
-	pub fn set_ciphertext(&mut self, cipher: Vec<u8>) -> Result<(), CryptError> {
-		Ok(self.ciphertext = cipher)
-	}
+    pub fn set_ciphertext(&mut self, cipher: Vec<u8>) -> Result<(), CryptError> {
+        self.ciphertext = cipher;
+        Ok(())
+    }
 
     /// Sets the public key for the `KeyControl` instance.
-	pub fn set_public_key(&mut self, public: Vec<u8>) -> Result<(), CryptError> {
-		Ok(self.public_key = public)
-
-	}
+    pub fn set_public_key(&mut self, public: Vec<u8>) -> Result<(), CryptError> {
+        self.public_key = public;
+        Ok(())
+    }
 
     /// Sets the secret key for the `KeyControl` instance.
-	pub fn set_secret_key(&mut self, sec: Vec<u8>) -> Result<(), CryptError> {
-		Ok(self.secret_key = sec)
-
-	}
+    pub fn set_secret_key(&mut self, sec: Vec<u8>) -> Result<(), CryptError> {
+        self.secret_key = sec;
+        Ok(())
+    }
 
     /// Retrieves a specified key based on `KeyTypes`.
 	pub fn get_key(&self, key: KeyTypes) -> Result<Key, CryptError> {
@@ -276,7 +314,6 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
 
 
     /// Getter methods for public_key, secret_key, ciphertext, and shared_secret.
-
 	pub fn public_key(&self) -> Result<Vec<u8>, CryptError> {
 		let key = &self.public_key;
 		Ok(key.to_vec())
@@ -304,4 +341,8 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
         T::decap(secret_key, ciphertext)
     }
 
+}
+
+impl<T: KyberKeyFunctions> Default for KeyControl<T> {
+    fn default() -> Self { Self::new() }
 }

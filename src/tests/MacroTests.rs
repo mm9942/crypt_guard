@@ -4,17 +4,19 @@ use crate::{
     cryptography::{
         hmac_sign::*, 
     },
-    Core::kyber::KyberFunctions,
-    KDF::*,
+    core::kyber::KyberFunctions,
+    kdf::*,
     KeyControKyber1024, 
     KeyControKyber512, 
     KeyControKyber768,
     KyberKeyFunctions,
-    KyberKeypair,
-    DilithiumKeypair,
-    FalconKeypair,
-    EncryptSign,
-    DecryptOpen,
+    kyber_keypair,
+    dilithium_keypair,
+    falcon_keypair,
+    encrypt_sign,
+    decrypt_open,
+    encryption,
+    decryption,
     // decrypt,
     AES,
     //falcon1024,
@@ -27,7 +29,7 @@ use crate::{
 
 #[test]
 fn test_kyber_keypair_1024() {
-    let (public, secret) = KyberKeypair!(1024);
+    let (public, secret) = kyber_keypair!(1024);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
     assert_eq!(public.len(), 1568, "Public key length should be correct for 512 bits");
@@ -36,7 +38,7 @@ fn test_kyber_keypair_1024() {
 
 #[test]
 fn test_kyber_keypair_768() {
-    let (public, secret) = KyberKeypair!(768);
+    let (public, secret) = kyber_keypair!(768);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
     assert_eq!(public.len(), 1184, "Public key length should be correct for 512 bits");
@@ -45,7 +47,7 @@ fn test_kyber_keypair_768() {
 
 #[test]
 fn test_kyber_keypair_512() {
-    let (public, secret) = KyberKeypair!(512);
+    let (public, secret) = kyber_keypair!(512);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
     assert_eq!(public.len(), 800, "Public key length should be correct for 512 bits");
@@ -54,28 +56,28 @@ fn test_kyber_keypair_512() {
 
 #[test]
 fn test_dilithium_keypair_5() {
-    let (public, secret) = DilithiumKeypair!(5);
+    let (public, secret) = dilithium_keypair!(5);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
 }
 
 #[test]
 fn test_dilithium_keypair_3() {
-    let (public, secret) = DilithiumKeypair!(3);
+    let (public, secret) = dilithium_keypair!(3);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
 }
 
 #[test]
 fn test_dilithium_keypair_2() {
-    let (public, secret) = DilithiumKeypair!(2);
+    let (public, secret) = dilithium_keypair!(2);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
 }
 
 #[test]
 fn test_falcon_keypair_1024() {
-    let (public, secret) = FalconKeypair!(1024);
+    let (public, secret) = falcon_keypair!(1024);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
     assert_eq!(public.len(), 1793, "Public key length should be correct for 512 bits");
@@ -84,7 +86,7 @@ fn test_falcon_keypair_1024() {
 
 #[test]
 fn test_falcon_keypair_512() {
-    let (public, secret) = FalconKeypair!(512);
+    let (public, secret) = falcon_keypair!(512);
     assert!(!public.is_empty(), "Public key must not be empty");
     assert!(!secret.is_empty(), "Secret key must not be empty");
     assert_eq!(public.len(), 897, "Public key length should be correct for 512 bits");
@@ -92,26 +94,26 @@ fn test_falcon_keypair_512() {
 }
 
 #[test]
-fn SignEncrypt() {
+fn sign_encrypt() {
     let message = b"hey, how are you doing?".to_vec();
-    let (public, secret) = FalconKeypair!(1024);
+    let (public, secret) = falcon_keypair!(1024);
     let (public_key, secret_key) = KeyControKyber1024::keypair().expect("Failed to generate keypair");
-    let (encrypt_message, cipher) = EncryptSign!(public_key.clone(), secret.clone(), message.to_owned(), "hey, how are you?").unwrap();
-    let decrypt_message = Decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), "hey, how are you?", cipher.to_owned(), AES).unwrap();
+    let (encrypt_message, cipher) = encrypt_sign!(public_key.clone(), secret.clone(), message.to_owned(), "hey, how are you?").unwrap();
+    let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), "hey, how are you?", cipher.to_owned(), AES).unwrap();
     let sign = Signature::<Falcon1024, Message>::new();
     let opened_message = sign.open(decrypt_message, public).unwrap();
     assert_eq!(message, opened_message);
 }
 
 #[test]
-fn SignEncrypt_DecryptOpen() {
+fn sign_encrypt_decrypt_open() {
     let message = b"hey, how are you doing?".to_vec();
-    let (public, secret) = FalconKeypair!(1024);
-    let (public_key, secret_key) = KyberKeypair!(1024);
+    let (public, secret) = falcon_keypair!(1024);
+    let (public_key, secret_key) = kyber_keypair!(1024);
 
-    let (encrypt_message, cipher) = EncryptSign!(public_key.to_owned(), secret.to_owned(), message.clone(), "hey, how are you?").unwrap();
+    let (encrypt_message, cipher) = encrypt_sign!(public_key.to_owned(), secret.to_owned(), message.clone(), "hey, how are you?").unwrap();
 
-    let decrypt_message = DecryptOpen!(secret_key.to_owned(), public.to_owned(), encrypt_message.clone(), "hey, how are you?", cipher.to_owned());
+    let decrypt_message = decrypt_open!(secret_key.to_owned(), public.to_owned(), encrypt_message.clone(), "hey, how are you?", cipher.to_owned());
     
     assert_eq!(message, decrypt_message);
 }
@@ -127,8 +129,8 @@ fn test_concat_and_split_key() {
     let cipher_hex = hex::encode(cipher);
 
     // Concatenate and split
-    let concatenated = ConcatCipher!((key_hex.clone(), cipher_hex.clone()));
-    let result = SplitCipher!(concatenated);
+    let concatenated = concat_cipher!((key_hex.clone(), cipher_hex.clone()));
+    let result = split_cipher!(concatenated);
 
     // Ensure the result is okay
     assert!(result.is_ok(), "Splitting failed with error");

@@ -1,4 +1,5 @@
-use crate::{KDF::*, error::*, FalconKeypair, Signature, Verify};
+#![allow(non_snake_case)]
+use crate::{kdf::*, error::*, falcon_keypair, signature, verify};
 use std::{
     fs,
     path::{Path, PathBuf}
@@ -8,9 +9,9 @@ use std::{
 #[test]
 fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
-    let (public_key, secret_key) = FalconKeypair!(1024);
-    let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Message);
-    let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), Message);
+    let (public_key, secret_key) = falcon_keypair!(1024);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Message)?;
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, Message)?;
     assert_eq!(data, verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -29,9 +30,9 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
 #[test]
 fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
-    let (public_key, secret_key) = FalconKeypair!(1024);
-    let sign = Signature!(Falcon, secret_key.to_owned(), 1024, data.clone(), Detached);
-    let verified = Verify!(Falcon, public_key.to_owned(), 1024, sign.clone(), data.clone(), Detached);
+    let (public_key, secret_key) = falcon_keypair!(1024);
+    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Detached)?;
+    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, data.to_owned(), Detached)?;
     assert!(verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -58,7 +59,7 @@ fn test_save_Falcon1024_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Falcon1024/key.pub").exists(), "File does not exist: {}", "./Falcon1024/key.pub");
     assert!(Path::new("./Falcon1024/key.sec").exists(), "File does not exist: {}", "./Falcon1024/key.sec");
     
-    let _ = fs::remove_dir_all("./Falcon1024")?;
+    fs::remove_dir_all("./Falcon1024")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("log.txt");
@@ -81,7 +82,7 @@ fn test_save_Falcon512_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Falcon512/key.pub").exists(), "File does not exist: {}", "./Falcon512/key.pub");
     assert!(Path::new("./Falcon512/key.sec").exists(), "File does not exist: {}", "./Falcon512/key.sec");
 
-    let _ = fs::remove_dir_all("./Falcon512")?;
+    fs::remove_dir_all("./Falcon512")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("log.txt");
@@ -105,7 +106,7 @@ fn test_save_Dilithium2_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium2/key.pub").exists(), "File does not exist: {}", "./Dilithium2/key.pub");
     assert!(Path::new("./Dilithium2/key.sec").exists(), "File does not exist: {}", "./Dilithium2/key.sec");
 
-    let _ = fs::remove_dir_all("./Dilithium2")?;
+    fs::remove_dir_all("./Dilithium2")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("log.txt");
@@ -128,7 +129,7 @@ fn test_save_Dilithium3_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium3/key.pub").exists(), "File does not exist: {}", "./Dilithium3/key.pub");
     assert!(Path::new("./Dilithium3/key.sec").exists(), "File does not exist: {}", "./Dilithium3/key.sec");
 
-    let _ = fs::remove_dir_all("./Dilithium3")?;
+    fs::remove_dir_all("./Dilithium3")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("log.txt");
@@ -151,7 +152,7 @@ fn test_save_Dilithium5_keys() -> Result<(), Box<dyn std::error::Error>> {
     assert!(Path::new("./Dilithium5/key.pub").exists(), "File does not exist: {}", "./Dilithium5/key.pub");
     assert!(Path::new("./Dilithium5/key.sec").exists(), "File does not exist: {}", "./Dilithium5/key.sec");
     
-    let _ = fs::remove_dir_all("./Dilithium5")?;
+    fs::remove_dir_all("./Dilithium5")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("log.txt");
@@ -168,7 +169,7 @@ fn test_falcon1024_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Falcon1024, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -196,7 +197,7 @@ fn test_falcon1024_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Falcon1024, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -220,7 +221,7 @@ fn test_falcon512_signature_message() -> Result<(), Box<dyn std::error::Error>> 
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Falcon512, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -247,7 +248,7 @@ fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>>
     let sign = Signature::<Falcon512, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -271,7 +272,7 @@ fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium2, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -298,7 +299,7 @@ fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium2, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -322,7 +323,7 @@ fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium3, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -349,7 +350,7 @@ fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium3, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;
@@ -373,7 +374,7 @@ fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let data = b"Hello, world!".to_vec();
     let sign = Signature::<Dilithium5, Message>::new();
     // Sign the message
-    let signed_message = sign.signature(data.clone(), secret_key)?;
+    let signed_message = sign.signature(data.to_owned(), secret_key)?;
 
     // Open the message
     let opened_message = sign.open(signed_message, public_key.to_owned())?;
@@ -400,7 +401,7 @@ fn test_dilithium5_detached_signature() -> Result<(), Box<dyn std::error::Error>
     let sign = Signature::<Dilithium5, Detached>::new();
 
     // Create a detached signature
-    let signature = sign.signature(data.clone(), secret_key)?;
+    let signature = sign.signature(data.to_owned(), secret_key)?;
 
     // Verify the detached signature
     let is_valid = sign.verify(data, signature, public_key.to_owned())?;

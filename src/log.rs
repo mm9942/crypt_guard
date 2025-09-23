@@ -9,14 +9,13 @@ use chrono::Local;
 use tracing_subscriber::prelude::*;
 use crate::error::CryptError;
 use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    pub static ref LOGGER: Mutex<Log> = Mutex::new(Log {
-        activated: false,
-        log: String::new(),
-        location: None,
-    });
-}
+pub static LOGGER: Lazy<Mutex<Log>> = Lazy::new(|| Mutex::new(Log {
+    activated: false,
+    log: String::new(),
+    location: None,
+}));
 
 /// Struct used for logging 
 pub struct Log {
@@ -26,9 +25,9 @@ pub struct Log {
 }
 
 pub fn initialize_logger(log_file: PathBuf) {
-    let mut logger = LOGGER.lock().unwrap();
+    let Ok(mut logger) = LOGGER.lock() else { return; };
     logger.activated = true;
-    logger.location = Some(log_file.clone());
+    logger.location = Some(log_file.to_owned());
 
     // Set up tracing subscriber to write to the provided file path.
     // We avoid printing time/level because our messages already contain the timestamp.
@@ -88,8 +87,14 @@ impl Log {
         }
         if let Some(ref location) = self.location {
             let parent_dir = location.parent().unwrap_or_else(|| Path::new(""));
-            let file_stem = location.file_stem().unwrap().to_str().unwrap();
-            let extension = location.extension().unwrap_or_default().to_str().unwrap();
+            let file_stem = match location.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s,
+                None => return Err(CryptError::CustomError("Invalid log file name".to_string())),
+            };
+            let extension = match location.extension().and_then(|s| s.to_str()) {
+                Some(s) => s,
+                None => "log",
+            };
 
             let log_dir = parent_dir.join(file_stem);
             if !log_dir.exists() {
@@ -103,7 +108,7 @@ impl Log {
                 counter += 1;
             }
 
-            let mut file = OpenOptions::new().create(true).write(true).open(file_path)?;
+            let mut file = OpenOptions::new().create(true).write(true).truncate(true).open(file_path)?;
             write!(file, "{}", self.log)?;
             
             // Clear the log content after writing to file

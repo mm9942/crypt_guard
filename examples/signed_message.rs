@@ -1,4 +1,4 @@
-use crypt_guard::KDF::*;
+use crypt_guard::kdf::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Falcon1024::keypair()?;

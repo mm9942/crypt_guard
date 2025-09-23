@@ -5,7 +5,7 @@ use std::{
 };
 use crate::error::CryptError;
 
-use crate::KeyControl::*;
+use crate::key_control::*;
 
 
 /// Manages metadata related to a file, including its location, type, and state within a cryptographic context.
@@ -110,7 +110,7 @@ impl FileMetadata {
     /// # Returns
     /// The raw content of the file as a byte vector, or a `CryptError` if loading or processing fails.
     pub fn load(&self) -> Result<Vec<u8>, CryptError> {
-        let file_content = fs::read_to_string(&self.location).map_err(|e| CryptError::from(e))?;
+        let file_content = fs::read_to_string(&self.location).map_err(CryptError::from)?;
         let (start_label, end_label) = self.tags()?;
 
         let start = file_content.find(&start_label)
@@ -152,7 +152,7 @@ impl FileMetadata {
         let (start_label, end_label) = self.tags()?;
         let content = format!("{}{}{}", start_label, hex::encode(content), end_label);
         let mut buffer = File::create(&self.location).map_err(|_| CryptError::WriteError)?;
-        let _ = buffer.write(content.as_bytes());
+        buffer.write_all(content.as_bytes()).map_err(|_| CryptError::WriteError)?;
         Ok(())
     }
     
@@ -161,6 +161,6 @@ impl FileMetadata {
     /// # Returns
     /// The raw content of the file as a byte vector, or a `CryptError` if the read operation fails.
     pub fn read(&self) -> Result<Vec<u8>, CryptError> {
-    	Ok(fs::read(&self.location).map_err(|e| CryptError::from(e))?)
+	    fs::read(&self.location).map_err(CryptError::from)
     }
 }

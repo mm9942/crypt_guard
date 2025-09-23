@@ -1,6 +1,6 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+// removed unused Path import per clippy
 use tempfile::tempdir;
 use crate::{*, archive::{Archive, ArchiveOperation}, zip_manager::*};
 use ::zip::read::ZipArchive;
@@ -22,7 +22,7 @@ fn test_archive_util_archive_without_deletion() {
     assert!(test_file_path.exists());
 
     // Archive the directory without deleting the source
-    ArchiveUtil!(temp_dir_path, false, Archive);
+    archive_util!(temp_dir_path, false, Archive);
 
     // Verify the archive file exists
     let archive_path = temp_dir_path.with_extension("tar.xz");
@@ -52,7 +52,7 @@ fn test_archive_util_archive_with_deletion() {
     assert!(test_file_path.exists());
 
     // Archive the directory and delete the source
-    ArchiveUtil!(temp_dir_path.clone(), true, Archive);
+    archive_util!(temp_dir_path.clone(), true, Archive);
 
     // Verify the archive file exists
     let archive_path = temp_dir_path.with_extension("tar.xz");
@@ -79,17 +79,17 @@ fn test_archive_util_extract_without_deletion() {
     }
 
     // Archive the directory without deleting the source
-    ArchiveUtil!(archive_temp_dir_path, false, Archive);
+    archive_util!(archive_temp_dir_path, false, Archive);
 
     // Path to the archive
     let archive_path = archive_temp_dir_path.with_extension("tar.xz");
     assert!(archive_path.exists(), "Archive file was not created.");
 
     // Extract the archive without deleting the archive file
-    ArchiveUtil!(archive_path.clone(), false, Extract);
+    archive_util!(archive_path.clone(), false, Extract);
 
     // Determine the extraction directory
-    let extraction_dir = archive_temp_dir_path.clone();
+    let extraction_dir = archive_temp_dir_path;
     assert!(extraction_dir.exists(), "Extraction directory does not exist.");
 
     // Verify the extracted file exists
@@ -123,14 +123,14 @@ fn test_archive_util_extract_with_deletion() {
     }
 
     // Archive the directory and delete the source
-    ArchiveUtil!(archive_temp_dir_path.clone(), true, Archive);
+    archive_util!(archive_temp_dir_path.clone(), true, Archive);
 
     // Path to the archive
     let archive_path = archive_temp_dir_path.with_extension("tar.xz");
     assert!(archive_path.exists(), "Archive file was not created.");
 
     // Extract the archive and delete the archive file
-    ArchiveUtil!(archive_path.clone(), true, Extract);
+    archive_util!(archive_path.clone(), true, Extract);
 
     // Determine the extraction directory
     let extraction_dir = archive_temp_dir_path.clone();

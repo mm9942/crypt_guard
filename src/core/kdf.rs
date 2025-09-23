@@ -1,4 +1,4 @@
-use hmac::{Mac};
+// removed unused import per clippy
 
 use pqcrypto_falcon::{falcon1024, falcon512};
 use pqcrypto_dilithium::{dilithium2, dilithium3, dilithium5};
@@ -44,7 +44,7 @@ pub trait KeyOperations {
     fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr>;
     fn save_public(public_key: &[u8]) -> Result<(), SigningErr>;
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr>;
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr>;
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr>;
 }
 
 /// Implements Falcon1024 algorithm operations.
@@ -65,7 +65,7 @@ impl KeyOperations for Falcon1024 {
         let _ = file.save(secret_key);
         Ok(())
     }
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
@@ -73,6 +73,22 @@ impl KeyOperations for Falcon1024 {
         };
         let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
+    }
+}
+
+// Inherent methods to allow `Falcon1024::keypair()` etc. at call sites
+impl Falcon1024 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
+        <Self as KeyOperations>::keypair()
+    }
+    pub fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_public(public_key)
+    }
+    pub fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_secret(secret_key)
+    }
+    pub fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
+        <Self as KeyOperations>::load(path)
     }
 }
 impl SignatureFunctions for Falcon1024 {
@@ -136,7 +152,7 @@ impl KeyOperations for Falcon512 {
         let _ = file.save(secret_key);
         Ok(())
     }
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
@@ -144,6 +160,22 @@ impl KeyOperations for Falcon512 {
         };
         let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
+    }
+}
+
+// Inherent methods to allow `Falcon512::keypair()` etc. at call sites
+impl Falcon512 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
+        <Self as KeyOperations>::keypair()
+    }
+    pub fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_public(public_key)
+    }
+    pub fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_secret(secret_key)
+    }
+    pub fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
+        <Self as KeyOperations>::load(path)
     }
 }
 impl SignatureFunctions for Falcon512 {
@@ -209,7 +241,7 @@ impl KeyOperations for Dilithium2 {
         let _ = file.save(secret_key);
         Ok(())
     }
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
@@ -217,6 +249,22 @@ impl KeyOperations for Dilithium2 {
         };
         let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
+    }
+}
+
+// Inherent methods to allow `Dilithium2::keypair()` etc.
+impl Dilithium2 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
+        <Self as KeyOperations>::keypair()
+    }
+    pub fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_public(public_key)
+    }
+    pub fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_secret(secret_key)
+    }
+    pub fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
+        <Self as KeyOperations>::load(path)
     }
 }
 impl SignatureFunctions for Dilithium2 {
@@ -280,7 +328,7 @@ impl KeyOperations for Dilithium3 {
         let _ = file.save(secret_key);
         Ok(())
     }
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
@@ -288,6 +336,22 @@ impl KeyOperations for Dilithium3 {
         };
         let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
+    }
+}
+
+// Inherent methods to allow `Dilithium3::keypair()` etc.
+impl Dilithium3 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
+        <Self as KeyOperations>::keypair()
+    }
+    pub fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_public(public_key)
+    }
+    pub fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_secret(secret_key)
+    }
+    pub fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
+        <Self as KeyOperations>::load(path)
     }
 }
 impl SignatureFunctions for Dilithium3 {
@@ -352,7 +416,7 @@ impl KeyOperations for Dilithium5 {
         let _ = file.save(secret_key);
         Ok(())
     }
-    fn load(path: &PathBuf) -> Result<Vec<u8>, SigningErr> {
+    fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::public_key(), FileState::not_encrypted()),
             Some("sec") => FileMetadata::from(PathBuf::from(path.as_os_str().to_str().unwrap()), FileTypes::secret_key(), FileState::not_encrypted()),
@@ -360,6 +424,22 @@ impl KeyOperations for Dilithium5 {
         };
         let key = file.load().map_err(|_e| SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string()))?;
         Ok(key)
+    }
+}
+
+// Inherent methods to allow `Dilithium5::keypair()` etc.
+impl Dilithium5 {
+    pub fn keypair() -> Result<(Vec<u8>, Vec<u8>), SigningErr> {
+        <Self as KeyOperations>::keypair()
+    }
+    pub fn save_public(public_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_public(public_key)
+    }
+    pub fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
+        <Self as KeyOperations>::save_secret(secret_key)
+    }
+    pub fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
+        <Self as KeyOperations>::load(path)
     }
 }
 impl SignatureFunctions for Dilithium5 {
@@ -419,6 +499,10 @@ impl<AlgorithmType, SignatureType> Signature<AlgorithmType, SignatureType> {
     pub fn new() -> Self {
         Signature { algorithm: PhantomData, signature_type: PhantomData }
     }
+}
+
+impl<AlgorithmType, SignatureType> Default for Signature<AlgorithmType, SignatureType> {
+    fn default() -> Self { Self::new() }
 }
 
 // Implementation of Signature for Falcon1024

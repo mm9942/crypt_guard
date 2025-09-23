@@ -1,6 +1,6 @@
 mod sign;
 
-use hmac::{Mac};
+// removed unused import per clippy
 
 use crate::{cryptography::*};
 use crate::error::SigningErr;
