@@ -206,6 +206,14 @@ pub mod log;
 pub mod error;
 
 pub mod utils;
+
+// ── Phase 2: New FIPS primitive modules ────────────────────────────────────
+/// ML-KEM backend trait and ML-KEM-512/768/1024 implementations (FIPS 203).
+pub mod kem;
+/// SignAlgorithm trait and ML-DSA/SLH-DSA implementations (FIPS 204/205).
+pub mod sign;
+/// HKDF-SHA256/512 key schedule with domain separation.
+pub mod kdf;
 /// Builder-style API for encryption/decryption, keygen, and signature flows
 pub mod builder;
 
@@ -236,7 +244,8 @@ pub use crate::{
 // Re-export the legacy kdf module when the feature is active so that
 // existing call sites using `crypt_guard::kdf::Falcon1024` etc. keep working.
 #[cfg(feature = "legacy-pqclean")]
-pub use crate::core::kdf;
+#[cfg(feature = "legacy-pqclean")]
+pub use crate::core::kdf as legacy_kdf;
 pub use builder::*;
 use std::path::Path;
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile

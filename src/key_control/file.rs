@@ -84,7 +84,7 @@ impl FileMetadata {
     /// # Returns
     /// The path to the file encapsulated within this `FileMetadata` instance.
     pub fn location(&self) -> Result<PathBuf, CryptError> {
-        let dir_str = &self.location.as_os_str().to_str().unwrap();
+        let dir_str = self.location.as_os_str().to_str().ok_or(CryptError::Utf8Error)?;
         let dir = PathBuf::from(dir_str);
         Ok(dir)
     }
@@ -99,8 +99,8 @@ impl FileMetadata {
             FileTypes::SecretKey => ("-----BEGIN SECRET KEY-----\n", "\n-----END SECRET KEY-----"),
             FileTypes::Message => ("-----BEGIN MESSAGE-----\n", "\n-----END MESSAGE-----"),
             FileTypes::Ciphertext => ("-----BEGIN CIPHERTEXT-----\n", "\n-----END CIPHERTEXT-----"),
-            FileTypes::File => unreachable!(),
-            FileTypes::Other => unreachable!(),
+            FileTypes::File => return Err(CryptError::InvalidKeyType),
+            FileTypes::Other => return Err(CryptError::InvalidKeyType),
         };
         Ok((start_label.to_string(), end_label.to_string()))
 	}
