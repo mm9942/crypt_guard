@@ -190,6 +190,10 @@
 
 pub use crypt_guard_proc::*;
 
+/// Shared zero-sized-type axis markers (Encryption/Decryption, Files/Message/Data, cipher markers).
+/// Re-exported here so `crate::*` continues to expose them.
+pub mod markers;
+
 /// Core functionalitys for control of Kyber keys as well as encryption and decryption
 mod core;
 /// Cryptographic related functionalitys, enums structs and modules
@@ -205,6 +209,11 @@ pub mod utils;
 /// Builder-style API for encryption/decryption, keygen, and signature flows
 pub mod builder;
 
+/// Legacy pqcrypto-backed KEM + signature path (Kyber/Falcon/Dilithium).
+/// Only compiled when the `legacy-pqclean` feature is active.
+#[cfg(feature = "legacy-pqclean")]
+pub mod legacy;
+
 #[cfg(test)]
 mod tests;
 
@@ -212,11 +221,10 @@ pub use crate::{
     log::*,
     key_control::{
         *,
-        file, 
+        file,
     },
     core::{
         *,
-        kdf,
         kyber::*,
     },
     utils::{
@@ -224,6 +232,11 @@ pub use crate::{
         zip_manager,
     }
 };
+
+// Re-export the legacy kdf module when the feature is active so that
+// existing call sites using `crypt_guard::kdf::Falcon1024` etc. keep working.
+#[cfg(feature = "legacy-pqclean")]
+pub use crate::core::kdf;
 pub use builder::*;
 use std::path::Path;
 /// Function activating the log, it takes one arg: `&str` which represents the location of the logfile
