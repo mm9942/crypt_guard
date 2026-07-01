@@ -201,32 +201,6 @@ crypt_guard::api           (Encryptor / Decryptor — safe entry points)
 
 ---
 
-## Release Readiness
-
-The safe-default upgrade is complete and currently verified across:
-
-```text
-cargo fmt --check
-cargo test
-cargo test --no-default-features --features ml-kem-backend,ml-dsa-backend
-cargo test --no-default-features --features legacy-pqclean
-```
-
-Before publishing the release, finish the release gates:
-
-- clean the Git index so generated/cache artifacts such as `old/.cargo-home/**`
-  and `test.log` are not part of the release
-- run and address a release clippy pass, or explicitly scope warning cleanup to
-  a post-2.0 maintenance milestone
-- keep the known non-blocking design debt documented: raw byte keys at the
-  `Encryptor`/`Decryptor` boundary, broad compatibility re-exports, and legacy
-  module cleanup
-
-See [guides/release-readiness.md](guides/release-readiness.md) for the current
-checklist.
-
----
-
 ## Legacy Compatibility
 
 If you have data encrypted with crypt_guard v1.x (pqcrypto Kyber, tuple-return
