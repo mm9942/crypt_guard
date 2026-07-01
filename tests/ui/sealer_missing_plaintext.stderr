@@ -9,5 +9,4 @@ error[E0599]: no method named `seal` found for struct `EncryptorBuilder<WithReci
   | |_________|
   |
   |
-  = note: the method was found for
-          - `EncryptorBuilder<WithRecipient, WithPlaintext, K, A>`
+  = note: the method was found for `EncryptorBuilder<WithRecipient, WithPlaintext, K, A>`

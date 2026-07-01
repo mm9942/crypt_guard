@@ -106,7 +106,7 @@ getrandom = { version = "0.4.2", features = ["std"] }
 
 [dev-dependencies]
 tempfile = "3.10.1"
-trybuild = "1.0.103"
+trybuild = "=1.0.117"
 
 # ── Example declarations ─────────────────────────────────────────────────────
 [[example]]
