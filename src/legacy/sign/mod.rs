@@ -14,8 +14,6 @@
 //! Compiled only when `cfg(feature = "legacy-pqclean")` is active.
 
 pub use crate::core::kdf::{
-    Falcon1024, Falcon512,
-    Dilithium2, Dilithium3, Dilithium5,
-    Signature, Detached, Message,
-    SignatureFunctions, KeyOperations, KeyVariant,
+    Detached, Dilithium2, Dilithium3, Dilithium5, Falcon1024, Falcon512, KeyOperations, KeyVariant,
+    Message, Signature, SignatureFunctions,
 };

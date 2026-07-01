@@ -10,7 +10,7 @@
 //! - [`derive_session_key_sha512`] — SHA-512 variant
 //! - Label constants: [`LABEL_XCHACHA20POLY1305`], [`LABEL_AESGCMSIV`], [`LABEL_AES`],
 //!   [`LABEL_XCHACHA20`], [`LABEL_GENERIC`]
-//! - [`types::HkdfSalt`], [`types::HmacKey`], [`types::SessionKey`]
+//! - [`types::HkdfSalt`](crate::kdf::types::HkdfSalt), [`types::HmacKey`](crate::kdf::types::HmacKey), [`types::SessionKey`](crate::kdf::types::SessionKey)
 //!
 //! # Concurrency
 //! All functions are pure; no shared mutable state.
@@ -26,17 +26,12 @@
 //! assert_eq!(key.as_ref().len(), 32);
 //! ```
 
-pub mod types;
 pub mod hkdf;
+pub mod types;
 
 pub use hkdf::{
-    derive_session_key,
-    derive_session_key_sha512,
-    LABEL_XCHACHA20POLY1305,
-    LABEL_AESGCMSIV,
-    LABEL_AES,
-    LABEL_XCHACHA20,
-    LABEL_GENERIC,
+    derive_session_key, derive_session_key_sha512, LABEL_AES, LABEL_AESGCMSIV, LABEL_GENERIC,
+    LABEL_XCHACHA20, LABEL_XCHACHA20POLY1305,
 };
 pub use types::{HkdfSalt, HmacKey, SessionKey};
 
@@ -45,4 +40,6 @@ pub use types::{HkdfSalt, HmacKey, SessionKey};
 // tests via `use crate::kdf::*`. They are re-exported here for backward
 // compatibility so the test suite compiles without modification.
 #[cfg(feature = "legacy-pqclean")]
-pub use crate::core::kdf::{Signature, Detached, Message, Falcon512, Falcon1024, Dilithium2, Dilithium3, Dilithium5};
+pub use crate::core::kdf::{
+    Detached, Dilithium2, Dilithium3, Dilithium5, Falcon1024, Falcon512, Message, Signature,
+};

@@ -11,10 +11,19 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            args: cargo test --verbose
+          - name: ml-lane
+            args: cargo test --no-default-features --features ml-kem-backend,ml-dsa-backend --verbose
+          - name: legacy-lane
+            args: cargo test --no-default-features --features legacy-pqclean --verbose
 
     steps:
     - uses: actions/checkout@v3
-    - name: Run tests
-      run: cargo test --verbose --lib
+    - name: Run ${{ matrix.name }} tests
+      run: ${{ matrix.args }}

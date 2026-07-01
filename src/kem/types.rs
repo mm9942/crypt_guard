@@ -54,10 +54,17 @@ impl<N: KemSize> MlKemPublicKey<N> {
     /// # Returns
     /// A new `MlKemPublicKey<N>`.
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self { bytes, _marker: PhantomData }
+        Self {
+            bytes,
+            _marker: PhantomData,
+        }
     }
 }
 
+/// Borrows the raw public-key bytes.
+///
+/// # Returns
+/// A `&[u8]` slice over the wrapped encapsulation-key bytes.
 impl<N: KemSize> AsRef<[u8]> for MlKemPublicKey<N> {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
@@ -88,10 +95,18 @@ impl<N: KemSize> MlKemSecretKey<N> {
     /// # Returns
     /// A new `MlKemSecretKey<N>`.
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self { bytes, _marker: PhantomData }
+        Self {
+            bytes,
+            _marker: PhantomData,
+        }
     }
 }
 
+/// Borrows the raw secret-key bytes.
+///
+/// # Returns
+/// A `&[u8]` slice over the wrapped decapsulation-key bytes. The borrow does not
+/// affect the [`ZeroizeOnDrop`] guarantee; bytes are still cleared on drop.
 impl<N: KemSize> AsRef<[u8]> for MlKemSecretKey<N> {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
@@ -124,6 +139,10 @@ impl KemCiphertext {
     }
 }
 
+/// Borrows the raw ciphertext bytes.
+///
+/// # Returns
+/// A `&[u8]` slice over the wrapped KEM ciphertext bytes.
 impl AsRef<[u8]> for KemCiphertext {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
@@ -156,6 +175,11 @@ impl KemSharedSecret {
     }
 }
 
+/// Borrows the raw shared-secret bytes.
+///
+/// # Returns
+/// A `&[u8]` slice over the wrapped shared-secret bytes. The borrow does not affect
+/// the [`ZeroizeOnDrop`] guarantee; bytes are still cleared on drop.
 impl AsRef<[u8]> for KemSharedSecret {
     fn as_ref(&self) -> &[u8] {
         &self.bytes

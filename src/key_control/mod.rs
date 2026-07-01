@@ -1,18 +1,40 @@
-
-
+//! Typed key and file-metadata primitives for the key-control subsystem.
+//!
+//! # Responsibility scope
+//! Owns the small enum vocabulary used throughout key handling — [`KeyTypes`],
+//! [`FileTypes`], and [`FileState`] — and re-exports the [`Key`] container (from
+//! [`key`]) and the [`FileMetadata`] helpers (from [`file`](mod@file)). The actual KEM logic
+//! and on-disk encoding live in those submodules; this module only defines the
+//! shared type tags and wires the public surface together.
+//!
+//! # Key types exported
+//! - [`KeyTypes`] — role tag for a key (public / secret / ciphertext / shared secret).
+//! - [`FileTypes`] — content classification of an on-disk file.
+//! - [`FileState`] — encryption/encoding state of an on-disk file.
+//! - [`Key`] — typed key container (re-exported from [`key`]).
+//! - [`FileMetadata`] and friends (re-exported from [`file`](mod@file)).
+//!
+//! # Concurrency
+//! All enums here are `Copy + Send + Sync`; they carry no interior mutability.
+//!
+//! # Examples
+//! ```rust
+//! use crypt_guard::key_control::{KeyTypes, FileTypes, FileState};
+//! let kt = KeyTypes::public_key();
+//! assert_eq!(kt, KeyTypes::PublicKey);
+//! let _ = (FileTypes::message(), FileState::encrypted());
+//! ```
 
 // removed unused kem imports per clippy
 
-/// A module defining the cryptographic key functionality.
-mod key;
 /// A module for handling file-related metadata and operations in a cryptographic context.
 pub mod file;
+/// A module defining the cryptographic key functionality.
+mod key;
 
-pub use key::Key;
 pub use file::*;
+pub use key::Key;
 //pub use keypair::*;
-
-
 
 /// Enumerates the types of cryptographic keys supported by the system.
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -30,24 +52,27 @@ pub enum KeyTypes {
 }
 
 impl KeyTypes {
+    /// Returns the [`KeyTypes::None`] tag (unspecified/undefined key type).
     pub fn none() -> Self {
         Self::None
     }
-    pub fn public_key()  -> Self {
+    /// Returns the [`KeyTypes::PublicKey`] tag.
+    pub fn public_key() -> Self {
         Self::PublicKey
     }
-    pub fn secret_key()  -> Self {
+    /// Returns the [`KeyTypes::SecretKey`] tag.
+    pub fn secret_key() -> Self {
         Self::SecretKey
     }
-    pub fn ciphertext()  -> Self {
+    /// Returns the [`KeyTypes::Ciphertext`] tag.
+    pub fn ciphertext() -> Self {
         Self::Ciphertext
     }
-    pub fn shared_secret()  -> Self {
+    /// Returns the [`KeyTypes::SharedSecret`] tag.
+    pub fn shared_secret() -> Self {
         Self::SharedSecret
     }
-
 }
-
 
 /// Enumerates the types of files recognized by the cryptographic system.
 #[derive(PartialEq, Debug, Copy, Clone)]

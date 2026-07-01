@@ -39,11 +39,16 @@ pub enum KemId {
     MlKem1024,
 }
 
+/// Human-readable formatting for [`KemId`].
+///
+/// # Description
+/// Renders the canonical algorithm name (`"ML-KEM-512"`, `"ML-KEM-768"`,
+/// `"ML-KEM-1024"`), matching the FIPS 203 designation for each parameter set.
 impl std::fmt::Display for KemId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KemId::MlKem512  => write!(f, "ML-KEM-512"),
-            KemId::MlKem768  => write!(f, "ML-KEM-768"),
+            KemId::MlKem512 => write!(f, "ML-KEM-512"),
+            KemId::MlKem768 => write!(f, "ML-KEM-768"),
             KemId::MlKem1024 => write!(f, "ML-KEM-1024"),
         }
     }
@@ -110,8 +115,9 @@ pub trait KemBackend: Sized + Send + Sync + 'static {
     ///
     /// # Errors
     /// - [`CryptError::EncapsulationError`]: if the RNG fails.
-    fn keypair(rng: &mut impl rand_core_010::CryptoRng)
-        -> Result<(Self::PublicKey, Self::SecretKey), CryptError>;
+    fn keypair(
+        rng: &mut impl rand_core_010::CryptoRng,
+    ) -> Result<(Self::PublicKey, Self::SecretKey), CryptError>;
 
     /// Encapsulate: produce a ciphertext and the sender's shared secret.
     ///
@@ -146,8 +152,12 @@ pub trait KemBackend: Sized + Send + Sync + 'static {
     ) -> Result<Self::SharedSecret, CryptError>;
 }
 
-// Re-export rand_core 0.10 under a stable alias so callers don't need to depend
-// directly on the specific rand_core version used by ml-kem.
+/// Re-export of the `rand_core` 0.10 crate under a stable alias.
+///
+/// # Description
+/// Exposes the exact `rand_core` version used internally by the `ml-kem` backend so
+/// callers can name the [`rand_core_010::CryptoRng`] bound required by [`KemBackend`]
+/// without taking a direct dependency on that specific `rand_core` release.
 pub use rand_core_010;
 
 /// Zero-sized OS-backed cryptographic RNG that satisfies `rand_core_010::CryptoRng`.
@@ -167,22 +177,36 @@ pub use rand_core_010;
 /// ```
 pub struct OsRng;
 
+/// Fallible RNG implementation for [`OsRng`] backed by [`getrandom::fill`].
+///
+/// # Description
+/// Each method draws fresh entropy from the operating system. The associated error type
+/// is [`core::convert::Infallible`] because OS entropy failures are surfaced as panics
+/// inside the implementation rather than returned as recoverable errors.
 impl rand_core_010::TryRng for OsRng {
     type Error = core::convert::Infallible;
+    /// Returns a random `u32` drawn from OS entropy.
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         let mut buf = [0u8; 4];
         getrandom::fill(&mut buf).expect("getrandom failed");
         Ok(u32::from_le_bytes(buf))
     }
+    /// Returns a random `u64` drawn from OS entropy.
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
         let mut buf = [0u8; 8];
         getrandom::fill(&mut buf).expect("getrandom failed");
         Ok(u64::from_le_bytes(buf))
     }
+    /// Fills `dst` entirely with OS entropy.
     fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
         getrandom::fill(dst).expect("getrandom failed");
         Ok(())
     }
 }
 
+/// Marks [`OsRng`] as cryptographically secure.
+///
+/// # Description
+/// This empty impl certifies that the entropy produced by [`OsRng`] is suitable for
+/// cryptographic use, satisfying the [`KemBackend`] RNG bound.
 impl rand_core_010::TryCryptoRng for OsRng {}

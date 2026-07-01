@@ -1,0 +1,11 @@
+error[E0599]: no method named `encrypt_file` found for struct `crypt_guard::hub::Kyber<ProcessStatus, KyberSize, ContentStatus, AlgorithmParam>` in the current scope
+  --> tests/ui/content_encrypt_file_on_message.rs:14:17
+   |
+14 |     let _ = enc.encrypt_file(PathBuf::from("/tmp/x"), "passphrase");
+   |                 ^^^^^^^^^^^^
+   |
+help: there is a method `encrypt_msg` with a similar name
+   |
+14 -     let _ = enc.encrypt_file(PathBuf::from("/tmp/x"), "passphrase");
+14 +     let _ = enc.encrypt_msg(PathBuf::from("/tmp/x"), "passphrase");
+   |

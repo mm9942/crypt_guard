@@ -13,39 +13,64 @@
 //!
 //! # Feature gate
 //! The `key_controler` sub-module and the cipher impl blocks are gated behind
-//! `legacy-pqclean` (now in default — see TODO in Cargo.toml).
+//! the opt-in `legacy-pqclean` compatibility feature.
 
 // Legacy KEM key-control: only available with the legacy-pqclean feature.
 #[cfg(feature = "legacy-pqclean")]
 pub mod key_controler;
 
-use std::{marker::PhantomData, path::PathBuf};
 use crate::error::CryptError;
+use std::{marker::PhantomData, path::PathBuf};
 
 // Re-export all shared ZST markers from the thin markers shim so that the
 // public `crate::core::kyber::*` glob continues to expose them.
 pub use crate::markers::{
-    Encryption, Decryption,
-    Files, Message, Data,
-    AES, AesGcmSiv, AesCtr, AesXts, XChaCha20, XChaCha20Poly1305,
+    AesCtr, AesGcmSiv, AesXts, Data, Decryption, Encryption, Files, Message, XChaCha20,
+    XChaCha20Poly1305, AES,
 };
 
 /// Trait for Kyber cryptographic functions.
 pub trait KyberFunctions {
     /// Encrypts a file at a given path with a passphrase, returning the encrypted data and nonce.
-    fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
+    fn encrypt_file(
+        &mut self,
+        path: PathBuf,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
     /// Encrypts a message with a passphrase, returning the encrypted data and nonce.
-    fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
+    fn encrypt_msg(
+        &mut self,
+        message: &str,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
     /// Encrypts data with a passphrase, returning the encrypted data and nonce.
-    fn encrypt_data(&mut self, data: Vec<u8>, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
+    fn encrypt_data(
+        &mut self,
+        data: Vec<u8>,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError>;
     /// Decrypts a file at a given path with a passphrase and ciphertext, returning the decrypted data.
-    fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>;
+    fn decrypt_file(
+        &self,
+        path: PathBuf,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError>;
     /// Decrypts a message with a passphrase and ciphertext, returning the decrypted data.
-    fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>;
+    fn decrypt_msg(
+        &self,
+        message: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError>;
     /// Decrypts data with a passphrase and ciphertext, returning the decrypted data.
-    fn decrypt_data(&self, data: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>;
+    fn decrypt_data(
+        &self,
+        data: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError>;
 }
-
 
 /// Enum representing Kyber variants.
 pub enum KyberVariant {
@@ -74,15 +99,21 @@ pub struct Kyber768;
 pub struct Kyber1024;
 
 impl KyberSizeVariant for Kyber512 {
-    fn variant() -> KyberVariant { KyberVariant::Kyber512 }
+    fn variant() -> KyberVariant {
+        KyberVariant::Kyber512
+    }
 }
 
 impl KyberSizeVariant for Kyber768 {
-    fn variant() -> KyberVariant { KyberVariant::Kyber768 }
+    fn variant() -> KyberVariant {
+        KyberVariant::Kyber768
+    }
 }
 
 impl KyberSizeVariant for Kyber1024 {
-    fn variant() -> KyberVariant { KyberVariant::Kyber1024 }
+    fn variant() -> KyberVariant {
+        KyberVariant::Kyber1024
+    }
 }
 
 /// Represents the data structure for Kyber algorithm, including key and nonce.
@@ -115,8 +146,12 @@ impl KyberData {
 
 /// Represents a generic Kyber structure with templated parameters for process status,
 /// Kyber size, content status, and algorithm parameter.
-pub struct Kyber<ProcessStatus = Encryption, KyberSize=Kyber1024, ContentStatus=Files, AlgorithmParam=AES>
-where
+pub struct Kyber<
+    ProcessStatus = Encryption,
+    KyberSize = Kyber1024,
+    ContentStatus = Files,
+    AlgorithmParam = AES,
+> where
     KyberSize: KyberSizeVariant,
 {
     pub(crate) kyber_data: KyberData,
@@ -127,7 +162,9 @@ where
     process_state: PhantomData<ProcessStatus>,
 }
 
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam> Kyber<ProcessStatus, KyberSize, ContentStatus, AlgorithmParam> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, AlgorithmParam>
+{
     /// Constructs a new Kyber instance with a key and an optional nonce.
     pub fn new(key: Vec<u8>, nonce: Option<String>) -> Result<Self, CryptError> {
         let nonce = nonce.map_or(String::new(), |data| data);
@@ -161,256 +198,698 @@ impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam> 
 /// Usable when KyberSize = Kyber1024
 impl Kyber<Encryption, Kyber1024, Files, AES> {
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AES> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AES> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber768
 impl Kyber<Encryption, Kyber768, Files, AES> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AES> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AES>  {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber512
 impl Kyber<Encryption, Kyber512, Files, AES> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AES> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AES>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AES> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AES> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber1024
 impl Kyber<Encryption, Kyber1024, Files, AesGcmSiv> {
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AesGcmSiv> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AesGcmSiv> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber768
 impl Kyber<Encryption, Kyber768, Files, AesGcmSiv> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AesGcmSiv> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AesGcmSiv>  {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber512
 impl Kyber<Encryption, Kyber512, Files, AesGcmSiv> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AesGcmSiv> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AesGcmSiv>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AesGcmSiv> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AesGcmSiv> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber1024
 impl Kyber<Encryption, Kyber1024, Files, AesCtr> {
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AesCtr> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AesCtr> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber768
 impl Kyber<Encryption, Kyber768, Files, AesCtr> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AesCtr> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber512(self) -> Result<Kyber<Encryption, Kyber512, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber512, Files, AesCtr>  {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber512>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber512, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber512>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when KyberSize = Kyber512
 impl Kyber<Encryption, Kyber512, Files, AesCtr> {
     pub fn kyber1024(self) -> Result<Kyber<Encryption, Kyber1024, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber1024, Files, AesCtr> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber1024>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber1024, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber1024>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
     pub fn kyber768(self) -> Result<Kyber<Encryption, Kyber768, Files, AesCtr>, CryptError> {
-        Ok(Kyber::<Encryption, Kyber768, Files, AesCtr> {kyber_data: self.kyber_data, hmac_size: self.hmac_size, process_state: self.process_state, kyber_state: PhantomData::<Kyber768>, content_state: self.content_state, algorithm_state: self.algorithm_state})
+        Ok(Kyber::<Encryption, Kyber768, Files, AesCtr> {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            process_state: self.process_state,
+            kyber_state: PhantomData::<Kyber768>,
+            content_state: self.content_state,
+            algorithm_state: self.algorithm_state,
+        })
     }
 }
 
 /// Usable when AlgorithmParam = AES
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, AES>
+{
     pub fn xchacha20(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_gcm_siv(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_ctr(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_xts(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn xchacha20poly1305(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+    pub fn xchacha20poly1305(
+        self,
+    ) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when AlgorithmParam = XChaCha20
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20>
+{
     pub fn aes(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_gcm_siv(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_ctr(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_xts(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn xchacha20poly1305(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+    pub fn xchacha20poly1305(
+        self,
+    ) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when AlgorithmParam = XChaCha20Poly1305
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305>
+{
     pub fn aes(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_gcm_siv(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_ctr(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_xts(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn xchacha20(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when AlgorithmParam = AesGcmSiv
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv>
+{
     pub fn xchacha20(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn xchacha20poly1305(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+    pub fn xchacha20poly1305(
+        self,
+    ) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_ctr(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_xts(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when AlgorithmParam = AesCtr
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr>
+{
     pub fn xchacha20(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_gcm_siv(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_xts(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn xchacha20poly1305(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+    pub fn xchacha20poly1305(
+        self,
+    ) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when AlgorithmParam = AesXts
-impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus> Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus>
+    Kyber<ProcessStatus, KyberSize, ContentStatus, AesXts>
+{
     pub fn xchacha20(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn xchacha20poly1305(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+    pub fn xchacha20poly1305(
+        self,
+    ) -> Kyber<ProcessStatus, KyberSize, ContentStatus, XChaCha20Poly1305> {
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AES> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_gcm_siv(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesGcmSiv> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn aes_ctr(self) -> Kyber<ProcessStatus, KyberSize, ContentStatus, AesCtr> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when ContentStatus = Files
-impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam> Kyber<ProcessStatus, KyberSize, Files, AlgorithmParam> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam>
+    Kyber<ProcessStatus, KyberSize, Files, AlgorithmParam>
+{
     pub fn message(self) -> Kyber<ProcessStatus, KyberSize, Message, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn data(self) -> Kyber<ProcessStatus, KyberSize, Data, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn is_file(self) -> bool { true }
-    pub fn is_message(self) -> bool { false }
-    pub fn is_data(self) -> bool { false }
+    pub fn is_file(self) -> bool {
+        true
+    }
+    pub fn is_message(self) -> bool {
+        false
+    }
+    pub fn is_data(self) -> bool {
+        false
+    }
 }
 
 /// Usable when ContentStatus = Message
-impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam> Kyber<ProcessStatus, KyberSize, Message, AlgorithmParam> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam>
+    Kyber<ProcessStatus, KyberSize, Message, AlgorithmParam>
+{
     pub fn file(self) -> Kyber<ProcessStatus, KyberSize, Files, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn data(self) -> Kyber<ProcessStatus, KyberSize, Data, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn is_file(self) -> bool { false }
-    pub fn is_message(self) -> bool { true }
-    pub fn is_data(self) -> bool { false }
+    pub fn is_file(self) -> bool {
+        false
+    }
+    pub fn is_message(self) -> bool {
+        true
+    }
+    pub fn is_data(self) -> bool {
+        false
+    }
 }
 
 /// Usable when ContentStatus = Data
-impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam> Kyber<ProcessStatus, KyberSize, Data, AlgorithmParam> {
+impl<ProcessStatus, KyberSize: KyberSizeVariant, AlgorithmParam>
+    Kyber<ProcessStatus, KyberSize, Data, AlgorithmParam>
+{
     pub fn file(self) -> Kyber<ProcessStatus, KyberSize, Files, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
     pub fn message(self) -> Kyber<ProcessStatus, KyberSize, Message, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
-    pub fn is_file(self) -> bool { false }
-    pub fn is_message(self) -> bool { false }
-    pub fn is_data(self) -> bool { true }
+    pub fn is_file(self) -> bool {
+        false
+    }
+    pub fn is_message(self) -> bool {
+        false
+    }
+    pub fn is_data(self) -> bool {
+        true
+    }
 }
 
 /// Usable when ProcessStatus = Encryption
-impl<KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam> Kyber<Encryption, KyberSize, ContentStatus, AlgorithmParam> {
+impl<KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam>
+    Kyber<Encryption, KyberSize, ContentStatus, AlgorithmParam>
+{
     pub fn decryption(self) -> Kyber<Decryption, KyberSize, Message, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }
 
 /// Usable when ProcessStatus = Decryption
-impl<KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam> Kyber<Decryption, KyberSize, ContentStatus, AlgorithmParam> {
+impl<KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam>
+    Kyber<Decryption, KyberSize, ContentStatus, AlgorithmParam>
+{
     pub fn encryption(self) -> Kyber<Encryption, KyberSize, Files, AlgorithmParam> {
-        Kyber { kyber_data: self.kyber_data, hmac_size: self.hmac_size, content_state: PhantomData, kyber_state: PhantomData, algorithm_state: PhantomData, process_state: PhantomData }
+        Kyber {
+            kyber_data: self.kyber_data,
+            hmac_size: self.hmac_size,
+            content_state: PhantomData,
+            kyber_state: PhantomData,
+            algorithm_state: PhantomData,
+            process_state: PhantomData,
+        }
     }
 }

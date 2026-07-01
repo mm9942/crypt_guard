@@ -44,5 +44,5 @@ pub mod ml_dsa;
 #[cfg(feature = "sign-slhdsa")]
 pub mod slh_dsa;
 
-pub use algorithm::{SignAlgorithm, SignatureMode, Detached, MessageMode, Keypair};
+pub use algorithm::{Detached, Keypair, MessageMode, SignAlgorithm, SignatureMode};
 pub use hub::Signature as NewSignature;

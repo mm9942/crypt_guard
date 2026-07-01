@@ -30,19 +30,16 @@
 //! ```
 
 use ml_dsa::{
-    MlDsa44, MlDsa65, MlDsa87,
-    SigningKey, VerifyingKey, Signature,
-    Generate,
-    Signer, Verifier, SignatureEncoding,
-    KeyExport, KeyInit,
+    Generate, KeyExport, KeyInit, MlDsa44, MlDsa65, MlDsa87, Signature, SignatureEncoding, Signer,
+    SigningKey, Verifier, VerifyingKey,
 };
 // Keypair trait provides .verifying_key() on SigningKey.
 use ml_dsa::Keypair as MlDsaKeypairTrait;
 
-use zeroize::ZeroizeOnDrop;
 use crate::error::CryptError;
-use crate::sign::algorithm::SignAlgorithm;
 use crate::kem::backend::rand_core_010;
+use crate::sign::algorithm::SignAlgorithm;
+use zeroize::ZeroizeOnDrop;
 
 /// ML-DSA signing key newtype (secret; `ZeroizeOnDrop`).
 ///
@@ -96,7 +93,13 @@ impl MlDsaVerifyingKey {
 #[derive(Clone, Debug)]
 pub struct MlDsaSignature(Vec<u8>);
 
+/// Borrow the raw signature bytes of an [`MlDsaSignature`].
+///
+/// # Description
+/// Exposes the wrapped signature byte vector as a `&[u8]` slice, enabling the
+/// type to satisfy the [`SignAlgorithm::Sig`] bound (`AsRef<[u8]>`).
 impl AsRef<[u8]> for MlDsaSignature {
+    /// Return the signature bytes as a slice.
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -106,9 +109,9 @@ impl AsRef<[u8]> for MlDsaSignature {
 macro_rules! impl_ml_dsa {
     ($impl_ty:ty, $param:ty) => {
         impl SignAlgorithm for $impl_ty {
-            type SigningKey   = MlDsaSigningKey;
+            type SigningKey = MlDsaSigningKey;
             type VerifyingKey = MlDsaVerifyingKey;
-            type Sig          = MlDsaSignature;
+            type Sig = MlDsaSignature;
 
             fn keypair(
                 rng: &mut impl rand_core_010::CryptoRng,
@@ -125,10 +128,7 @@ macro_rules! impl_ml_dsa {
                 ))
             }
 
-            fn sign(
-                sk: &Self::SigningKey,
-                message: &[u8],
-            ) -> Result<Self::Sig, CryptError> {
+            fn sign(sk: &Self::SigningKey, message: &[u8]) -> Result<Self::Sig, CryptError> {
                 let signing_key = SigningKey::<$param>::new_from_slice(sk.as_bytes())
                     .map_err(|_| CryptError::SigningFailed)?;
                 let sig: Signature<$param> = Signer::sign(&signing_key, message);

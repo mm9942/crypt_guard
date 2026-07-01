@@ -1,29 +1,23 @@
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::{CryptographicFunctions, KeyControlVariant};
 use crate::{
-    *,
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    error::*, 
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
+    cryptography::{
+        hmac_sign::{Operation, Sign, SignType},
+        *,
     },
+    error::*,
 };
-
-
 
 use chacha20::{
-    XChaCha20, 
-    cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray}
+    cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher},
+    XChaCha20,
 };
-use std::{
-    result::Result, 
-    fs
-};
-use rand::{RngCore, rngs::OsRng};
 use hex;
-
+use rand::{rngs::OsRng, RngCore};
+use std::{fs, result::Result};
 
 /// Generates a 24-byte nonce using OS-level randomness.
 ///
@@ -46,22 +40,29 @@ impl CipherChaCha {
     ///
     /// # Returns
     /// A new `CipherChaCha` instance.
-	pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
+    pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
         let nonce: [u8; 24] = match nonce {
-            Some(nonce) => hex::decode(nonce).expect("An error occoured while decoding hex!").try_into().unwrap(),
+            Some(nonce) => hex::decode(nonce)
+                .expect("An error occoured while decoding hex!")
+                .try_into()
+                .unwrap(),
             None => generate_nonce(),
         };
         // println!("infos: {:?}", infos);
-		CipherChaCha { infos, sharedsecret: Vec::new(), nonce }
-	}
+        CipherChaCha {
+            infos,
+            sharedsecret: Vec::new(),
+            nonce,
+        }
+    }
 
     /// Retrieves the encrypted or decrypted data stored within the `CryptographicInformation`.
     ///
     /// # Returns
     /// A result containing the data as a vector of bytes (`Vec<u8>`) or a `CryptError`.
-	pub fn get_data(&self) -> Result<Vec<u8>, CryptError> {
-		let data = &self.infos.content()?;
-		let data = data.to_vec();
+    pub fn get_data(&self) -> Result<Vec<u8>, CryptError> {
+        let data = &self.infos.content()?;
+        let data = data.to_vec();
 
         Ok(data)
     }
@@ -72,10 +73,10 @@ impl CipherChaCha {
     ///
     /// # Returns
     /// A reference to the `CipherChaCha` instance to allow method chaining.
-	pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
-		self.sharedsecret = sharedsecret;
-		self
-	}
+    pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        self.sharedsecret = sharedsecret;
+        self
+    }
 
     /// Retrieves the shared secret.
     ///
@@ -110,19 +111,27 @@ impl CipherChaCha {
     /// # Returns
     /// A result containing a tuple of encrypted data (`Vec<u8>`) and the nonce vector (`Vec<u8>`) used, or a `CryptError`.
     /// This method reads the file if `ContentType` is File and performs cryptographic operations accordingly.
+    // Legacy raw-XChaCha20 orchestration helper; kept for the tuple-return path,
+    // not reachable from the default envelope API.
+    #[allow(dead_code)]
     fn cryptography(&mut self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let passphrase = self.infos.passphrase()?.to_vec();
         let file_contained = self.infos.contains_file()?;
-    
+
         if file_contained && self.infos.metadata.content_type == ContentType::File {
             let content = fs::read(self.infos.location()?).unwrap();
             self.infos.set_data(&content)?;
         }
-        
+
         match self.infos.metadata.process()? {
             Process::Encryption => {
                 let (encrypted_data, nonce_vec) = self.process_data()?;
-                let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
+                let mut hmac = Sign::new(
+                    encrypted_data,
+                    passphrase,
+                    Operation::Sign,
+                    SignType::Sha512,
+                );
                 let data = hmac.hmac();
                 if self.infos.safe()? {
                     self.infos.set_data(&data)?;
@@ -131,7 +140,12 @@ impl CipherChaCha {
                 Ok((data, nonce_vec))
             }
             Process::Decryption => {
-                let mut verifier = Sign::new(self.infos.content()?.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
+                let mut verifier = Sign::new(
+                    self.infos.content()?.to_vec(),
+                    passphrase,
+                    Operation::Verify,
+                    SignType::Sha512,
+                );
                 let data = verifier.hmac();
                 self.infos.set_data(&data)?;
                 let (decrypted, nonce_vec) = self.process_data()?;
@@ -148,17 +162,23 @@ impl CipherChaCha {
     ///
     /// # Returns
     /// A result containing a tuple of processed data (`Vec<u8>`) and nonce vector (`Vec<u8>`), or a `CryptError`.
-    fn process_data(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> { 
+    // Legacy raw-XChaCha20 keystream helper; reached only via `cryptography` above.
+    #[allow(dead_code)]
+    fn process_data(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let data = &self.infos.content()?;
         let sharedsecret = self.sharedsecret()?;
         let nonce = self.nonce();
         let mut encrypted_data = data.to_vec();
-        let mut cipher = XChaCha20::new(GenericArray::from_slice(sharedsecret), GenericArray::from_slice(nonce));
+        let mut cipher = XChaCha20::new(
+            GenericArray::from_slice(sharedsecret),
+            GenericArray::from_slice(nonce),
+        );
         cipher.apply_keystream(&mut encrypted_data);
         Ok((encrypted_data, nonce.to_vec()))
     }
 }
 
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherChaCha {
     /// Encrypts the provided data using the public key.
     ///
@@ -185,7 +205,7 @@ impl CryptographicFunctions for CipherChaCha {
     ///
     /// # Returns
     /// A result containing the decrypted data (`Vec<u8>`), or a `CryptError`.
-    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
+    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);

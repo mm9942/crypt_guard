@@ -71,7 +71,7 @@ impl Key {
         #[cfg(feature = "legacy-pqclean")]
         {
             use pqcrypto_kyber::kyber1024;
-            use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
+            use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
             match key_type {
                 KeyTypes::PublicKey => {
                     if let Ok(k) = kyber1024::PublicKey::from_bytes(&content) {
@@ -107,7 +107,10 @@ impl Key {
     /// # Arguments
     /// - `key` (`Vec<u8>`): raw public key bytes.
     pub fn new_public_key(key: Vec<u8>) -> Self {
-        Key { key_type: KeyTypes::PublicKey, content: key }
+        Key {
+            key_type: KeyTypes::PublicKey,
+            content: key,
+        }
     }
 
     /// Create a secret key.
@@ -115,7 +118,10 @@ impl Key {
     /// # Arguments
     /// - `key` (`Vec<u8>`): raw secret key bytes.
     pub fn new_secret_key(key: Vec<u8>) -> Self {
-        Key { key_type: KeyTypes::SecretKey, content: key }
+        Key {
+            key_type: KeyTypes::SecretKey,
+            content: key,
+        }
     }
 
     /// Create a ciphertext key entry.
@@ -123,7 +129,10 @@ impl Key {
     /// # Arguments
     /// - `key` (`Vec<u8>`): raw ciphertext bytes.
     pub fn new_ciphertext(key: Vec<u8>) -> Self {
-        Key { key_type: KeyTypes::Ciphertext, content: key }
+        Key {
+            key_type: KeyTypes::Ciphertext,
+            content: key,
+        }
     }
 
     /// Create a shared secret key entry.
@@ -131,7 +140,10 @@ impl Key {
     /// # Arguments
     /// - `key` (`Vec<u8>`): raw shared secret bytes.
     pub fn new_shared_secret(key: Vec<u8>) -> Self {
-        Key { key_type: KeyTypes::SharedSecret, content: key }
+        Key {
+            key_type: KeyTypes::SharedSecret,
+            content: key,
+        }
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -184,7 +196,8 @@ impl Key {
         };
 
         let path = base_path.join(file_name);
-        let file_metadata = FileMetadata::from(path, self.file_type_from_key_type(), FileState::Encrypted);
+        let file_metadata =
+            FileMetadata::from(path, self.file_type_from_key_type(), FileState::Encrypted);
         file_metadata.save(&self.content)
     }
 
@@ -217,7 +230,7 @@ impl Key {
     #[cfg(feature = "legacy-pqclean")]
     fn encap_inner(&self) -> Result<(Key, Key), CryptError> {
         use pqcrypto_kyber::kyber1024;
-        use pqcrypto_traits::kem::{PublicKey, SharedSecret as SST, Ciphertext as CT};
+        use pqcrypto_traits::kem::{Ciphertext as CT, PublicKey, SharedSecret as SST};
         let pk = kyber1024::PublicKey::from_bytes(self.content()?)
             .map_err(|_| CryptError::InvalidKemPublicKey)?;
         let (ss, ct) = kyber1024::encapsulate(&pk);
@@ -252,7 +265,7 @@ impl Key {
     #[cfg(feature = "legacy-pqclean")]
     fn decap_inner(&self, ciphertext: Key) -> Result<Key, CryptError> {
         use pqcrypto_kyber::kyber1024;
-        use pqcrypto_traits::kem::{SecretKey, Ciphertext as CT};
+        use pqcrypto_traits::kem::{Ciphertext as CT, SecretKey};
         let ct = kyber1024::Ciphertext::from_bytes(ciphertext.content()?)
             .map_err(|_| CryptError::InvalidKemCiphertext)?;
         let sk = kyber1024::SecretKey::from_bytes(self.content()?)

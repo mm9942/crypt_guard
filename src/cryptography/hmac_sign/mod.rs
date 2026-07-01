@@ -2,7 +2,7 @@ mod sign;
 
 // removed unused import per clippy
 
-use crate::{cryptography::*};
+use crate::cryptography::*;
 use crate::error::SigningErr;
 
 /// Defines the operation being performed, either verification or signing.
@@ -18,7 +18,7 @@ pub enum SignType {
     Sha512,
     Sha256,
     Falcon,
-    Dilithium
+    Dilithium,
 }
 
 /// Represents a signing operation including the data and metadata for the operation.
@@ -28,7 +28,7 @@ pub struct Sign {
     pub status: Operation,
     pub hash_type: SignType,
     pub length: usize,
-    pub veryfied: bool
+    pub veryfied: bool,
 }
 
 /// Contains the data to be signed or verified, alongside necessary metadata like passphrase.
@@ -77,9 +77,13 @@ impl SignatureMechanism {
     /// Constructs a new `SignatureMechanism` with a public key.
     pub fn new(public_key: Vec<u8>) -> Self {
         let mut public = SignatureKey::new();
-        let _ = public.set_public_key(public_key).unwrap();
+        public.set_public_key(public_key).unwrap();
         let signature_type = SignatureType::UnSigned;
-        SignatureMechanism { signature: Vec::new(), public_key: public, signature_type }
+        SignatureMechanism {
+            signature: Vec::new(),
+            public_key: public,
+            signature_type,
+        }
     }
 
     /// Sets the signature for the mechanism. but doesn't define the type of signature.
@@ -131,7 +135,7 @@ pub trait Mechanism {
 
     fn save_signed_msg(&self, path: PathBuf) -> Result<(), SigningErr>;
     fn save_detached(&self, path: PathBuf) -> Result<(), SigningErr>;
-    
+
     fn sign_msg(&mut self) -> Result<Vec<u8>, SigningErr>;
     fn sign_detached(&mut self) -> Result<Vec<u8>, SigningErr>;
 
@@ -160,16 +164,20 @@ impl MechanismSetter for SignatureKey {
     }
     /// Sets the detached signature.
     fn set_signature(&mut self, detached_signature: Vec<u8>) -> Result<(), SigningErr> {
-        self.data  = detached_signature;
+        self.data = detached_signature;
         self.key_type = SignatureDataType::DetachedSignature;
         Ok(())
     }
 }
+// Typed accessors over the signature key material; retained as a stable API for
+// the signing surface even though the current callers go through `Signature`.
+#[allow(dead_code)]
 impl SignatureKey {
     /// Constructs a new `SignatureKey`.
     fn new() -> Self {
         Self {
-            data: Vec::new(), key_type: SignatureDataType::None
+            data: Vec::new(),
+            key_type: SignatureDataType::None,
         }
     }
     /// Sets and gets the public key.

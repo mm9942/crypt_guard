@@ -33,16 +33,14 @@
 //! }
 //! ```
 
+use crate::error::CryptError;
+use crate::kem::backend::rand_core_010;
+use crate::sign::algorithm::SignAlgorithm;
 use slh_dsa::{
-    Shake128f, Shake128s,
-    Shake192f, Shake192s,
-    Shake256f, Shake256s,
-    SigningKey, signature::{Signer, Verifier},
+    signature::{Signer, Verifier},
+    Shake128f, Shake128s, Shake192f, Shake192s, Shake256f, Shake256s, SigningKey,
 };
 use zeroize::ZeroizeOnDrop;
-use crate::error::CryptError;
-use crate::sign::algorithm::SignAlgorithm;
-use crate::kem::backend::rand_core_010;
 
 /// SLH-DSA signing key newtype (secret; `ZeroizeOnDrop`).
 ///
@@ -95,7 +93,13 @@ impl SlhDsaVerifyingKey {
 #[derive(Clone, Debug)]
 pub struct SlhDsaSignature(Vec<u8>);
 
+/// Borrow the raw signature bytes of an [`SlhDsaSignature`].
+///
+/// # Description
+/// Exposes the wrapped signature byte vector as a `&[u8]` slice, enabling the
+/// type to satisfy the [`SignAlgorithm::Sig`] bound (`AsRef<[u8]>`).
 impl AsRef<[u8]> for SlhDsaSignature {
+    /// Return the signature bytes as a slice.
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -105,9 +109,9 @@ impl AsRef<[u8]> for SlhDsaSignature {
 macro_rules! impl_slh_dsa {
     ($impl_ty:ty, $param:ty) => {
         impl SignAlgorithm for $impl_ty {
-            type SigningKey   = SlhDsaSigningKey;
+            type SigningKey = SlhDsaSigningKey;
             type VerifyingKey = SlhDsaVerifyingKey;
-            type Sig          = SlhDsaSignature;
+            type Sig = SlhDsaSignature;
 
             fn keypair(
                 rng: &mut impl rand_core_010::CryptoRng,
@@ -123,10 +127,7 @@ macro_rules! impl_slh_dsa {
                 ))
             }
 
-            fn sign(
-                sk: &Self::SigningKey,
-                message: &[u8],
-            ) -> Result<Self::Sig, CryptError> {
+            fn sign(sk: &Self::SigningKey, message: &[u8]) -> Result<Self::Sig, CryptError> {
                 let signing_key = SigningKey::<$param>::try_from(sk.as_bytes())
                     .map_err(|_| CryptError::SigningFailed)?;
                 // Use deterministic signing (no RNG needed).
@@ -144,7 +145,8 @@ macro_rules! impl_slh_dsa {
                     .map_err(|_| CryptError::SignatureVerificationFailed)?;
                 let signature = <slh_dsa::Signature<$param>>::try_from(sig.as_ref())
                     .map_err(|_| CryptError::SignatureVerificationFailed)?;
-                verifying_key.verify(message, &signature)
+                verifying_key
+                    .verify(message, &signature)
                     .map_err(|_| CryptError::SignatureVerificationFailed)
             }
         }

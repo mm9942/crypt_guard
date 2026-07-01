@@ -14,7 +14,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Open the message
     let opened_message = sign.open(signed_message, public_key)?;
 
-    let message = String::from_utf8(opened_message).expect("Failed to convert decrypted message to string");
+    let message =
+        String::from_utf8(opened_message).expect("Failed to convert decrypted message to string");
     println!("{:?}", message);
     Ok(())
 }

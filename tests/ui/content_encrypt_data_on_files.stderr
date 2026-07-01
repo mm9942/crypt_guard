@@ -1,0 +1,11 @@
+error[E0599]: no method named `encrypt_data` found for struct `crypt_guard::hub::Kyber<ProcessStatus, KyberSize, ContentStatus, AlgorithmParam>` in the current scope
+  --> tests/ui/content_encrypt_data_on_files.rs:13:17
+   |
+13 |     let _ = enc.encrypt_data(b"bytes", "passphrase");
+   |                 ^^^^^^^^^^^^
+   |
+help: there is a method `encrypt_file` with a similar name
+   |
+13 -     let _ = enc.encrypt_data(b"bytes", "passphrase");
+13 +     let _ = enc.encrypt_file(b"bytes", "passphrase");
+   |

@@ -30,9 +30,9 @@
 //! }
 //! ```
 
-use std::marker::PhantomData;
 use crate::error::CryptError;
 use crate::sign::algorithm::{SignAlgorithm, SignatureMode};
+use std::marker::PhantomData;
 
 /// Generic signature container parameterised over algorithm `A` and mode `S`.
 ///
@@ -52,7 +52,12 @@ pub struct Signature<A: SignAlgorithm, S: SignatureMode> {
     _mode: PhantomData<S>,
 }
 
+/// Default construction for [`Signature<A, S>`].
+///
+/// # Description
+/// Delegates to [`Signature::new`]; the result is a zero-sized, stateless container.
 impl<A: SignAlgorithm, S: SignatureMode> Default for Signature<A, S> {
+    /// Construct a default `Signature<A, S>` (identical to [`Signature::new`]).
     fn default() -> Self {
         Self::new()
     }
@@ -98,11 +103,7 @@ impl<A: SignAlgorithm, S: SignatureMode> Signature<A, S> {
     ///
     /// # Errors
     /// - [`CryptError::SigningFailed`]: the signing operation failed.
-    pub fn sign_detached(
-        &self,
-        sk: &A::SigningKey,
-        message: &[u8],
-    ) -> Result<A::Sig, CryptError> {
+    pub fn sign_detached(&self, sk: &A::SigningKey, message: &[u8]) -> Result<A::Sig, CryptError> {
         A::sign(sk, message)
     }
 

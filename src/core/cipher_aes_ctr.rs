@@ -2,18 +2,21 @@
 
 //use crypt_guard_proc::{*, log_activity, write_log};
 use crate::{
-    *,
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    error::{*}, 
     core::{
         // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     },
+    cryptography::{
+        hmac_sign::{Operation, Sign, SignType},
+        *,
+    },
+    error::*,
+    *,
 };
-use std::result::Result;
-use rand::{RngCore, rngs::OsRng};
+use aes::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher};
 use hex;
-use aes::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray};
+use rand::{rngs::OsRng, RngCore};
+use std::result::Result;
 
 /// Generates a 16-byte iv using OS-level randomness.
 ///
@@ -44,7 +47,11 @@ impl CipherAesCtr {
             None => generate_iv().to_vec(),
         };
         // println!("infos: {:?}", infos);
-        CipherAesCtr { infos, sharedsecret: Vec::new(), iv }
+        CipherAesCtr {
+            infos,
+            sharedsecret: Vec::new(),
+            iv,
+        }
     }
 
     /// Retrieves the encrypted or decrypted data stored within the CryptographicInformation.
@@ -104,7 +111,12 @@ impl CipherAesCtr {
         let iv = GenericArray::from_slice(&self.iv);
         let mut cipher = Aes256Ctr64LE::new(key, iv);
 
-        let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
+        let mut hmac = Sign::new(
+            plaintext.to_vec(),
+            passphrase,
+            Operation::Sign,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
 
         let mut buf = data;
@@ -126,7 +138,12 @@ impl CipherAesCtr {
         cipher.apply_keystream(&mut buf);
 
         //println!("decrypted: {:?}", &decrypted);
-        let mut hmac = Sign::new(buf.to_owned(), passphrase, Operation::Verify, SignType::Sha512);
+        let mut hmac = Sign::new(
+            buf.to_owned(),
+            passphrase,
+            Operation::Verify,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
 
         //println!("Verified: {:?}", &data);
@@ -161,7 +178,7 @@ impl CryptographicFunctions for CipherAesCtr {
     ///
     /// # Returns
     /// A result containing the decrypted data (Vec<u8>), or a CryptError.
-    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
+    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);

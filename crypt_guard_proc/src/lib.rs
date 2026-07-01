@@ -20,6 +20,7 @@
 //! `#[derive(ErrorObservable)]` — constructor-as-observable derive macro. Generates:
 //! - Observable constructor methods for every variant annotated with `#[observable(...)]`
 //! - Each constructor emits a structured `tracing` event at construction time
+//!
 //! See the `#[derive(ErrorObservable)]` documentation for usage.
 
 extern crate proc_macro;
@@ -27,11 +28,8 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, ItemFn, LitStr, Expr,
-    DeriveInput, Data, Fields, Attribute,
-    parse::ParseStream,
-    punctuated::Punctuated,
-    Token, MetaNameValue,
+    parse::ParseStream, parse_macro_input, punctuated::Punctuated, Attribute, Data, DeriveInput,
+    Expr, Fields, ItemFn, LitStr, MetaNameValue, Token,
 };
 
 // ── activate_log ──────────────────────────────────────────────────────────────
@@ -283,17 +281,17 @@ pub fn derive_error_observable(input: TokenStream) -> TokenStream {
             Fields::Unnamed(fields) => {
                 let args: Vec<_> = (0..fields.unnamed.len())
                     .map(|i| {
-                        let name = syn::Ident::new(&format!("arg{}", i), proc_macro2::Span::call_site());
+                        let name =
+                            syn::Ident::new(&format!("arg{}", i), proc_macro2::Span::call_site());
                         let ty = &fields.unnamed[i].ty;
                         (name, ty)
                     })
                     .collect();
                 let arg_names: Vec<_> = args.iter().map(|(n, _)| n).collect();
                 let arg_decls: Vec<_> = args.iter().map(|(n, t)| quote! { #n: #t }).collect();
-                let field_tokens: Vec<_> = arg_names.iter()
-                    .map(|n| quote! { ?#n })
-                    .collect();
-                let trace_call = make_trace_call(&level_str, &event_lit, &enum_name_lit, &field_tokens);
+                let field_tokens: Vec<_> = arg_names.iter().map(|n| quote! { ?#n }).collect();
+                let trace_call =
+                    make_trace_call(&level_str, &event_lit, &enum_name_lit, &field_tokens);
                 quote! {
                     /// Observable constructor — emits a tracing event at construction time.
                     pub fn #constructor_name(#(#arg_decls),*) -> Self {
@@ -303,7 +301,9 @@ pub fn derive_error_observable(input: TokenStream) -> TokenStream {
                 }
             }
             Fields::Named(fields) => {
-                let args: Vec<_> = fields.named.iter()
+                let args: Vec<_> = fields
+                    .named
+                    .iter()
                     .map(|f| {
                         let name = f.ident.as_ref().unwrap();
                         let ty = &f.ty;
@@ -312,10 +312,9 @@ pub fn derive_error_observable(input: TokenStream) -> TokenStream {
                     .collect();
                 let arg_names: Vec<_> = args.iter().map(|(n, _)| *n).collect();
                 let arg_decls: Vec<_> = args.iter().map(|(n, t)| quote! { #n: #t }).collect();
-                let field_tokens: Vec<_> = arg_names.iter()
-                    .map(|n| quote! { %#n })
-                    .collect();
-                let trace_call = make_trace_call(&level_str, &event_lit, &enum_name_lit, &field_tokens);
+                let field_tokens: Vec<_> = arg_names.iter().map(|n| quote! { %#n }).collect();
+                let trace_call =
+                    make_trace_call(&level_str, &event_lit, &enum_name_lit, &field_tokens);
                 quote! {
                     /// Observable constructor — emits a tracing event at construction time.
                     pub fn #constructor_name(#(#arg_decls),*) -> Self {
@@ -352,10 +351,16 @@ fn parse_observable_attr(attr: &Attribute) -> syn::Result<(String, String)> {
     attr.parse_args_with(|input: ParseStream| {
         let pairs = Punctuated::<MetaNameValue, Token![,]>::parse_terminated(input)?;
         for pair in &pairs {
-            let key = pair.path.get_ident()
+            let key = pair
+                .path
+                .get_ident()
                 .map(|i| i.to_string())
                 .unwrap_or_default();
-            if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }) = &pair.value {
+            if let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(s),
+                ..
+            }) = &pair.value
+            {
                 match key.as_str() {
                     "level" => level = s.value(),
                     "event" => event = s.value(),
@@ -390,10 +395,10 @@ fn make_trace_call(
 
     match level {
         "error" => quote! { tracing::error!(#fields_ts event = #event_lit, #enum_name_lit) },
-        "warn"  => quote! { tracing::warn!(#fields_ts event = #event_lit, #enum_name_lit) },
-        "info"  => quote! { tracing::info!(#fields_ts event = #event_lit, #enum_name_lit) },
+        "warn" => quote! { tracing::warn!(#fields_ts event = #event_lit, #enum_name_lit) },
+        "info" => quote! { tracing::info!(#fields_ts event = #event_lit, #enum_name_lit) },
         "debug" => quote! { tracing::debug!(#fields_ts event = #event_lit, #enum_name_lit) },
-        _       => quote! { tracing::trace!(#fields_ts event = #event_lit, #enum_name_lit) },
+        _ => quote! { tracing::trace!(#fields_ts event = #event_lit, #enum_name_lit) },
     }
 }
 

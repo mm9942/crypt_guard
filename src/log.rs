@@ -35,8 +35,8 @@
 
 use std::path::PathBuf;
 use tracing::Level;
-use tracing_subscriber::{fmt, EnvFilter};
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
 
 // ── Compatibility shim ────────────────────────────────────────────────────────
 
@@ -114,12 +114,9 @@ impl LoggerCompat {
 /// crypt_guard::log::init_log(tracing::Level::INFO);
 /// ```
 pub fn init_log(level: Level) {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(level.as_str()));
-    let _ = fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .try_init();
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(level.as_str()));
+    let _ = fmt().with_env_filter(filter).with_target(false).try_init();
 }
 
 /// Initialize the logger from a file path — called by the `activate_log` proc-macro.
@@ -149,15 +146,14 @@ pub fn initialize_logger(log_file: PathBuf) {
     ) {
         let _ = std::fs::create_dir_all(parent);
         let appender = tracing_appender::rolling::never(parent, file_name);
-        let subscriber = tracing_subscriber::registry()
-            .with(
-                fmt::layer()
-                    .with_ansi(false)
-                    .with_target(false)
-                    .without_time()
-                    .with_level(false)
-                    .with_writer(appender),
-            );
+        let subscriber = tracing_subscriber::registry().with(
+            fmt::layer()
+                .with_ansi(false)
+                .with_target(false)
+                .without_time()
+                .with_level(false)
+                .with_writer(appender),
+        );
         // Ignore error if a subscriber is already installed.
         let _ = tracing::subscriber::set_global_default(subscriber);
     } else {

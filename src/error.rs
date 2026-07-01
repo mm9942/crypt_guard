@@ -24,13 +24,13 @@
 //! println!("{}", e);
 //! ```
 
-pub use zeroize::Zeroize;
 use std::{
-    fmt::{self, Display, Formatter},
     error::Error,
+    fmt::{self, Display, Formatter},
     io,
     sync::Arc,
 };
+pub use zeroize::Zeroize;
 
 /// Primary error type for all crypt_guard operations.
 ///
@@ -173,9 +173,15 @@ impl fmt::Display for CryptError {
 
             CryptError::EncapsulationError => write!(f, "KEM encapsulation failed"),
             CryptError::DecapsulationError => write!(f, "KEM decapsulation failed"),
-            CryptError::InvalidKemPublicKey => write!(f, "KEM public key is malformed or has wrong length"),
-            CryptError::InvalidKemSecretKey => write!(f, "KEM secret key is malformed or has wrong length"),
-            CryptError::InvalidKemCiphertext => write!(f, "KEM ciphertext is malformed or has wrong length"),
+            CryptError::InvalidKemPublicKey => {
+                write!(f, "KEM public key is malformed or has wrong length")
+            }
+            CryptError::InvalidKemSecretKey => {
+                write!(f, "KEM secret key is malformed or has wrong length")
+            }
+            CryptError::InvalidKemCiphertext => {
+                write!(f, "KEM ciphertext is malformed or has wrong length")
+            }
 
             CryptError::HmacVerificationError => write!(f, "HMAC verification failed"),
             CryptError::HmacShortData => write!(f, "data is too short to contain a valid HMAC tag"),
@@ -223,7 +229,7 @@ impl Clone for CryptError {
             CryptError::MessageExtractionError => CryptError::MessageExtractionError,
             CryptError::InvalidMessageFormat => CryptError::InvalidMessageFormat,
             CryptError::Utf8Error => CryptError::Utf8Error,
-            CryptError::HexError(e) => CryptError::HexError(e.clone()),
+            CryptError::HexError(e) => CryptError::HexError(*e),
             CryptError::HexDecodingError(s) => CryptError::HexDecodingError(s.clone()),
             CryptError::EncapsulationError => CryptError::EncapsulationError,
             CryptError::DecapsulationError => CryptError::DecapsulationError,
@@ -283,9 +289,9 @@ impl Error for CryptError {
     /// diagnostic tools and `tracing`'s `%error` formatter can walk the full causal chain.
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            CryptError::IOError(e)  => Some(e.as_ref()),
+            CryptError::IOError(e) => Some(e.as_ref()),
             CryptError::HexError(e) => Some(e),
-            CryptError::Signing(e)  => Some(e.as_ref()),
+            CryptError::Signing(e) => Some(e.as_ref()),
             _ => None,
         }
     }
@@ -404,12 +410,12 @@ impl PartialEq for SigningErr {
         matches!(
             (self, other),
             (SecretKeyMissing, SecretKeyMissing)
-            | (PublicKeyMissing, PublicKeyMissing)
-            | (SignatureVerificationFailed, SignatureVerificationFailed)
-            | (SigningMessageFailed, SigningMessageFailed)
-            | (SignatureMissing, SignatureMissing)
-            | (FileCreationFailed, FileCreationFailed)
-            | (FileWriteFailed, FileWriteFailed)
+                | (PublicKeyMissing, PublicKeyMissing)
+                | (SignatureVerificationFailed, SignatureVerificationFailed)
+                | (SigningMessageFailed, SigningMessageFailed)
+                | (SignatureMissing, SignatureMissing)
+                | (FileCreationFailed, FileCreationFailed)
+                | (FileWriteFailed, FileWriteFailed)
         )
     }
 }

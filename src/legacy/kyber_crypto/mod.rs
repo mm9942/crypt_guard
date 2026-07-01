@@ -27,4 +27,4 @@ pub use key_controler::*;
 // Legacy size markers for the pqcrypto-backed Kyber KEM variants.
 // These re-export the definitions from crate::core::kyber so that legacy call sites
 // using `Kyber512` etc. keep resolving to the same types already used in the hub.
-pub use crate::core::kyber::{Kyber512, Kyber768, Kyber1024};
+pub use crate::core::kyber::{Kyber1024, Kyber512, Kyber768};

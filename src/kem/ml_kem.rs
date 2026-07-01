@@ -32,13 +32,13 @@
 //! }
 //! ```
 
-use ml_kem::{
-    MlKem512, MlKem768, MlKem1024,
-    kem::{Kem, KeyExport, Encapsulate, Decapsulate, TryKeyInit, FromSeed},
-};
 use crate::error::CryptError;
-use crate::kem::backend::{KemBackend, KemId, rand_core_010};
+use crate::kem::backend::{rand_core_010, KemBackend, KemId};
 use crate::kem::types::{KemCiphertext, KemSharedSecret, KemSize, MlKemPublicKey, MlKemSecretKey};
+use ml_kem::{
+    kem::{Decapsulate, Encapsulate, FromSeed, Kem, KeyExport, TryKeyInit},
+    MlKem1024, MlKem512, MlKem768,
+};
 
 /// Size marker for ML-KEM-512.
 ///
@@ -46,6 +46,7 @@ use crate::kem::types::{KemCiphertext, KemSharedSecret, KemSize, MlKemPublicKey,
 /// Zero-sized type encoding the ML-KEM-512 security parameter set on the type level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Size512;
+/// Marks [`Size512`] as a valid ML-KEM parameter-set size.
 impl KemSize for Size512 {}
 
 /// Size marker for ML-KEM-768.
@@ -54,6 +55,7 @@ impl KemSize for Size512 {}
 /// Zero-sized type encoding the ML-KEM-768 security parameter set on the type level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Size768;
+/// Marks [`Size768`] as a valid ML-KEM parameter-set size.
 impl KemSize for Size768 {}
 
 /// Size marker for ML-KEM-1024.
@@ -62,6 +64,7 @@ impl KemSize for Size768 {}
 /// Zero-sized type encoding the ML-KEM-1024 security parameter set on the type level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Size1024;
+/// Marks [`Size1024`] as a valid ML-KEM parameter-set size.
 impl KemSize for Size1024 {}
 
 /// ML-KEM-512 `KemBackend` implementation (FIPS 203, security category 1).
@@ -103,10 +106,10 @@ pub struct MlKem1024Impl;
 macro_rules! impl_ml_kem {
     ($impl_ty:ty, $kem_ty:ty, $size_ty:ty, $kem_id:expr) => {
         impl KemBackend for $impl_ty {
-            type Size         = $size_ty;
-            type PublicKey    = MlKemPublicKey<$size_ty>;
-            type SecretKey    = MlKemSecretKey<$size_ty>;
-            type Ciphertext   = KemCiphertext;
+            type Size = $size_ty;
+            type PublicKey = MlKemPublicKey<$size_ty>;
+            type SecretKey = MlKemSecretKey<$size_ty>;
+            type Ciphertext = KemCiphertext;
             type SharedSecret = KemSharedSecret;
 
             const ID: KemId = $kem_id;
@@ -129,8 +132,8 @@ macro_rules! impl_ml_kem {
                 rng: &mut impl rand_core_010::CryptoRng,
             ) -> Result<(Self::Ciphertext, Self::SharedSecret), CryptError> {
                 type EK = <$kem_ty as Kem>::EncapsulationKey;
-                let ek = EK::new_from_slice(pk.as_ref())
-                    .map_err(|_| CryptError::InvalidKemPublicKey)?;
+                let ek =
+                    EK::new_from_slice(pk.as_ref()).map_err(|_| CryptError::InvalidKemPublicKey)?;
                 let (ct, ss) = ek.encapsulate_with_rng(rng);
                 Ok((
                     KemCiphertext::from_bytes(ct.as_slice().to_vec()),
@@ -142,7 +145,6 @@ macro_rules! impl_ml_kem {
                 sk: &Self::SecretKey,
                 ct: &Self::Ciphertext,
             ) -> Result<Self::SharedSecret, CryptError> {
-                type DK = <$kem_ty as Kem>::DecapsulationKey;
                 // Restore from the compact seed bytes saved during keypair generation.
                 let seed_arr = <ml_kem::kem::Seed<$kem_ty>>::try_from(sk.as_ref())
                     .map_err(|_| CryptError::InvalidKemSecretKey)?;
@@ -157,6 +159,6 @@ macro_rules! impl_ml_kem {
     };
 }
 
-impl_ml_kem!(MlKem512Impl,  MlKem512,  Size512,  KemId::MlKem512);
-impl_ml_kem!(MlKem768Impl,  MlKem768,  Size768,  KemId::MlKem768);
+impl_ml_kem!(MlKem512Impl, MlKem512, Size512, KemId::MlKem512);
+impl_ml_kem!(MlKem768Impl, MlKem768, Size768, KemId::MlKem768);
 impl_ml_kem!(MlKem1024Impl, MlKem1024, Size1024, KemId::MlKem1024);

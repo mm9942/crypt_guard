@@ -1,16 +1,21 @@
 #![allow(non_snake_case)]
-use crate::{kdf::*, error::*, falcon_keypair, signature, verify};
+use crate::{error::*, falcon_keypair, kdf::*, signature, verify};
 use std::{
     fs,
-    path::{Path, PathBuf}
+    path::{Path, PathBuf},
 };
-
 
 #[test]
 fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Message)?;
+    let sign = signature!(
+        Falcon,
+        secret_key.to_owned(),
+        1024,
+        data.to_owned(),
+        Message
+    )?;
     let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, Message)?;
     assert_eq!(data, verified);
 
@@ -26,13 +31,25 @@ fn test_falcon1024_signature_message_macro() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-
 #[test]
 fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::Error>> {
     let data = b"hey, how are you?".to_vec();
     let (public_key, secret_key) = falcon_keypair!(1024);
-    let sign = signature!(Falcon, secret_key.to_owned(), 1024, data.to_owned(), Detached)?;
-    let verified = verify!(Falcon, public_key.to_owned(), 1024, sign, data.to_owned(), Detached)?;
+    let sign = signature!(
+        Falcon,
+        secret_key.to_owned(),
+        1024,
+        data.to_owned(),
+        Detached
+    )?;
+    let verified = verify!(
+        Falcon,
+        public_key.to_owned(),
+        1024,
+        sign,
+        data.to_owned(),
+        Detached
+    )?;
     assert!(verified);
 
     let _ = fs::remove_file("crypt_tests.log");
@@ -43,7 +60,7 @@ fn test_falcon1024_signature_detached_macro() -> Result<(), Box<dyn std::error::
     let _ = fs::remove_dir_all("./crypt_tests");
     let _ = fs::remove_dir_all("./key");
     let _ = fs::remove_dir_all("./log");
-    
+
     Ok(())
 }
 
@@ -56,9 +73,17 @@ fn test_save_Falcon1024_keys() -> Result<(), Box<dyn std::error::Error>> {
     let loaded_pub = Falcon1024::load(&PathBuf::from("./Falcon1024/key.pub"))?;
     let _loaded_sec = Falcon1024::load(&PathBuf::from("./Falcon1024/key.sec"))?;
     assert_eq!(public_key, loaded_pub);
-    assert!(Path::new("./Falcon1024/key.pub").exists(), "File does not exist: {}", "./Falcon1024/key.pub");
-    assert!(Path::new("./Falcon1024/key.sec").exists(), "File does not exist: {}", "./Falcon1024/key.sec");
-    
+    assert!(
+        Path::new("./Falcon1024/key.pub").exists(),
+        "File does not exist: {}",
+        "./Falcon1024/key.pub"
+    );
+    assert!(
+        Path::new("./Falcon1024/key.sec").exists(),
+        "File does not exist: {}",
+        "./Falcon1024/key.sec"
+    );
+
     fs::remove_dir_all("./Falcon1024")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
@@ -74,13 +99,21 @@ fn test_save_Falcon1024_keys() -> Result<(), Box<dyn std::error::Error>> {
 fn test_save_Falcon512_keys() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Falcon512::keypair().unwrap();
     let _ = Falcon512::save_public(&public_key);
-    let _ = Falcon512::save_secret(&secret_key);    
+    let _ = Falcon512::save_secret(&secret_key);
 
     let loaded_pub = Falcon512::load(&PathBuf::from("./Falcon512/key.pub"))?;
     let _loaded_sec = Falcon512::load(&PathBuf::from("./Falcon512/key.sec"))?;
     assert_eq!(public_key, loaded_pub);
-    assert!(Path::new("./Falcon512/key.pub").exists(), "File does not exist: {}", "./Falcon512/key.pub");
-    assert!(Path::new("./Falcon512/key.sec").exists(), "File does not exist: {}", "./Falcon512/key.sec");
+    assert!(
+        Path::new("./Falcon512/key.pub").exists(),
+        "File does not exist: {}",
+        "./Falcon512/key.pub"
+    );
+    assert!(
+        Path::new("./Falcon512/key.sec").exists(),
+        "File does not exist: {}",
+        "./Falcon512/key.sec"
+    );
 
     fs::remove_dir_all("./Falcon512")?;
     let _ = fs::remove_file("crypt_tests.log");
@@ -103,8 +136,16 @@ fn test_save_Dilithium2_keys() -> Result<(), Box<dyn std::error::Error>> {
     let loaded_pub = Dilithium2::load(&PathBuf::from("./Dilithium2/key.pub"))?;
     let _loaded_sec = Dilithium2::load(&PathBuf::from("./Dilithium2/key.sec"))?;
     assert_eq!(public_key, loaded_pub);
-    assert!(Path::new("./Dilithium2/key.pub").exists(), "File does not exist: {}", "./Dilithium2/key.pub");
-    assert!(Path::new("./Dilithium2/key.sec").exists(), "File does not exist: {}", "./Dilithium2/key.sec");
+    assert!(
+        Path::new("./Dilithium2/key.pub").exists(),
+        "File does not exist: {}",
+        "./Dilithium2/key.pub"
+    );
+    assert!(
+        Path::new("./Dilithium2/key.sec").exists(),
+        "File does not exist: {}",
+        "./Dilithium2/key.sec"
+    );
 
     fs::remove_dir_all("./Dilithium2")?;
     let _ = fs::remove_file("crypt_tests.log");
@@ -119,15 +160,23 @@ fn test_save_Dilithium2_keys() -> Result<(), Box<dyn std::error::Error>> {
 }
 #[test]
 fn test_save_Dilithium3_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let (public_key, secret_key) = Dilithium3::keypair().unwrap();    
+    let (public_key, secret_key) = Dilithium3::keypair().unwrap();
     let _ = Dilithium3::save_public(&public_key);
     let _ = Dilithium3::save_secret(&secret_key);
 
     let loaded_pub = Dilithium3::load(&PathBuf::from("./Dilithium3/key.pub"))?;
     let _loaded_sec = Dilithium3::load(&PathBuf::from("./Dilithium3/key.sec"))?;
     assert_eq!(public_key, loaded_pub);
-    assert!(Path::new("./Dilithium3/key.pub").exists(), "File does not exist: {}", "./Dilithium3/key.pub");
-    assert!(Path::new("./Dilithium3/key.sec").exists(), "File does not exist: {}", "./Dilithium3/key.sec");
+    assert!(
+        Path::new("./Dilithium3/key.pub").exists(),
+        "File does not exist: {}",
+        "./Dilithium3/key.pub"
+    );
+    assert!(
+        Path::new("./Dilithium3/key.sec").exists(),
+        "File does not exist: {}",
+        "./Dilithium3/key.sec"
+    );
 
     fs::remove_dir_all("./Dilithium3")?;
     let _ = fs::remove_file("crypt_tests.log");
@@ -142,16 +191,24 @@ fn test_save_Dilithium3_keys() -> Result<(), Box<dyn std::error::Error>> {
 }
 #[test]
 fn test_save_Dilithium5_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let (public_key, secret_key) = Dilithium5::keypair().unwrap();    
+    let (public_key, secret_key) = Dilithium5::keypair().unwrap();
     let _ = Dilithium5::save_public(&public_key);
     let _ = Dilithium5::save_secret(&secret_key);
 
     let loaded_pub = Dilithium5::load(&PathBuf::from("./Dilithium5/key.pub"))?;
     let _loaded_sec = Dilithium5::load(&PathBuf::from("./Dilithium5/key.sec"))?;
     assert_eq!(public_key, loaded_pub);
-    assert!(Path::new("./Dilithium5/key.pub").exists(), "File does not exist: {}", "./Dilithium5/key.pub");
-    assert!(Path::new("./Dilithium5/key.sec").exists(), "File does not exist: {}", "./Dilithium5/key.sec");
-    
+    assert!(
+        Path::new("./Dilithium5/key.pub").exists(),
+        "File does not exist: {}",
+        "./Dilithium5/key.pub"
+    );
+    assert!(
+        Path::new("./Dilithium5/key.sec").exists(),
+        "File does not exist: {}",
+        "./Dilithium5/key.sec"
+    );
+
     fs::remove_dir_all("./Dilithium5")?;
     let _ = fs::remove_file("crypt_tests.log");
     let _ = fs::remove_file("message.txt");
@@ -186,7 +243,6 @@ fn test_falcon1024_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let _ = fs::remove_dir_all("./log");
     Ok(())
 }
-
 
 #[test]
 fn test_falcon1024_detached_signature() -> Result<(), Box<dyn std::error::Error>> {
@@ -239,7 +295,6 @@ fn test_falcon512_signature_message() -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-
 #[test]
 fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Falcon512::keypair().unwrap();
@@ -265,7 +320,6 @@ fn test_falcon512_detached_signature() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-
 #[test]
 fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Dilithium2::keypair().unwrap();
@@ -289,7 +343,6 @@ fn test_dilithium2_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let _ = fs::remove_dir_all("./log");
     Ok(())
 }
-
 
 #[test]
 fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>> {
@@ -316,7 +369,6 @@ fn test_dilithium2_detached_signature() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-
 #[test]
 fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Dilithium3::keypair().unwrap();
@@ -340,7 +392,6 @@ fn test_dilithium3_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let _ = fs::remove_dir_all("./log");
     Ok(())
 }
-
 
 #[test]
 fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>> {
@@ -367,7 +418,6 @@ fn test_dilithium3_detached_signature() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-
 #[test]
 fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>> {
     let (public_key, secret_key) = Dilithium5::keypair().unwrap();
@@ -391,7 +441,6 @@ fn test_dilithium5_signature_message() -> Result<(), Box<dyn std::error::Error>>
     let _ = fs::remove_dir_all("./log");
     Ok(())
 }
-
 
 #[test]
 fn test_dilithium5_detached_signature() -> Result<(), Box<dyn std::error::Error>> {

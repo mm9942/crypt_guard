@@ -19,26 +19,27 @@
 //! # Feature gate
 //! Compiled only when `cfg(feature = "legacy-pqclean")` is active.
 //!
-//! # TODO(phase4): remove `legacy-pqclean` from the `default` feature set once the
-//! ml-kem primary path lands in Phase 2.
+//! # Status
+//! `legacy-pqclean` is no longer part of the default feature set. Enable it
+//! explicitly when you need the legacy compatibility surface.
 
 pub mod kyber_crypto;
 pub mod sign;
 
 // Re-export size markers as #[deprecated] aliases at the crate root level.
 // These point to the definitions in core::kyber so the same type identity is preserved.
+#[deprecated(note = "use MlKem1024 (FIPS 203) once the ml-kem feature is active")]
+pub use crate::core::kyber::Kyber1024;
 #[deprecated(note = "use MlKem512 (FIPS 203) once the ml-kem feature is active")]
 pub use crate::core::kyber::Kyber512;
 #[deprecated(note = "use MlKem768 (FIPS 203) once the ml-kem feature is active")]
 pub use crate::core::kyber::Kyber768;
-#[deprecated(note = "use MlKem1024 (FIPS 203) once the ml-kem feature is active")]
-pub use crate::core::kyber::Kyber1024;
 
 // Falcon
-#[deprecated(note = "use FnDsa512 (FIPS 206 draft) behind the `preview` feature")]
-pub use crate::core::kdf::Falcon512;
 #[deprecated(note = "use FnDsa1024 (FIPS 206 draft) behind the `preview` feature")]
 pub use crate::core::kdf::Falcon1024;
+#[deprecated(note = "use FnDsa512 (FIPS 206 draft) behind the `preview` feature")]
+pub use crate::core::kdf::Falcon512;
 
 // Dilithium
 #[deprecated(note = "use MlDsa44 (FIPS 204) once the ml-dsa feature is active")]

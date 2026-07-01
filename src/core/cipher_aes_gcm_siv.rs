@@ -2,22 +2,25 @@
 
 //use crypt_guard_proc::{*, log_activity, write_log};
 use crate::{
-    *,
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    error::{*}, 
     core::{
         // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
     },
+    cryptography::{
+        hmac_sign::{Operation, Sign, SignType},
+        *,
+    },
+    error::*,
+    *,
 };
-use std::result::Result;
-use rand::{RngCore, rngs::OsRng};
-use hex;
+use aes::cipher::generic_array::GenericArray;
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
 };
-use aes::cipher::generic_array::GenericArray;
+use hex;
+use rand::{rngs::OsRng, RngCore};
+use std::result::Result;
 
 /// Generates a 12-byte iv using OS-level randomness.
 ///
@@ -46,7 +49,11 @@ impl CipherAesGcmSiv {
             None => generate_iv().to_vec(),
         };
         // println!("infos: {:?}", infos);
-        CipherAesGcmSiv { infos, sharedsecret: Vec::new(), iv }
+        CipherAesGcmSiv {
+            infos,
+            sharedsecret: Vec::new(),
+            iv,
+        }
     }
 
     /// Retrieves the encrypted or decrypted data stored within the CryptographicInformation.
@@ -105,9 +112,16 @@ impl CipherAesGcmSiv {
         let key = GenericArray::from_slice(&self.sharedsecret);
         let cipher = Aes256GcmSiv::new(key);
         let iv = Nonce::from_slice(&self.iv);
-        let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
+        let mut hmac = Sign::new(
+            plaintext.to_vec(),
+            passphrase,
+            Operation::Sign,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
-        let encrypted = cipher.encrypt(iv, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let encrypted = cipher
+            .encrypt(iv, &*data)
+            .map_err(|e| CryptError::new(e.to_string().as_str()))?;
         let iv = self.iv();
         Ok((encrypted, iv.to_owned()))
     }
@@ -118,9 +132,16 @@ impl CipherAesGcmSiv {
         let key = GenericArray::from_slice(&self.sharedsecret);
         let cipher = Aes256GcmSiv::new(key);
         let iv = Nonce::from_slice(&self.iv);
-        let decrypted = cipher.decrypt(iv, &*ciphertext.to_vec()).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let decrypted = cipher
+            .decrypt(iv, &*ciphertext.to_vec())
+            .map_err(|e| CryptError::new(e.to_string().as_str()))?;
         //println!("decrypted: {:?}", &decrypted);
-        let mut hmac = Sign::new(decrypted.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
+        let mut hmac = Sign::new(
+            decrypted.to_vec(),
+            passphrase,
+            Operation::Verify,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
         //println!("Verified: {:?}", &data);
         let iv = self.iv();
@@ -154,7 +175,7 @@ impl CryptographicFunctions for CipherAesGcmSiv {
     ///
     /// # Returns
     /// A result containing the decrypted data (Vec<u8>), or a CryptError.
-    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
+    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);

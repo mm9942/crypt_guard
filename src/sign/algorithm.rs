@@ -138,11 +138,7 @@ pub trait SignAlgorithm: Sized + Send + Sync + 'static {
     ///
     /// # Errors
     /// - [`CryptError::SignatureVerificationFailed`]: the signature is invalid.
-    fn verify(
-        vk: &Self::VerifyingKey,
-        message: &[u8],
-        sig: &Self::Sig,
-    ) -> Result<(), CryptError>;
+    fn verify(vk: &Self::VerifyingKey, message: &[u8], sig: &Self::Sig) -> Result<(), CryptError>;
 }
 
 /// Convenience pair holding both keys from a `SignAlgorithm::keypair()` call.
@@ -170,7 +166,10 @@ impl<A: SignAlgorithm> Keypair<A> {
     /// # Returns
     /// A new `Keypair<A>`.
     pub fn new(signing_key: A::SigningKey, verifying_key: A::VerifyingKey) -> Self {
-        Self { signing_key, verifying_key }
+        Self {
+            signing_key,
+            verifying_key,
+        }
     }
 
     /// Generate a fresh `Keypair<A>` using the provided RNG.
@@ -187,6 +186,9 @@ impl<A: SignAlgorithm> Keypair<A> {
         rng: &mut impl crate::kem::backend::rand_core_010::CryptoRng,
     ) -> Result<Self, CryptError> {
         let (signing_key, verifying_key) = A::keypair(rng)?;
-        Ok(Self { signing_key, verifying_key })
+        Ok(Self {
+            signing_key,
+            verifying_key,
+        })
     }
 }

@@ -1,17 +1,16 @@
-workspace = { members = [ "crypt_guard_proc"] }
+workspace = { members = [ "crypt_guard_proc"], exclude = ["old"] }
 [package]
 name = "crypt_guard"
-version = "2.0.0-alpha.1"
+version = "2.0.0"
 edition = "2021"
 description = "CryptGuard is a post-quantum cryptography framework with NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) plus legacy Kyber/Falcon/Dilithium, combined with AES and XChaCha20."
 license = "MIT"
 repository = "https://github.com/mm9942/crypt_guard"
 
 [features]
-# Phase 2: ml-kem-backend and ml-dsa-backend added to default alongside legacy-pqclean.
-# TODO(phase4): remove legacy-pqclean from default once the new primary path is fully wired.
+# Phase 4 complete: the safe ML-KEM + ML-DSA path is the default build.
+# Legacy compatibility remains opt-in via `--features legacy-pqclean`.
 default = [
-    "legacy-pqclean",
     "ml-kem-backend",
     "ml-dsa-backend",
 ]
@@ -107,3 +106,25 @@ getrandom = { version = "0.4.2", features = ["std"] }
 
 [dev-dependencies]
 tempfile = "3.10.1"
+trybuild = "1.0.103"
+
+# ── Example declarations ─────────────────────────────────────────────────────
+[[example]]
+name = "encrypt_aes"
+path = "examples/encrypt_aes.rs"
+required-features = ["ml-kem-backend"]
+
+[[example]]
+name = "encrypt_xchacha"
+path = "examples/encrypt_xchacha.rs"
+required-features = ["ml-kem-backend"]
+
+[[example]]
+name = "macro_example"
+path = "examples/macro_example.rs"
+required-features = ["legacy-pqclean"]
+
+[[example]]
+name = "signed_message"
+path = "examples/signed_message.rs"
+required-features = ["legacy-pqclean"]

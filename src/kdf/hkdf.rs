@@ -29,34 +29,29 @@
 //! assert_eq!(session_key.as_ref().len(), 32);
 //! ```
 
-use hkdf::Hkdf;
-use sha2_011::{Sha256, Sha512};
 use crate::error::CryptError;
 use crate::kdf::types::{HkdfSalt, SessionKey};
+use hkdf::Hkdf;
+use sha2_011::{Sha256, Sha512};
 
 /// Domain separation label for XChaCha20-Poly1305 AEAD.
 ///
 /// # Description
 /// Used as the `info` parameter to HKDF-Expand. Ensures that session keys derived for
 /// different AEAD algorithms are independent even from the same shared secret.
-pub const LABEL_XCHACHA20POLY1305: &[u8] =
-    b"crypt_guard:v2:aead:xchacha20poly1305";
+pub const LABEL_XCHACHA20POLY1305: &[u8] = b"crypt_guard:v2:aead:xchacha20poly1305";
 
 /// Domain separation label for AES-256-GCM-SIV AEAD.
-pub const LABEL_AESGCMSIV: &[u8] =
-    b"crypt_guard:v2:aead:aes-gcm-siv";
+pub const LABEL_AESGCMSIV: &[u8] = b"crypt_guard:v2:aead:aes-gcm-siv";
 
 /// Domain separation label for AES-256-CBC (legacy HMAC mode).
-pub const LABEL_AES: &[u8] =
-    b"crypt_guard:v2:aead:aes-cbc-hmac";
+pub const LABEL_AES: &[u8] = b"crypt_guard:v2:aead:aes-cbc-hmac";
 
 /// Domain separation label for XChaCha20 (stream, no authentication).
-pub const LABEL_XCHACHA20: &[u8] =
-    b"crypt_guard:v2:aead:xchacha20";
+pub const LABEL_XCHACHA20: &[u8] = b"crypt_guard:v2:aead:xchacha20";
 
 /// Generic domain separation label for unnamed AEAD algorithms.
-pub const LABEL_GENERIC: &[u8] =
-    b"crypt_guard:v2:aead:generic";
+pub const LABEL_GENERIC: &[u8] = b"crypt_guard:v2:aead:generic";
 
 /// Derive a 32-byte session key from a KEM shared secret using HKDF-SHA256.
 ///
@@ -101,8 +96,9 @@ pub fn derive_session_key(
 ) -> Result<SessionKey, CryptError> {
     let hk = Hkdf::<Sha256>::new(Some(salt.as_ref()), shared_secret);
     let mut okm = [0u8; 32];
-    hk.expand(label, &mut okm)
-        .map_err(|_| CryptError::CustomError("HKDF expand failed: invalid output length".to_owned()))?;
+    hk.expand(label, &mut okm).map_err(|_| {
+        CryptError::CustomError("HKDF expand failed: invalid output length".to_owned())
+    })?;
     Ok(SessionKey::from_bytes(okm))
 }
 
@@ -144,7 +140,8 @@ pub fn derive_session_key_sha512(
 ) -> Result<SessionKey, CryptError> {
     let hk = Hkdf::<Sha512>::new(Some(salt.as_ref()), shared_secret);
     let mut okm = [0u8; 32];
-    hk.expand(label, &mut okm)
-        .map_err(|_| CryptError::CustomError("HKDF-SHA512 expand failed: invalid output length".to_owned()))?;
+    hk.expand(label, &mut okm).map_err(|_| {
+        CryptError::CustomError("HKDF-SHA512 expand failed: invalid output length".to_owned())
+    })?;
     Ok(SessionKey::from_bytes(okm))
 }
