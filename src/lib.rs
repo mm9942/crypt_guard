@@ -19,7 +19,7 @@
 //!
 //! ## Introduction
 //!
-//! Current release status: `2.0.2`. The safe-default Phase 4 upgrade is
+//! Current release status: `2.0.3`. The safe-default Phase 4 upgrade is
 //! implemented, externally consumer-tested, and test-green. This patch closes
 //! the post-alpha hardening findings for constant-time HMAC verification,
 //! legacy HKDF key derivation, and secret zeroization.

@@ -1,6 +1,6 @@
 # Release Readiness
 
-This guide tracks what remains before publishing `2.0.2`.
+This guide tracks what remains before publishing `2.0.3`.
 
 ## Current status
 
@@ -25,7 +25,7 @@ RUSTC_WRAPPER= cargo clippy --lib
 ```
 
 External consumer verification also passed from `/tmp/crypt_guard_consumer`
-against the local `crypt_guard v2.0.2` path dependency:
+against the local `crypt_guard v2.0.3` path dependency:
 
 ```bash
 RUSTC_WRAPPER= cargo test
@@ -45,7 +45,7 @@ These should be closed before publishing:
 
 2. Confirm the release version.
 
-   The version is now `2.0.2`. The safe-default upgrade and external consumer
+   The version is now `2.0.3`. The safe-default upgrade and external consumer
    checks passed before the patch bump; rerun the matrix after security
    hardening changes before publishing.
 
@@ -78,7 +78,7 @@ ideal from the Obsidian assessment:
 
 ## Exit criteria
 
-For `2.0.2`:
+For `2.0.3`:
 
 - all release blockers above are closed
 - test matrix is green
@@ -87,6 +87,6 @@ For `2.0.2`:
 
 For publish:
 
-- `2.0.2` has no known correctness regressions
+- `2.0.3` has no known correctness regressions
 - any remaining public API debt is documented as intentional compatibility debt
 - CI runs the three feature lanes successfully on the release branch
