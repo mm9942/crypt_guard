@@ -80,7 +80,6 @@
 //!
 //! This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-
 use std::{
     fs::File,
     io::{BufWriter, Seek, Write},
@@ -89,9 +88,9 @@ use std::{
 
 use walkdir::WalkDir;
 use zip::{
+    result::ZipResult,
     write::{FileOptions, ZipWriter},
     CompressionMethod,
-    result::ZipResult,
 };
 
 /// Represents the type of a path (file or directory).
@@ -169,38 +168,25 @@ impl ZipManager {
         let mut zip_writer = ZipWriter::new(buf_writer);
 
         let options: FileOptions<()> = match compression {
-            Compression::Deflated => {
-                FileOptions::default()
-                    .compression_method(CompressionMethod::Deflated)
-                    .unix_permissions(0o755)
-            }
-            Compression::Stored => {
-                FileOptions::default()
-                    .compression_method(CompressionMethod::Stored)
-                    .unix_permissions(0o755)
-            }
-            Compression::Bzip2 => {
-                FileOptions::default()
-                    .compression_method(CompressionMethod::Bzip2)
-                    .unix_permissions(0o755)
-            }
-            Compression::Zstd => {
-                FileOptions::default()
-                    .compression_method(CompressionMethod::Zstd)
-                    .unix_permissions(0o755)
-            }
+            Compression::Deflated => FileOptions::default()
+                .compression_method(CompressionMethod::Deflated)
+                .unix_permissions(0o755),
+            Compression::Stored => FileOptions::default()
+                .compression_method(CompressionMethod::Stored)
+                .unix_permissions(0o755),
+            Compression::Bzip2 => FileOptions::default()
+                .compression_method(CompressionMethod::Bzip2)
+                .unix_permissions(0o755),
+            Compression::Zstd => FileOptions::default()
+                .compression_method(CompressionMethod::Zstd)
+                .unix_permissions(0o755),
         };
 
         for item in &self.items {
             match item.path_type {
                 PathType::File => {
                     let base_path = item.source_path.parent().unwrap_or(Path::new(""));
-                    self.compress_file(
-                        &mut zip_writer,
-                        &item.source_path,
-                        base_path,
-                        &options,
-                    )?;
+                    self.compress_file(&mut zip_writer, &item.source_path, base_path, &options)?;
                 }
                 PathType::Dir => {
                     let base_path = &item.source_path;

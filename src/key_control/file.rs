@@ -1,12 +1,40 @@
-use std::{
-	path::{PathBuf},
-	io::{Write},
-	fs::{self, File},
-};
+//! On-disk metadata and load/save helpers for cryptographic files.
+//!
+//! # Responsibility scope
+//! Owns [`FileMetadata`], which couples a filesystem path with a [`FileTypes`]
+//! classification and a [`FileState`]. It provides PEM-style tag wrapping
+//! (`-----BEGIN ...-----`), hex encode/decode on save/load, raw reads, and
+//! parent-directory resolution. It does not perform any encryption itself — it
+//! only serialises already-processed bytes to and from disk.
+//!
+//! # Key types exported
+//! - [`FileMetadata`] — path + type + state plus its I/O methods.
+//!
+//! # Concurrency
+//! [`FileMetadata`] is `Clone + Send + Sync`; methods touch the filesystem and so
+//! are not synchronised against concurrent writers to the same path.
+//!
+//! # Errors
+//! Methods return [`CryptError`](crate::error::CryptError) variants such as `Utf8Error`, `WriteError`,
+//! `InvalidKeyType`, `InvalidMessageFormat`, and `HexDecodingError`, plus I/O
+//! errors converted from [`std::io::Error`].
+//!
+//! # Examples
+//! ```rust,no_run
+//! use std::path::PathBuf;
+//! use crypt_guard::key_control::{FileMetadata, FileTypes, FileState};
+//! let meta = FileMetadata::from(PathBuf::from("public_key.pub"), FileTypes::PublicKey, FileState::Encrypted);
+//! meta.save(b"raw-bytes").unwrap();
+//! ```
+
 use crate::error::CryptError;
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use crate::key_control::*;
-
 
 /// Manages metadata related to a file, including its location, type, and state within a cryptographic context.
 #[derive(PartialEq, Debug, Clone)]
@@ -19,6 +47,12 @@ pub struct FileMetadata {
     file_state: FileState,
 }
 
+impl Default for FileMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Manages metadata and operations for cryptographic files, including key files, messages, and ciphertexts.
 ///
 /// Provides functionality for loading, saving, and manipulating file paths and contents according to the cryptographic context.
@@ -27,13 +61,13 @@ impl FileMetadata {
     ///
     /// # Returns
     /// A new instance of `FileMetadata` with empty location, and default types set to `Other`.
-	pub fn new() -> Self {
-		FileMetadata {
-			location: PathBuf::new(),
-			file_type: FileTypes::Other,
-			file_state: FileState::Other,
-		}
-	}
+    pub fn new() -> Self {
+        FileMetadata {
+            location: PathBuf::new(),
+            file_type: FileTypes::Other,
+            file_state: FileState::Other,
+        }
+    }
 
     /// Constructs a `FileMetadata` instance from specified parameters.
     ///
@@ -44,13 +78,13 @@ impl FileMetadata {
     ///
     /// # Returns
     /// A new instance of `FileMetadata` configured with the provided details.
-	pub fn from(location: PathBuf, file_type: FileTypes, file_state: FileState) -> Self {
-		FileMetadata {
-			location,
-			file_type,
-			file_state,
-		}
-	}    
+    pub fn from(location: PathBuf, file_type: FileTypes, file_state: FileState) -> Self {
+        FileMetadata {
+            location,
+            file_type,
+            file_state,
+        }
+    }
 
     // Setters
     /// Sets the file location.
@@ -84,7 +118,11 @@ impl FileMetadata {
     /// # Returns
     /// The path to the file encapsulated within this `FileMetadata` instance.
     pub fn location(&self) -> Result<PathBuf, CryptError> {
-        let dir_str = &self.location.as_os_str().to_str().unwrap();
+        let dir_str = self
+            .location
+            .as_os_str()
+            .to_str()
+            .ok_or(CryptError::Utf8Error)?;
         let dir = PathBuf::from(dir_str);
         Ok(dir)
     }
@@ -93,17 +131,17 @@ impl FileMetadata {
     ///
     /// # Returns
     /// A tuple containing start and end tags as strings, or a `CryptError` if the operation fails.
-	pub fn tags(&self) -> Result<(String, String), CryptError> {
-		let (start_label, end_label) = match self.file_type {
+    pub fn tags(&self) -> Result<(String, String), CryptError> {
+        let (start_label, end_label) = match self.file_type {
             FileTypes::PublicKey => ("-----BEGIN PUBLIC KEY-----\n", "\n-----END PUBLIC KEY-----"),
             FileTypes::SecretKey => ("-----BEGIN SECRET KEY-----\n", "\n-----END SECRET KEY-----"),
             FileTypes::Message => ("-----BEGIN MESSAGE-----\n", "\n-----END MESSAGE-----"),
             FileTypes::Ciphertext => ("-----BEGIN CIPHERTEXT-----\n", "\n-----END CIPHERTEXT-----"),
-            FileTypes::File => unreachable!(),
-            FileTypes::Other => unreachable!(),
+            FileTypes::File => return Err(CryptError::InvalidKeyType),
+            FileTypes::Other => return Err(CryptError::InvalidKeyType),
         };
         Ok((start_label.to_string(), end_label.to_string()))
-	}
+    }
 
     /// Loads the file's content, decoding it if necessary and stripping any encapsulation tags.
     ///
@@ -113,9 +151,12 @@ impl FileMetadata {
         let file_content = fs::read_to_string(&self.location).map_err(CryptError::from)?;
         let (start_label, end_label) = self.tags()?;
 
-        let start = file_content.find(&start_label)
-            .ok_or(CryptError::InvalidMessageFormat)? + start_label.len();
-        let end = file_content.rfind(&end_label)
+        let start = file_content
+            .find(&start_label)
+            .ok_or(CryptError::InvalidMessageFormat)?
+            + start_label.len();
+        let end = file_content
+            .rfind(&end_label)
             .ok_or(CryptError::InvalidMessageFormat)?;
 
         let content = &file_content[start..end].trim();
@@ -130,7 +171,7 @@ impl FileMetadata {
         let parent = self.location.parent();
         let parent = match parent {
             Some(parent) => PathBuf::from(parent),
-            _ => {PathBuf::new()}
+            _ => PathBuf::new(),
         };
         Ok(parent)
     }
@@ -152,15 +193,17 @@ impl FileMetadata {
         let (start_label, end_label) = self.tags()?;
         let content = format!("{}{}{}", start_label, hex::encode(content), end_label);
         let mut buffer = File::create(&self.location).map_err(|_| CryptError::WriteError)?;
-        buffer.write_all(content.as_bytes()).map_err(|_| CryptError::WriteError)?;
+        buffer
+            .write_all(content.as_bytes())
+            .map_err(|_| CryptError::WriteError)?;
         Ok(())
     }
-    
+
     /// Reads the raw content of the file without processing.
     ///
     /// # Returns
     /// The raw content of the file as a byte vector, or a `CryptError` if the read operation fails.
     pub fn read(&self) -> Result<Vec<u8>, CryptError> {
-	    fs::read(&self.location).map_err(CryptError::from)
+        fs::read(&self.location).map_err(CryptError::from)
     }
 }

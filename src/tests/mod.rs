@@ -1,25 +1,28 @@
 #![allow(non_snake_case)]
 
-#[cfg(test)]
+#[cfg(all(test, feature = "archive"))]
 mod ArchiveTests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod KyberKeyTests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod KyberTests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod SignatureTests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod MacroTests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod LegacyCleanupTests;
 
 #[cfg(test)]
 mod ze_end;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-pqclean"))]
 mod BuilderPatternTests;
+
+#[cfg(test)]
+mod Phase3Tests;

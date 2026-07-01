@@ -1,8 +1,7 @@
-use crate::cryptography::hmac_sign::{Sign, SignType, Operation, SignatureData};
+use crate::cryptography::hmac_sign::{Operation, Sign, SignType, SignatureData};
 
 use hmac::{Hmac, Mac};
-use sha2::{Sha512, Sha256};
-
+use sha2::{Sha256, Sha512};
 
 /// Represents a cryptographic signing operation, including data, passphrase, operational status,
 /// hash type, signature length, and verification status.
@@ -19,13 +18,34 @@ impl Sign {
     /// A new `Sign` instance.
     pub fn new(data: Vec<u8>, passphrase: Vec<u8>, status: Operation, hash_type: SignType) -> Self {
         let data = SignatureData {
-            data, passphrase, hmac: Vec::new(), concat_data: Vec::new()
+            data,
+            passphrase,
+            hmac: Vec::new(),
+            concat_data: Vec::new(),
         };
         match hash_type {
-            SignType::Sha512 => Sign { data, status, hash_type, length: 64, veryfied: false},
-            SignType::Sha256 => Sign { data, status, hash_type, length: 32, veryfied: false},
-            _ => Sign { data, status, hash_type, length: 64, veryfied: false},
-         } 
+            SignType::Sha512 => Sign {
+                data,
+                status,
+                hash_type,
+                length: 64,
+                veryfied: false,
+            },
+            SignType::Sha256 => Sign {
+                data,
+                status,
+                hash_type,
+                length: 32,
+                veryfied: false,
+            },
+            _ => Sign {
+                data,
+                status,
+                hash_type,
+                length: 64,
+                veryfied: false,
+            },
+        }
     }
 
     /// Performs the HMAC operation based on the operation status: generates HMAC for signing
@@ -56,7 +76,7 @@ impl Sign {
                 let concat_data = [&self.data.data, hmac.as_slice()].concat();
                 //println!("Concated data: {:?}", concat_data);
                 concat_data
-            },
+            }
             SignType::Sha256 => {
                 let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&self.data.passphrase)
                     .expect("HMAC can take key of any size");
@@ -66,7 +86,7 @@ impl Sign {
                 let concat_data = [&self.data.data, hmac.as_slice()].concat();
                 // println!("Concated data: {:?}", concat_data);
                 concat_data
-            },
+            }
             _ => vec![],
         }
     }

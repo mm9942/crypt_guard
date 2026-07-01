@@ -1,0 +1,11 @@
+# Standalone project (NOT part of the crypt_guard workspace) used to pull the
+# published crypt_guard from crates.io for before/after comparison.
+[workspace]
+
+[package]
+name = "old"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crypt_guard = "1.4.2"
