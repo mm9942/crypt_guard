@@ -1,7 +1,7 @@
 workspace = { members = [ "crypt_guard_proc"], exclude = ["old"] }
 [package]
 name = "crypt_guard"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2021"
 description = "CryptGuard is a post-quantum cryptography framework with NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) plus legacy Kyber/Falcon/Dilithium, combined with AES and XChaCha20."
 license = "MIT"

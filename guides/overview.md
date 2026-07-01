@@ -3,9 +3,10 @@
 `crypt_guard` now defaults to ML-KEM + ML-DSA, HKDF-based key derivation, and
 one authenticated envelope format.
 
-The current crate version is `2.0.0`. The safe-default Phase 4 upgrade is
-implemented, externally consumer-tested, and test-green; see
-`release-readiness.md` for the publish hygiene checklist.
+The current crate version is `2.0.2`. The safe-default Phase 4 upgrade is
+implemented, externally consumer-tested, and test-green. The 2.0.2 patch closes
+the post-alpha hardening findings around constant-time HMAC verification,
+legacy HKDF key derivation, and secret zeroization.
 
 Use the safe API when you want:
 

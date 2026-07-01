@@ -19,9 +19,10 @@
 //!
 //! ## Introduction
 //!
-//! Current release status: `2.0.0`. The safe-default Phase 4 upgrade is
-//! implemented, externally consumer-tested, and test-green. Before publishing,
-//! close the release hygiene gates tracked in `guides/release-readiness.md`.
+//! Current release status: `2.0.2`. The safe-default Phase 4 upgrade is
+//! implemented, externally consumer-tested, and test-green. This patch closes
+//! the post-alpha hardening findings for constant-time HMAC verification,
+//! legacy HKDF key derivation, and secret zeroization.
 //!
 //! CryptGuard is a post-quantum sealing library built on the NIST FIPS 203/204/205
 //! final standards. The primary flow is:

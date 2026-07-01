@@ -15,10 +15,10 @@ The primary API produces one self-contained CGv2 envelope. Nonce handling,
 key derivation, and KEM encapsulation are all internal — the caller provides
 a public key and plaintext and receives a sealed `Envelope` back.
 
-Current release status: `2.0.0`. The Phase 4 safe-default upgrade is
-implemented, externally consumer-tested, and test-green. Before publishing,
-close the release hygiene gates in
-[guides/release-readiness.md](guides/release-readiness.md).
+Current release status: `2.0.2`. The Phase 4 safe-default upgrade is
+implemented, externally consumer-tested, and test-green. This patch release
+closes the post-alpha hardening findings for constant-time HMAC verification,
+legacy HKDF key derivation, and secret zeroization.
 
 ---
 
@@ -143,14 +143,14 @@ To use only the new FIPS path without legacy code:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.0", default-features = true }
+crypt_guard = { version = "2.0.2", default-features = true }
 ```
 
 To include the legacy path for reading data encrypted with v1.x:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.0", features = ["legacy-pqclean"] }
+crypt_guard = { version = "2.0.2", features = ["legacy-pqclean"] }
 ```
 
 ---
@@ -208,7 +208,7 @@ API, manual nonce), enable the `legacy-pqclean` feature:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.0", features = ["legacy-pqclean"] }
+crypt_guard = { version = "2.0.2", features = ["legacy-pqclean"] }
 ```
 
 The old `Kyber<Encryption, Kyber1024, Message, AES>` types, the

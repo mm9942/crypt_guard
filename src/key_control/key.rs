@@ -26,6 +26,7 @@
 use crate::error::CryptError;
 use crate::key_control::*;
 use std::path::PathBuf;
+use zeroize::Zeroize;
 
 /// Represents a cryptographic key — its type tag and raw bytes.
 ///
@@ -41,6 +42,14 @@ pub struct Key {
     key_type: KeyTypes,
     /// The raw key bytes.
     content: Vec<u8>,
+}
+
+impl Drop for Key {
+    fn drop(&mut self) {
+        if matches!(self.key_type, KeyTypes::SecretKey | KeyTypes::SharedSecret) {
+            self.content.zeroize();
+        }
+    }
 }
 
 impl Key {
