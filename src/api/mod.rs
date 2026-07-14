@@ -4,9 +4,9 @@
 //! typed `Encryptor` / `Decryptor` entry points with staged builders and no
 //! manual nonce handling in the default flow.
 //!
-//! It additionally exposes the HPKE-style (RFC 9180) single-shot [`seal`] /
-//! [`open`] functions (see [`hpke`]), which mirror `SealBase` / `OpenBase` over
-//! the same envelope path while binding caller-supplied `info` and `aad`.
+//! It additionally exposes the legacy [`hpke`] compatibility module. Its
+//! single-shot [`seal`] / [`open`] helpers use CGv2/HFv1 framing and retain
+//! historical names for source compatibility; they are not RFC 9180 HPKE.
 
 pub mod hpke;
 mod open;
@@ -19,10 +19,8 @@ pub use seal::{
     Encryptor, EncryptorBuilder, MissingPlaintext, MissingRecipient, WithPlaintext, WithRecipient,
 };
 
-// HPKE-style single-shot entry points. `src/lib.rs` is owned by another agent;
-// once it adds `pub use api::{seal as hpke_seal, open as hpke_open};` these
-// become crate-root accessible. Until then they are reachable as
-// `crypt_guard::api::{seal, open}` and `crypt_guard::api::hpke::{seal, open}`.
+// Legacy CGv2/HFv1 compatibility entry points. They are also re-exported at the
+// crate root with historical `hpke_` names, but do not implement RFC 9180 HPKE.
 pub use hpke::{open, seal};
 
 mod private {
