@@ -19,8 +19,7 @@ Current release version: `2.0.4`. The Phase 4 safe-default upgrade remains the
 primary supported path. The additive `crypt_guard::hpke::rfc9180` API provides
 vector-verified RFC 9180 setup for all five DHKEMs, all registered encryption
 AEADs, and Base/PSK/Auth/AuthPSK; it is intentionally distinct from CGv2.
-Separately, the opt-in `hpke-pq-draft-05` feature exposes revision-pinned,
-experimental PQ HPKE APIs. The legacy API remains a vector-gated Base-mode API for two pinned
+Separately, the default build exposes revision-pinned, experimental PQ HPKE APIs. The legacy API remains a vector-gated Base-mode API for two pinned
 `draft-ietf-hpke-pq-05` ML-KEM profiles. That active Internet-Draft is not an
 RFC or a finalized IANA profile; its literal revision is part of the protocol
 identity.
@@ -120,7 +119,7 @@ framing.
 
 ## Experimental `draft-ietf-hpke-pq-05` Base mode
 
-With the non-default `hpke-pq-draft-05` feature, the additive
+The additive default
 `crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full` namespace exposes the
 draft-05 registry (ML-KEM, hybrid KEM identifiers, HKDF/SHAKE/TurboSHAKE KDFs,
 and the registered AEADs). Capabilities are reported and unavailable hybrid
@@ -138,13 +137,7 @@ the literal `draft-ietf-hpke-pq-05` revision, and the exact profile alongside
 the separately transported `enc` and ciphertext; they must select this reader
 directly rather than trial-decrypting CGv2/HFv1 data.
 
-Enable the feature explicitly; it is intentionally not part of the default
-feature set:
-
-```toml
-[dependencies]
-crypt_guard = { version = "2.0.4", features = ["hpke-pq-draft-05"] }
-```
+No feature flag is required; the revision-pinned API is part of the default build.
 
 ```rust
 use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05::{
@@ -209,7 +202,6 @@ opaque authentication failure when opening.
 | `ml-kem-backend` | yes | ML-KEM-512/768/1024 (FIPS 203) |
 | `ml-dsa-backend` | yes | ML-DSA-44/65/87 (FIPS 204) |
 | `sign-slhdsa` | no | SLH-DSA (FIPS 205) |
-| `hpke-pq-draft-05` | no | vector-gated experimental `draft-ietf-hpke-pq-05` Base-mode ML-KEM API; not an RFC-standardized profile |
 | `aes-ctr` | no | AES-CTR stream cipher |
 | `aes-xts` | no | AES-XTS disk encryption |
 | `archive` | no | tar/xz/gz archive helpers |

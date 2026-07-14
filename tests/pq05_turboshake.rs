@@ -1,5 +1,3 @@
-#![cfg(feature = "hpke-pq-draft-05")]
-
 use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full as hpke;
 use turboshake::{
     digest::{ExtendableOutput, Update, XofReader},

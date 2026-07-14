@@ -1,5 +1,4 @@
 //! Draft-05 MLKEM768-P256 endpoint-vector interoperability.
-#![cfg(feature = "hpke-pq-draft-05")]
 
 use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full::{
     setup_base_receiver, setup_base_sender_with_ikm_e, Aead, Kdf, Kem, RecipientPrivateKey, Suite,

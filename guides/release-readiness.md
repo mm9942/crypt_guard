@@ -14,7 +14,7 @@ Phase 4 is functionally complete:
 - the separate `hpke/` module has a partial RFC 9180 Base-mode core (labeled
   key schedule, context state, nonce sequencing, exporter derivation, and
   ChaCha20-Poly1305); it has no KEM setup or vector-verified complete suite
-- the opt-in `hpke_pq::draft_ietf_hpke_pq_05` module exposes the two pinned,
+- the default `hpke_pq::draft_ietf_hpke_pq_05` module exposes the two pinned,
   vector-gated active-draft Base-mode profiles with separate `enc` transport;
   it is explicitly not an RFC-standardized PQ HPKE profile
 - content-axis and staged-builder misuse are covered by `trybuild`
@@ -27,7 +27,7 @@ cargo fmt --check
 RUSTC_WRAPPER= cargo test
 RUSTC_WRAPPER= cargo test --no-default-features --features ml-kem-backend,ml-dsa-backend
 RUSTC_WRAPPER= cargo test --no-default-features --features legacy-pqclean
-RUSTC_WRAPPER= cargo test --no-default-features --features hpke-pq-draft-05
+RUSTC_WRAPPER= cargo test --no-default-features
 RUSTC_WRAPPER= cargo clippy --lib
 ```
 
@@ -72,7 +72,7 @@ These should be closed before publishing:
    The legacy `api::hpke` names remain CGv2/HFv1 compatibility framing and
    must not be advertised as RFC 9180 HPKE. The partial `hpke/` core is not an
    interoperable suite because it has no KEM setup or complete vector evidence.
-   The additive draft-05 feature has its own separate `enc` transport and
+   The default draft-05 API has its own separate `enc` transport and
    profile identity; it must not serialize as CGv2, parse through `Envelope`,
    or reinterpret existing bytes. Applications select the reader from an
    application-owned protocol/version/profile discriminator; trial decryption
@@ -81,7 +81,7 @@ These should be closed before publishing:
 6. Keep the post-quantum claim precise.
 
    `draft-ietf-hpke-pq-05` is an active Internet-Draft, not a standardized RFC
-   profile. The opt-in public Base-mode API is limited to its two pinned,
+   profile. The default public Base-mode API is limited to its two pinned,
    vector-gated profiles; it must retain its literal revision in code,
    transport metadata, and release evidence.
 
@@ -97,9 +97,10 @@ ideal from the Obsidian assessment:
   inside encrypted plaintext and it will not be converted into real HPKE.
 - `hpke::rfc9180` provides the separate RFC 9180 stateful setup/context API,
   with complete classic-DHKEM and AEAD vector coverage. The distinct
-  `draft-ietf-hpke-pq-05` feature exposes a revision-pinned registry and
-  vector-gated FIPS 203 ML-KEM profiles; concrete hybrid descriptors remain
-  explicitly unavailable until their complete endpoint vectors pass. It makes
+  `draft-ietf-hpke-pq-05` default API exposes a revision-pinned registry and
+  vector-gated FIPS 203 ML-KEM profiles plus MLKEM768-P256 and MLKEM1024-P384
+  endpoint vectors. MLKEM768-X25519 remains explicitly unavailable until its
+  complete endpoint vectors pass. It makes
   no RFC standardization claim.
 - `src/lib.rs` still preserves broad compatibility re-exports.
 - Legacy type identity still depends on `src/core/kyber` while implementation

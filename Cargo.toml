@@ -19,18 +19,6 @@ default = [
 ml-kem-backend  = ["dep:ml-kem"]
 ml-dsa-backend  = ["dep:ml-dsa"]
 sign-slhdsa     = ["dep:slh-dsa"]
-# Experimental, revision-pinned public support for draft-ietf-hpke-pq-05.
-# This remains separate from the existing CGv2 ML-KEM backend. It exposes only
-# the two vector-gated Base-mode profiles; it is not an RFC-standardized HPKE
-# profile and makes no permanent interoperability claim.
-hpke-pq-draft-05 = [
-    "dep:libcrux-ml-kem",
-    "dep:sha3",
-    "dep:p256",
-    "dep:p384",
-    "dep:x25519-dalek",
-    "dep:turboshake",
-]
 # preview         = ["dep:hqc", "dep:falcon-rs"]
 
 # ── Legacy pqcrypto path ───────────────────────────────────────────────────────
@@ -97,18 +85,18 @@ crrl             = { version = "=0.9.0", default-features = false, features = ["
 ml-kem  = { version = "0.3.2", optional = true, features = ["zeroize"] }
 # PQCA/PQCP ML-KEM backend for the standards-track HPKE path. Pin exactly so
 # the reviewed validation and serialization contract cannot change unnoticed.
-libcrux-ml-kem = { version = "=0.0.9", optional = true, default-features = false, features = ["std", "mlkem512", "mlkem768", "mlkem1024"] }
+libcrux-ml-kem = { version = "=0.0.9", default-features = false, features = ["std", "mlkem512", "mlkem768", "mlkem1024"] }
 # RFC 9180 registers AES-128-GCM and AES-256-GCM alongside
 # ChaCha20-Poly1305. The HPKE context core supports all three suites.
 aes-gcm = { version = "=0.11.0" }
-sha3 = { version = "=0.11.0", optional = true }
-turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"], optional = true }
+sha3 = { version = "=0.11.0" }
+turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"] }
 # Direct, pure-Rust traditional components for the revision-pinned concrete
 # hybrid KEMs.  Keep their feature closure minimal: arithmetic only for the
 # NIST curves, and the RFC 7748 primitive for X25519.
-p256 = { version = "=0.13.2", optional = true, default-features = false, features = ["arithmetic"] }
-p384 = { version = "=0.13.1", optional = true, default-features = false, features = ["arithmetic"] }
-x25519-dalek = { version = "=2.0.1", optional = true, default-features = false, features = ["zeroize"] }
+p256 = { version = "=0.13.2", default-features = false, features = ["arithmetic"] }
+p384 = { version = "=0.13.1", default-features = false, features = ["arithmetic"] }
+x25519-dalek = { version = "=2.0.1", default-features = false, features = ["zeroize"] }
 ml-dsa  = { version = "0.1.1", optional = true, features = ["zeroize", "rand_core"] }
 slh-dsa = { version = "0.2.0-rc.5", optional = true }
 

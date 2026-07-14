@@ -1,7 +1,5 @@
 //! Contract tests for the revision-pinned full draft-05 namespace.
 
-#![cfg(feature = "hpke-pq-draft-05")]
-
 use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full::{
     generate_recipient_key_pair, setup_base_receiver, setup_base_sender, setup_psk_receiver,
     setup_psk_sender, Aead, Capability, Encapsulation, Error, Kdf, Kem, Suite,
@@ -92,8 +90,8 @@ fn export_only_constructs_a_context_but_never_an_encryption_context() {
 }
 
 #[test]
-fn unsupported_draft_kems_and_turboshake_are_typed_not_substituted() {
-    let unavailable = [Kem::MlKem1024P384, Kem::MlKem768X25519];
+fn unavailable_draft_kems_are_typed_not_substituted() {
+    let unavailable = [Kem::MlKem768X25519];
     for kem in unavailable {
         let suite = Suite::new(kem, Kdf::HkdfSha256, Aead::Aes128Gcm);
         assert!(matches!(suite.capability(), Capability::Unavailable(_)));

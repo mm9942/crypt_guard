@@ -4,8 +4,7 @@
 //! PQCA/PQCP `libcrux-ml-kem` implementation to the ML-KEM HPKE KEM interface
 //! described by the currently pinned post-quantum HPKE Internet-Draft. It does
 //! not itself claim RFC-standardized ML-KEM HPKE support: the IETF mapping is
-//! still a draft.  This module is compiled only by the non-default
-//! `hpke-pq-draft-05` feature and must never be described as an RFC-standard
+//! still a draft. This default module must never be described as an RFC-standard
 //! ML-KEM HPKE profile.
 //!
 //! The adapters implement ML-KEM-512, ML-KEM-768 and ML-KEM-1024. They store the HPKE
@@ -137,7 +136,7 @@ fn kem_labeled_derive(
 
 impl Error for Draft05Error {}
 
-/// The two non-default, vector-gated profiles implemented by this module.
+/// The two legacy compatibility profiles implemented by this module.
 ///
 /// These identifiers are from an active Internet-Draft, not an RFC or a final
 /// IANA registration.  No negotiation or fallback is performed by this API.
@@ -1196,7 +1195,7 @@ fn setup_base_receiver_1024(
 
 /// Experimental API for the pinned `draft-ietf-hpke-pq-05` profile mapping.
 ///
-/// This module is intentionally feature-gated and explicitly revision-named:
+/// This module is intentionally revision-named:
 /// it implements only the two Base-mode profiles covered by the vendored
 /// draft-05 vectors.  The Internet-Draft is not an RFC, its identifiers are
 /// not final IANA registrations, and this API must not be advertised as a
@@ -1676,6 +1675,10 @@ pub mod draft_ietf_hpke_pq_05_full {
     };
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     use p256::{ecdh::diffie_hellman, PublicKey as P256PublicKey, SecretKey as P256SecretKey};
+    use p384::{
+        ecdh::diffie_hellman as p384_diffie_hellman, PublicKey as P384PublicKey,
+        SecretKey as P384SecretKey,
+    };
     use sha2_011::Sha512;
     use sha3::Shake128;
     use sha3::{Digest, Sha3_256};
@@ -1849,8 +1852,8 @@ pub mod draft_ietf_hpke_pq_05_full {
                     | Kdf::TurboShake128
                     | Kdf::TurboShake256 => Capability::Available,
                 },
-                Kem::MlKem768P256 => Capability::Available,
-                Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
+                Kem::MlKem768P256 | Kem::MlKem1024P384 => Capability::Available,
+                Kem::MlKem768X25519 => {
                     Capability::Unavailable("concrete hybrid KEM is not yet implemented")
                 }
             }
@@ -1946,28 +1949,49 @@ pub mod draft_ietf_hpke_pq_05_full {
     }
     impl HybridPublicKey {
         fn from_bytes(kem: Kem, bytes: &[u8]) -> Result<Self, Error> {
-            if kem != Kem::MlKem768P256 || bytes.len() != MLKEM768_P256_PUBLIC_KEY_BYTES {
-                return Err(Error::InvalidRecipientPublicKey);
+            match kem {
+                Kem::MlKem768P256 if bytes.len() == MLKEM768_P256_PUBLIC_KEY_BYTES => {
+                    MlKem768PublicKey::from_bytes(&bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
+                        .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                    P256PublicKey::from_sec1_bytes(&bytes[ML_KEM_768_PUBLIC_KEY_BYTES..])
+                        .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                }
+                Kem::MlKem1024P384 if bytes.len() == MLKEM1024_P384_PUBLIC_KEY_BYTES => {
+                    MlKem1024PublicKey::from_bytes(&bytes[..ML_KEM_1024_PUBLIC_KEY_BYTES])
+                        .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                    P384PublicKey::from_sec1_bytes(&bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..])
+                        .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                }
+                _ => return Err(Error::InvalidRecipientPublicKey),
             }
-            let _pq = MlKem768PublicKey::from_bytes(&bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
-                .map_err(|_| Error::InvalidRecipientPublicKey)?;
-            P256PublicKey::from_sec1_bytes(&bytes[ML_KEM_768_PUBLIC_KEY_BYTES..])
-                .map_err(|_| Error::InvalidRecipientPublicKey)?;
             Ok(Self {
                 kem,
                 bytes: bytes.to_vec(),
             })
         }
         fn derive(kem: Kem, seed: &[u8]) -> Result<Self, Error> {
-            if kem != Kem::MlKem768P256 || seed.len() != HYBRID_SEED_BYTES {
+            if seed.len() != HYBRID_SEED_BYTES {
                 return Err(Error::InvalidRecipientPrivateKey);
             }
-            let (pq, _, scalar) = derive_hybrid_key_pair(seed)?;
-            let point = scalar.public_key().to_encoded_point(false);
-            let mut bytes = Vec::with_capacity(MLKEM768_P256_PUBLIC_KEY_BYTES);
-            bytes.extend_from_slice(pq.as_bytes());
-            bytes.extend_from_slice(point.as_bytes());
-            Ok(Self { kem, bytes })
+            match kem {
+                Kem::MlKem768P256 => {
+                    let (pq, _, scalar) = derive_hybrid_key_pair(seed)?;
+                    let point = scalar.public_key().to_encoded_point(false);
+                    let mut bytes = Vec::with_capacity(MLKEM768_P256_PUBLIC_KEY_BYTES);
+                    bytes.extend_from_slice(pq.as_bytes());
+                    bytes.extend_from_slice(point.as_bytes());
+                    Ok(Self { kem, bytes })
+                }
+                Kem::MlKem1024P384 => {
+                    let (pq, _, scalar) = derive_hybrid_p384_key_pair(seed)?;
+                    let point = scalar.public_key().to_encoded_point(false);
+                    let mut bytes = Vec::with_capacity(MLKEM1024_P384_PUBLIC_KEY_BYTES);
+                    bytes.extend_from_slice(pq.as_bytes());
+                    bytes.extend_from_slice(point.as_bytes());
+                    Ok(Self { kem, bytes })
+                }
+                _ => Err(Error::InvalidRecipientPrivateKey),
+            }
         }
         fn as_bytes(&self) -> &[u8] {
             &self.bytes
@@ -1978,16 +2002,18 @@ pub mod draft_ietf_hpke_pq_05_full {
         seed: Zeroizing<[u8; HYBRID_SEED_BYTES]>,
     }
     impl HybridPrivateKey {
-        fn from_seed_bytes(seed: &[u8]) -> Result<Self, Error> {
+        fn from_seed_bytes(kem: Kem, seed: &[u8]) -> Result<Self, Error> {
             let value = <[u8; HYBRID_SEED_BYTES]>::try_from(seed)
                 .map_err(|_| Error::InvalidRecipientPrivateKey)?;
-            Ok(Self::from_seed(Zeroizing::new(value)))
-        }
-        fn from_seed(seed: Zeroizing<[u8; HYBRID_SEED_BYTES]>) -> Self {
-            Self {
-                kem: Kem::MlKem768P256,
-                seed,
+            match kem {
+                Kem::MlKem768P256 | Kem::MlKem1024P384 => {
+                    Ok(Self::from_seed(kem, Zeroizing::new(value)))
+                }
+                _ => Err(Error::InvalidRecipientPrivateKey),
             }
+        }
+        fn from_seed(kem: Kem, seed: Zeroizing<[u8; HYBRID_SEED_BYTES]>) -> Self {
+            Self { kem, seed }
         }
         fn as_seed_bytes(&self) -> &[u8] {
             &self.seed[..]
@@ -2000,13 +2026,23 @@ pub mod draft_ietf_hpke_pq_05_full {
     }
     impl HybridEncapsulation {
         fn from_bytes(kem: Kem, bytes: &[u8]) -> Result<Self, Error> {
-            if kem != Kem::MlKem768P256 || bytes.len() != MLKEM768_P256_ENCAPSULATION_BYTES {
-                return Err(Error::InvalidEncapsulation);
+            match kem {
+                Kem::MlKem768P256 if bytes.len() == MLKEM768_P256_ENCAPSULATION_BYTES => {
+                    P256PublicKey::from_sec1_bytes(&bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..])
+                        .map_err(|_| Error::InvalidEncapsulation)?;
+                    MlKem768Encapsulation::from_bytes(&bytes[..ML_KEM_768_ENCAPSULATED_KEY_BYTES])
+                        .map_err(|_| Error::InvalidEncapsulation)?;
+                }
+                Kem::MlKem1024P384 if bytes.len() == MLKEM1024_P384_ENCAPSULATION_BYTES => {
+                    P384PublicKey::from_sec1_bytes(&bytes[ML_KEM_1024_ENCAPSULATED_KEY_BYTES..])
+                        .map_err(|_| Error::InvalidEncapsulation)?;
+                    MlKem1024Encapsulation::from_bytes(
+                        &bytes[..ML_KEM_1024_ENCAPSULATED_KEY_BYTES],
+                    )
+                    .map_err(|_| Error::InvalidEncapsulation)?;
+                }
+                _ => return Err(Error::InvalidEncapsulation),
             }
-            p256::PublicKey::from_sec1_bytes(&bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..])
-                .map_err(|_| Error::InvalidEncapsulation)?;
-            MlKem768Encapsulation::from_bytes(&bytes[..ML_KEM_768_ENCAPSULATED_KEY_BYTES])
-                .map_err(|_| Error::InvalidEncapsulation)?;
             Ok(Self {
                 kem,
                 bytes: bytes.to_vec(),
@@ -2021,6 +2057,9 @@ pub mod draft_ietf_hpke_pq_05_full {
         key: &HybridPublicKey,
         deterministic: Option<&[u8]>,
     ) -> Result<(HybridEncapsulation, MlKemSharedSecret), Error> {
+        if kem == Kem::MlKem1024P384 {
+            return hybrid_p384_encapsulate(key, deterministic);
+        }
         if kem != Kem::MlKem768P256 {
             return Err(Error::UnavailableCapability {
                 suite: Suite::new(kem, Kdf::HkdfSha256, Aead::ExportOnly),
@@ -2063,6 +2102,9 @@ pub mod draft_ietf_hpke_pq_05_full {
         key: &HybridPrivateKey,
         enc: &HybridEncapsulation,
     ) -> Result<MlKemSharedSecret, Error> {
+        if kem == Kem::MlKem1024P384 {
+            return hybrid_p384_decapsulate(key, enc);
+        }
         if kem != Kem::MlKem768P256 {
             return Err(Error::UnavailableCapability {
                 suite: Suite::new(kem, Kdf::HkdfSha256, Aead::ExportOnly),
@@ -2093,7 +2135,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         recipient_seed: &[u8],
         ikm_e: &[u8],
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Error> {
-        let private = HybridPrivateKey::from_seed_bytes(recipient_seed)?;
+        let private = HybridPrivateKey::from_seed_bytes(Kem::MlKem768P256, recipient_seed)?;
         let public = HybridPublicKey::derive(Kem::MlKem768P256, private.as_seed_bytes())?;
         let (encapsulation, shared_secret) =
             hybrid_encapsulate(Kem::MlKem768P256, &public, Some(ikm_e))?;
@@ -2154,14 +2196,101 @@ pub mod draft_ietf_hpke_pq_05_full {
         }
         Err(Error::InternalInvariant)
     }
+    fn derive_hybrid_p384_key_pair(
+        seed: &[u8],
+    ) -> Result<(MlKem1024PublicKey, MlKem1024PrivateKey, P384SecretKey), Error> {
+        // draft-concrete-hybrid-kems: PRG(seed_H) split into a 64-byte
+        // ML-KEM seed and a 48-byte P-384 seed. P-384 RandomScalar consumes
+        // the latter as a big-endian scalar candidate.
+        let mut x = Shake256::default();
+        x.update(seed);
+        let mut material = [0u8; 112];
+        x.finalize_xof().read(&mut material);
+        let mut pqseed = [0u8; 64];
+        pqseed.copy_from_slice(&material[..64]);
+        let (pq, privk) = expand_1024_seed(pqseed);
+        let scalar =
+            P384SecretKey::from_slice(&material[64..]).map_err(|_| Error::InternalInvariant)?;
+        Ok((pq, privk, scalar))
+    }
+    fn hybrid_p384_encapsulate(
+        key: &HybridPublicKey,
+        deterministic: Option<&[u8]>,
+    ) -> Result<(HybridEncapsulation, MlKemSharedSecret), Error> {
+        if key.kem != Kem::MlKem1024P384 {
+            return Err(Error::InvalidRecipientPublicKey);
+        }
+        let mut r = [0u8; 80];
+        if let Some(seed) = deterministic {
+            if seed.len() != r.len() {
+                return Err(Error::InvalidEncapsulation);
+            }
+            r.copy_from_slice(seed);
+        } else {
+            rand::rngs::OsRng.fill_bytes(&mut r);
+        }
+        let pqpk = MlKem1024PublicKey::from_bytes(&key.bytes[..ML_KEM_1024_PUBLIC_KEY_BYTES])
+            .map_err(|_| Error::InvalidRecipientPublicKey)?;
+        let (pqenc, pss) =
+            encapsulate_derand_1024(&pqpk, &r[..32]).map_err(|_| Error::InternalInvariant)?;
+        let eph = P384SecretKey::from_slice(&r[32..]).map_err(|_| Error::InternalInvariant)?;
+        let rpk = P384PublicKey::from_sec1_bytes(&key.bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..])
+            .map_err(|_| Error::InvalidRecipientPublicKey)?;
+        let ss_t = p384_diffie_hellman(eph.to_nonzero_scalar(), rpk.as_affine());
+        let eph_bytes = eph.public_key().to_encoded_point(false);
+        let comb = combine_hybrid_for(
+            pss.as_bytes(),
+            ss_t.raw_secret_bytes().as_slice(),
+            eph_bytes.as_bytes(),
+            &key.bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..],
+            b"MLKEM1024-P384",
+        );
+        let mut bytes = Vec::with_capacity(MLKEM1024_P384_ENCAPSULATION_BYTES);
+        bytes.extend_from_slice(pqenc.as_bytes());
+        bytes.extend_from_slice(eph_bytes.as_bytes());
+        Ok((
+            HybridEncapsulation {
+                kem: Kem::MlKem1024P384,
+                bytes,
+            },
+            MlKemSharedSecret(Zeroizing::new(comb)),
+        ))
+    }
+    fn hybrid_p384_decapsulate(
+        key: &HybridPrivateKey,
+        enc: &HybridEncapsulation,
+    ) -> Result<MlKemSharedSecret, Error> {
+        if key.kem != Kem::MlKem1024P384 || enc.kem != Kem::MlKem1024P384 {
+            return Err(Error::InvalidEncapsulation);
+        }
+        let (_, privk, scalar) = derive_hybrid_p384_key_pair(key.as_seed_bytes())?;
+        let recipient = HybridPublicKey::derive(Kem::MlKem1024P384, key.as_seed_bytes())?;
+        let pqenc =
+            MlKem1024Encapsulation::from_bytes(&enc.bytes[..ML_KEM_1024_ENCAPSULATED_KEY_BYTES])
+                .map_err(|_| Error::InvalidEncapsulation)?;
+        let pss = decapsulate_1024(&privk, &pqenc).map_err(|_| Error::InternalInvariant)?;
+        let epk = P384PublicKey::from_sec1_bytes(&enc.bytes[ML_KEM_1024_ENCAPSULATED_KEY_BYTES..])
+            .map_err(|_| Error::InvalidEncapsulation)?;
+        let ss_t = p384_diffie_hellman(scalar.to_nonzero_scalar(), epk.as_affine());
+        let comb = combine_hybrid_for(
+            pss.as_bytes(),
+            ss_t.raw_secret_bytes().as_slice(),
+            &enc.bytes[ML_KEM_1024_ENCAPSULATED_KEY_BYTES..],
+            &recipient.as_bytes()[ML_KEM_1024_PUBLIC_KEY_BYTES..],
+            b"MLKEM1024-P384",
+        );
+        Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+    }
     fn combine_hybrid(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8]) -> [u8; 32] {
+        combine_hybrid_for(pq, t, ct, ek, b"MLKEM768-P256")
+    }
+    fn combine_hybrid_for(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8], label: &[u8]) -> [u8; 32] {
         let mut h = Sha3_256::new();
         sha3::Digest::update(&mut h, pq);
         sha3::Digest::update(&mut h, t);
         sha3::Digest::update(&mut h, ct);
         sha3::Digest::update(&mut h, ek);
-        // Concrete-hybrid label for the P-256 instantiation.
-        sha3::Digest::update(&mut h, b"MLKEM768-P256");
+        sha3::Digest::update(&mut h, label);
         h.finalize().into()
     }
 
@@ -2246,7 +2375,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                     .map(RecipientPrivateKeyInner::MlKem1024)
                     .map_err(|_| Error::InvalidRecipientPrivateKey)?,
                 Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
-                    RecipientPrivateKeyInner::Hybrid(HybridPrivateKey::from_seed_bytes(seed)?)
+                    RecipientPrivateKeyInner::Hybrid(HybridPrivateKey::from_seed_bytes(kem, seed)?)
                 }
             };
             Ok(Self { kem, inner })
@@ -2270,7 +2399,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         /// Derive the corresponding public key for the concrete hybrid KEM.
         pub fn public_key(&self) -> Result<RecipientPublicKey, Error> {
             match self.kem {
-                Kem::MlKem768P256 => Ok(RecipientPublicKey {
+                Kem::MlKem768P256 | Kem::MlKem1024P384 => Ok(RecipientPublicKey {
                     kem: self.kem,
                     inner: RecipientPublicKeyInner::Hybrid(HybridPublicKey::derive(
                         self.kem,
@@ -2346,7 +2475,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
                 let mut seed = Zeroizing::new([0_u8; HYBRID_SEED_BYTES]);
                 rng.fill_bytes(&mut seed[..]);
-                let private_key = HybridPrivateKey::from_seed(seed);
+                let private_key = HybridPrivateKey::from_seed(kem, seed);
                 let public_key = HybridPublicKey::derive(kem, private_key.as_seed_bytes())?;
                 Ok(RecipientKeyPair {
                     public_key: RecipientPublicKey {

@@ -1,9 +1,7 @@
 //! Consumer-facing coverage for the explicit experimental draft-05 API.
 //!
-//! The feature is off by default, so this entire test target is absent from
-//! normal builds.  It must be run with `--features hpke-pq-draft-05`.
-
-#![cfg(feature = "hpke-pq-draft-05")]
+//! This API is in the default build; the consumer compile check deliberately
+//! also uses `default-features = false` to prove the HPKE surface is not hidden.
 
 use std::{fs, path::PathBuf, process::Command};
 
@@ -142,7 +140,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-crypt_guard = {{ path = "{}", default-features = false, features = ["hpke-pq-draft-05"] }}
+crypt_guard = {{ path = "{}", default-features = false }}
 
 [workspace]
 "#,

@@ -49,7 +49,7 @@ HPKE, fall back between readers, or reinterpret existing CGv2 bytes as HPKE.
   reinterprets a CGv2/HFv1 payload.
 - The current `draft-ietf-hpke-pq-05` ML-KEM mapping is an active
   Internet-Draft, not an RFC or standardized profile.
-- When `hpke-pq-draft-05` is enabled, the additive
+- The additive default
   `hpke_pq::draft_ietf_hpke_pq_05` API exposes only the pinned,
   vector-gated Base-mode profiles. It returns a separately transported `enc`
   and non-cloneable sender/recipient contexts; it deliberately has no manual

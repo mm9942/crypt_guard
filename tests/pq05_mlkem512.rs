@@ -1,7 +1,5 @@
 //! Official draft-05 corpus coverage for the FIPS 203 ML-KEM-512 adapter.
 
-#![cfg(feature = "hpke-pq-draft-05")]
-
 use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full::{
     generate_recipient_key_pair, setup_base_receiver, setup_base_sender, Aead, Capability,
     Encapsulation, Error, Kdf, Kem, RecipientPrivateKey, RecipientPublicKey, Suite,

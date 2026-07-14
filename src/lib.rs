@@ -50,7 +50,7 @@
 //!   `Message` instance is a compile error (E0599).
 //! - **Legacy Kyber / Falcon / Dilithium** kept behind `legacy-pqclean` feature
 //!   so v1.x data remains decryptable.
-//! - **Experimental draft HPKE**, behind `hpke-pq-draft-05`, at
+//! - **Experimental draft HPKE**, in the default build, at
 //!   `hpke_pq::draft_ietf_hpke_pq_05`. This is a pinned
 //!   `draft-ietf-hpke-pq-05` mapping, not an RFC-standardized PQ HPKE profile.
 //!
@@ -200,13 +200,11 @@ pub mod api;
 pub mod builder;
 /// RFC 9180 HPKE suite identifiers and labeled HKDF primitives.
 pub mod hpke;
-/// Experimental, vector-gated `draft-ietf-hpke-pq-05` Base-mode HPKE API.
+/// Revision-pinned, vector-gated `draft-ietf-hpke-pq-05` HPKE APIs.
 ///
-/// This feature-gated module is intentionally separate from CGv2 and is not
-/// an RFC-standardized post-quantum HPKE profile.  Its only public surface is
-/// `hpke_pq::draft_ietf_hpke_pq_05`, whose revision-specific name is part of
-/// the protocol identity.
-#[cfg(feature = "hpke-pq-draft-05")]
+/// This default module is intentionally separate from CGv2 and is not an
+/// RFC-standardized post-quantum HPKE profile. Its revision-specific public
+/// namespaces are part of the protocol identity.
 pub mod hpke_pq;
 /// HKDF-SHA256/512 key schedule with domain separation.
 pub mod kdf;

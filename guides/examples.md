@@ -20,7 +20,7 @@ historical CGv2/HFv1 compatibility format. Its `info` and `aad` values are
 framed inside encrypted plaintext; it is not RFC 9180 HPKE.
 
 New applications must not label this output as HPKE. Use the separate
-`crypt_guard::hpke::rfc9180` API for classic RFC 9180 HPKE. The feature-gated
+`crypt_guard::hpke::rfc9180` API for classic RFC 9180 HPKE. The default
 draft-05 PQ transport API below must still store an application-owned
 protocol/version/profile discriminator with each payload and dispatch to
 exactly one reader. Do not use trial decryption or CGv2 fallback as protocol
@@ -31,7 +31,7 @@ Internet-Draft, not a standardized RFC profile.
 
 ## Experimental draft-05 Base mode
 
-Enable `hpke-pq-draft-05` to use the additive,
+Use the additive, default
 revision-named `hpke_pq::draft_ietf_hpke_pq_05` module. It is vector-gated for
 the pinned ML-KEM-768/HKDF-SHA256/AES-128-GCM and
 ML-KEM-1024/HKDF-SHA384/AES-256-GCM Base-mode profiles. It is not an RFC
