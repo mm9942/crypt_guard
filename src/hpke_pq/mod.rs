@@ -328,7 +328,7 @@ pub(crate) fn encapsulate_512(
     rng.fill_bytes(&mut randomness[..]);
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem512::encapsulate(&raw_public_key, *randomness);
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok((
         MlKem512Encapsulation(*encapsulation.as_slice()),
         MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)),
@@ -353,7 +353,7 @@ pub(crate) fn decapsulate_512(
     let shared_secret = libcrux_ml_kem::mlkem512::decapsulate(&raw_private_key, &raw_encapsulation);
     let mut private_key_bytes: [u8; ML_KEM_512_EXPANDED_PRIVATE_KEY_BYTES] = raw_private_key.into();
     private_key_bytes.zeroize();
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok(MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)))
 }
 
@@ -516,7 +516,7 @@ pub(crate) fn encapsulate(
     rng.fill_bytes(&mut randomness[..]);
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem768::encapsulate(&raw_public_key, *randomness);
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
 
     Ok((
         MlKem768Encapsulation(*encapsulation.as_slice()),
@@ -546,7 +546,7 @@ pub(crate) fn encapsulate_derand(
     }
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem768::encapsulate(&raw_public_key, randomness);
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok((
         MlKem768Encapsulation(*encapsulation.as_slice()),
         MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)),
@@ -588,7 +588,7 @@ pub(crate) fn decapsulate(
     let mut private_key_bytes: [u8; ML_KEM_768_EXPANDED_PRIVATE_KEY_BYTES] = raw_private_key.into();
     private_key_bytes.zeroize();
 
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok(MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)))
 }
 
@@ -741,7 +741,7 @@ pub(crate) fn encapsulate_1024(
     rng.fill_bytes(&mut randomness[..]);
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem1024::encapsulate(&raw_public_key, *randomness);
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
 
     Ok((
         MlKem1024Encapsulation(*encapsulation.as_slice()),
@@ -771,7 +771,7 @@ pub(crate) fn encapsulate_derand_1024(
     }
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem1024::encapsulate(&raw_public_key, randomness);
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok((
         MlKem1024Encapsulation(*encapsulation.as_slice()),
         MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)),
@@ -811,7 +811,7 @@ pub(crate) fn decapsulate_1024(
         raw_private_key.into();
     private_key_bytes.zeroize();
 
-    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret.into();
+    let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
     Ok(MlKemSharedSecret(Zeroizing::new(shared_secret_bytes)))
 }
 
@@ -1477,8 +1477,8 @@ pub mod draft_ietf_hpke_pq_05 {
 
     #[derive(Clone, Eq, PartialEq)]
     enum EncapsulationInner {
-        MlKem768(MlKem768Encapsulation),
-        MlKem1024(MlKem1024Encapsulation),
+        MlKem768(Box<MlKem768Encapsulation>),
+        MlKem1024(Box<MlKem1024Encapsulation>),
     }
 
     impl Encapsulation {
@@ -1491,10 +1491,11 @@ pub mod draft_ietf_hpke_pq_05 {
         pub fn from_bytes(profile: Profile, bytes: &[u8]) -> Result<Self, Error> {
             let inner = match profile {
                 Profile::MlKem768HkdfSha256Aes128Gcm => MlKem768Encapsulation::from_bytes(bytes)
+                    .map(Box::new)
                     .map(EncapsulationInner::MlKem768)
                     .map_err(|_| Error::InvalidEncapsulation)?,
                 Profile::MlKem1024HkdfSha384Aes256Gcm => MlKem1024Encapsulation::from_bytes(bytes)
-                    .map(EncapsulationInner::MlKem1024)
+                    .map(|encapsulation| EncapsulationInner::MlKem1024(Box::new(encapsulation)))
                     .map_err(|_| Error::InvalidEncapsulation)?,
             };
             Ok(Self { profile, inner })
@@ -1577,7 +1578,7 @@ pub mod draft_ietf_hpke_pq_05 {
                 Ok((
                     Encapsulation {
                         profile,
-                        inner: EncapsulationInner::MlKem768(encapsulation),
+                        inner: EncapsulationInner::MlKem768(Box::new(encapsulation)),
                     },
                     SenderContext(context),
                 ))
@@ -1592,7 +1593,7 @@ pub mod draft_ietf_hpke_pq_05 {
                 Ok((
                     Encapsulation {
                         profile,
-                        inner: EncapsulationInner::MlKem1024(encapsulation),
+                        inner: EncapsulationInner::MlKem1024(Box::new(encapsulation)),
                     },
                     SenderContext(context),
                 ))
@@ -2208,7 +2209,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         // from external IKM.  Stored keys must not derive it a second time.
         let h = seed;
         let mut x = Shake256::default();
-        x.update(&h);
+        x.update(h);
         let mut material = [0u8; 192];
         x.finalize_xof().read(&mut material);
         let mut pqseed = [0u8; 64];
@@ -2420,8 +2421,8 @@ pub mod draft_ietf_hpke_pq_05_full {
     #[derive(Clone, Eq, PartialEq)]
     enum RecipientPublicKeyInner {
         MlKem512(Box<MlKem512PublicKey>),
-        MlKem768(MlKem768PublicKey),
-        MlKem1024(MlKem1024PublicKey),
+        MlKem768(Box<MlKem768PublicKey>),
+        MlKem1024(Box<MlKem1024PublicKey>),
         Hybrid(HybridPublicKey),
     }
 
@@ -2442,9 +2443,11 @@ pub mod draft_ietf_hpke_pq_05_full {
                     .map(RecipientPublicKeyInner::MlKem512)
                     .map_err(|_| Error::InvalidRecipientPublicKey)?,
                 Kem::MlKem768 => MlKem768PublicKey::from_bytes(bytes)
+                    .map(Box::new)
                     .map(RecipientPublicKeyInner::MlKem768)
                     .map_err(|_| Error::InvalidRecipientPublicKey)?,
                 Kem::MlKem1024 => MlKem1024PublicKey::from_bytes(bytes)
+                    .map(Box::new)
                     .map(RecipientPublicKeyInner::MlKem1024)
                     .map_err(|_| Error::InvalidRecipientPublicKey)?,
                 Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
@@ -2576,7 +2579,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 Ok(RecipientKeyPair {
                     public_key: RecipientPublicKey {
                         kem,
-                        inner: RecipientPublicKeyInner::MlKem768(public_key),
+                        inner: RecipientPublicKeyInner::MlKem768(Box::new(public_key)),
                     },
                     private_key: RecipientPrivateKey {
                         kem,
@@ -2589,7 +2592,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 Ok(RecipientKeyPair {
                     public_key: RecipientPublicKey {
                         kem,
-                        inner: RecipientPublicKeyInner::MlKem1024(public_key),
+                        inner: RecipientPublicKeyInner::MlKem1024(Box::new(public_key)),
                     },
                     private_key: RecipientPrivateKey {
                         kem,
@@ -3130,6 +3133,8 @@ pub mod draft_ietf_hpke_pq_05_full {
         }
     }
 
+    type KeyScheduleMaterial = (Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>);
+
     fn combine_two_stage(
         suite: Suite,
         shared_secret: &[u8],
@@ -3137,7 +3142,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         psk: &[u8],
         psk_id: &[u8],
         psk_mode: bool,
-    ) -> Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>), Error> {
+    ) -> Result<KeyScheduleMaterial, Error> {
         let mode = if psk_mode { 1 } else { 0 };
         let psk_id_hash = labeled_extract(suite, b"", b"psk_id_hash", psk_id)?;
         let info_hash = labeled_extract(suite, b"", b"info_hash", info)?;
@@ -3172,7 +3177,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         psk: &[u8],
         psk_id: &[u8],
         psk_mode: bool,
-    ) -> Result<(Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>), Error> {
+    ) -> Result<KeyScheduleMaterial, Error> {
         let mut secrets = Zeroizing::new(Vec::new());
         append_length_prefixed(&mut secrets, psk)?;
         append_length_prefixed(&mut secrets, shared_secret)?;
