@@ -3,7 +3,7 @@
 `crypt_guard` now defaults to ML-KEM + ML-DSA, HKDF-based key derivation, and
 one authenticated envelope format.
 
-The current crate version is `2.0.4`. The safe-default Phase 4 upgrade remains
+The current crate version is `2.0.5`. The safe-default Phase 4 upgrade remains
 the supported default. The additive `hpke::rfc9180` API implements the five
 classic RFC 9180 DHKEMs, the three registered encryption AEADs, and all four
 RFC setup modes against the pinned RFC vector corpus; it remains separate from

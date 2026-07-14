@@ -16,8 +16,7 @@ legacy-only.
   `hpke_pq::draft_ietf_hpke_pq_05` compatibility Base-mode API plus the
   revision-pinned `draft_ietf_hpke_pq_05_full` registry. The currently
   operational profiles are FIPS 203 ML-KEM-512/768/1024 plus the vector-verified
-  MLKEM768-P256 and MLKEM1024-P384 hybrids. MLKEM768-X25519 remains typed
-  fail-closed until its complete vectors are implemented. It is
+  MLKEM768-P256, MLKEM1024-P384, and MLKEM768-X25519 hybrids. It is
   gated by the vendored draft-05 vectors. The
   active Internet-Draft is not an RFC or a finalized IANA profile, so this is
   not a standardized PQ HPKE feature.

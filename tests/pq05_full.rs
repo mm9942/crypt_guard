@@ -90,15 +90,14 @@ fn export_only_constructs_a_context_but_never_an_encryption_context() {
 }
 
 #[test]
-fn unavailable_draft_kems_are_typed_not_substituted() {
-    let unavailable = [Kem::MlKem768X25519];
-    for kem in unavailable {
+fn every_draft_hybrid_kem_is_available_without_substitution() {
+    for kem in [Kem::MlKem768P256, Kem::MlKem1024P384, Kem::MlKem768X25519] {
         let suite = Suite::new(kem, Kdf::HkdfSha256, Aead::Aes128Gcm);
-        assert!(matches!(suite.capability(), Capability::Unavailable(_)));
-        assert!(matches!(
-            generate_recipient_key_pair(kem),
-            Err(Error::UnavailableCapability { suite: actual, .. }) if actual == Suite::new(kem, Kdf::HkdfSha256, Aead::ExportOnly)
-        ));
+        assert_eq!(suite.capability(), Capability::Available);
+        assert_eq!(
+            generate_recipient_key_pair(kem).unwrap().public_key().kem(),
+            kem
+        );
     }
     let suite = Suite::new(Kem::MlKem768, Kdf::TurboShake128, Aead::Aes128Gcm);
     assert_eq!(suite.capability(), Capability::Available);

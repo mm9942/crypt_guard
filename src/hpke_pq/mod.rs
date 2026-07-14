@@ -1683,6 +1683,7 @@ pub mod draft_ietf_hpke_pq_05_full {
     use sha3::Shake128;
     use sha3::{Digest, Sha3_256};
     use turboshake::{TurboShake128, TurboShake256};
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519SecretKey};
 
     const HYBRID_SEED_BYTES: usize = 32;
     const P256_POINT_BYTES: usize = 65;
@@ -1852,9 +1853,8 @@ pub mod draft_ietf_hpke_pq_05_full {
                     | Kdf::TurboShake128
                     | Kdf::TurboShake256 => Capability::Available,
                 },
-                Kem::MlKem768P256 | Kem::MlKem1024P384 => Capability::Available,
-                Kem::MlKem768X25519 => {
-                    Capability::Unavailable("concrete hybrid KEM is not yet implemented")
+                Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
+                    Capability::Available
                 }
             }
         }
@@ -1962,6 +1962,14 @@ pub mod draft_ietf_hpke_pq_05_full {
                     P384PublicKey::from_sec1_bytes(&bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..])
                         .map_err(|_| Error::InvalidRecipientPublicKey)?;
                 }
+                Kem::MlKem768X25519 if bytes.len() == MLKEM768_X25519_PUBLIC_KEY_BYTES => {
+                    MlKem768PublicKey::from_bytes(&bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
+                        .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                    let traditional =
+                        <[u8; X25519_POINT_BYTES]>::try_from(&bytes[ML_KEM_768_PUBLIC_KEY_BYTES..])
+                            .map_err(|_| Error::InvalidRecipientPublicKey)?;
+                    let _ = X25519PublicKey::from(traditional);
+                }
                 _ => return Err(Error::InvalidRecipientPublicKey),
             }
             Ok(Self {
@@ -1990,6 +1998,14 @@ pub mod draft_ietf_hpke_pq_05_full {
                     bytes.extend_from_slice(point.as_bytes());
                     Ok(Self { kem, bytes })
                 }
+                Kem::MlKem768X25519 => {
+                    let (pq, _, secret) = derive_hybrid_x25519_key_pair(seed)?;
+                    let point = X25519PublicKey::from(&secret);
+                    let mut bytes = Vec::with_capacity(MLKEM768_X25519_PUBLIC_KEY_BYTES);
+                    bytes.extend_from_slice(pq.as_bytes());
+                    bytes.extend_from_slice(point.as_bytes());
+                    Ok(Self { kem, bytes })
+                }
                 _ => Err(Error::InvalidRecipientPrivateKey),
             }
         }
@@ -2006,7 +2022,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             let value = <[u8; HYBRID_SEED_BYTES]>::try_from(seed)
                 .map_err(|_| Error::InvalidRecipientPrivateKey)?;
             match kem {
-                Kem::MlKem768P256 | Kem::MlKem1024P384 => {
+                Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
                     Ok(Self::from_seed(kem, Zeroizing::new(value)))
                 }
                 _ => Err(Error::InvalidRecipientPrivateKey),
@@ -2041,6 +2057,15 @@ pub mod draft_ietf_hpke_pq_05_full {
                     )
                     .map_err(|_| Error::InvalidEncapsulation)?;
                 }
+                Kem::MlKem768X25519 if bytes.len() == MLKEM768_X25519_ENCAPSULATION_BYTES => {
+                    MlKem768Encapsulation::from_bytes(&bytes[..ML_KEM_768_ENCAPSULATED_KEY_BYTES])
+                        .map_err(|_| Error::InvalidEncapsulation)?;
+                    let traditional = <[u8; X25519_POINT_BYTES]>::try_from(
+                        &bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..],
+                    )
+                    .map_err(|_| Error::InvalidEncapsulation)?;
+                    let _ = X25519PublicKey::from(traditional);
+                }
                 _ => return Err(Error::InvalidEncapsulation),
             }
             Ok(Self {
@@ -2059,6 +2084,9 @@ pub mod draft_ietf_hpke_pq_05_full {
     ) -> Result<(HybridEncapsulation, MlKemSharedSecret), Error> {
         if kem == Kem::MlKem1024P384 {
             return hybrid_p384_encapsulate(key, deterministic);
+        }
+        if kem == Kem::MlKem768X25519 {
+            return hybrid_x25519_encapsulate(key, deterministic);
         }
         if kem != Kem::MlKem768P256 {
             return Err(Error::UnavailableCapability {
@@ -2104,6 +2132,9 @@ pub mod draft_ietf_hpke_pq_05_full {
     ) -> Result<MlKemSharedSecret, Error> {
         if kem == Kem::MlKem1024P384 {
             return hybrid_p384_decapsulate(key, enc);
+        }
+        if kem == Kem::MlKem768X25519 {
+            return hybrid_x25519_decapsulate(key, enc);
         }
         if kem != Kem::MlKem768P256 {
             return Err(Error::UnavailableCapability {
@@ -2281,6 +2312,98 @@ pub mod draft_ietf_hpke_pq_05_full {
         );
         Ok(MlKemSharedSecret(Zeroizing::new(comb)))
     }
+    fn derive_hybrid_x25519_key_pair(
+        seed: &[u8],
+    ) -> Result<(MlKem768PublicKey, MlKem768PrivateKey, X25519SecretKey), Error> {
+        // PRG(seed_H) splits into a 64-byte ML-KEM seed and an RFC 7748
+        // X25519 scalar. The scalar is clamped by x25519-dalek at use.
+        let mut x = Shake256::default();
+        x.update(seed);
+        let mut material = [0u8; 96];
+        x.finalize_xof().read(&mut material);
+        let mut pqseed = [0u8; 64];
+        pqseed.copy_from_slice(&material[..64]);
+        let (pq, privk) = expand_768_seed(pqseed);
+        let scalar = X25519SecretKey::from(
+            <[u8; X25519_POINT_BYTES]>::try_from(&material[64..])
+                .map_err(|_| Error::InternalInvariant)?,
+        );
+        Ok((pq, privk, scalar))
+    }
+    fn hybrid_x25519_encapsulate(
+        key: &HybridPublicKey,
+        deterministic: Option<&[u8]>,
+    ) -> Result<(HybridEncapsulation, MlKemSharedSecret), Error> {
+        if key.kem != Kem::MlKem768X25519 {
+            return Err(Error::InvalidRecipientPublicKey);
+        }
+        let mut r = [0u8; 64];
+        if let Some(seed) = deterministic {
+            if seed.len() != r.len() {
+                return Err(Error::InvalidEncapsulation);
+            }
+            r.copy_from_slice(seed);
+        } else {
+            rand::rngs::OsRng.fill_bytes(&mut r);
+        }
+        let pqpk = MlKem768PublicKey::from_bytes(&key.bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
+            .map_err(|_| Error::InvalidRecipientPublicKey)?;
+        let (pqenc, pss) =
+            encapsulate_derand(&pqpk, &r[..32]).map_err(|_| Error::InternalInvariant)?;
+        let eph = X25519SecretKey::from(
+            <[u8; X25519_POINT_BYTES]>::try_from(&r[32..]).map_err(|_| Error::InternalInvariant)?,
+        );
+        let rpk = X25519PublicKey::from(
+            <[u8; X25519_POINT_BYTES]>::try_from(&key.bytes[ML_KEM_768_PUBLIC_KEY_BYTES..])
+                .map_err(|_| Error::InvalidRecipientPublicKey)?,
+        );
+        let ss_t = eph.diffie_hellman(&rpk);
+        let eph_public = X25519PublicKey::from(&eph);
+        let comb = combine_hybrid_for(
+            pss.as_bytes(),
+            ss_t.as_bytes(),
+            eph_public.as_bytes(),
+            &key.bytes[ML_KEM_768_PUBLIC_KEY_BYTES..],
+            &[0x5c, 0x2e, 0x2f, 0x2f, 0x5e, 0x5c],
+        );
+        let mut bytes = Vec::with_capacity(MLKEM768_X25519_ENCAPSULATION_BYTES);
+        bytes.extend_from_slice(pqenc.as_bytes());
+        bytes.extend_from_slice(eph_public.as_bytes());
+        Ok((
+            HybridEncapsulation {
+                kem: Kem::MlKem768X25519,
+                bytes,
+            },
+            MlKemSharedSecret(Zeroizing::new(comb)),
+        ))
+    }
+    fn hybrid_x25519_decapsulate(
+        key: &HybridPrivateKey,
+        enc: &HybridEncapsulation,
+    ) -> Result<MlKemSharedSecret, Error> {
+        if key.kem != Kem::MlKem768X25519 || enc.kem != Kem::MlKem768X25519 {
+            return Err(Error::InvalidEncapsulation);
+        }
+        let (_, privk, scalar) = derive_hybrid_x25519_key_pair(key.as_seed_bytes())?;
+        let recipient = HybridPublicKey::derive(Kem::MlKem768X25519, key.as_seed_bytes())?;
+        let pqenc =
+            MlKem768Encapsulation::from_bytes(&enc.bytes[..ML_KEM_768_ENCAPSULATED_KEY_BYTES])
+                .map_err(|_| Error::InvalidEncapsulation)?;
+        let pss = decapsulate(&privk, &pqenc).map_err(|_| Error::InternalInvariant)?;
+        let epk = X25519PublicKey::from(
+            <[u8; X25519_POINT_BYTES]>::try_from(&enc.bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..])
+                .map_err(|_| Error::InvalidEncapsulation)?,
+        );
+        let ss_t = scalar.diffie_hellman(&epk);
+        let comb = combine_hybrid_for(
+            pss.as_bytes(),
+            ss_t.as_bytes(),
+            &enc.bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..],
+            &recipient.as_bytes()[ML_KEM_768_PUBLIC_KEY_BYTES..],
+            &[0x5c, 0x2e, 0x2f, 0x2f, 0x5e, 0x5c],
+        );
+        Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+    }
     fn combine_hybrid(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8]) -> [u8; 32] {
         combine_hybrid_for(pq, t, ct, ek, b"MLKEM768-P256")
     }
@@ -2399,13 +2522,15 @@ pub mod draft_ietf_hpke_pq_05_full {
         /// Derive the corresponding public key for the concrete hybrid KEM.
         pub fn public_key(&self) -> Result<RecipientPublicKey, Error> {
             match self.kem {
-                Kem::MlKem768P256 | Kem::MlKem1024P384 => Ok(RecipientPublicKey {
-                    kem: self.kem,
-                    inner: RecipientPublicKeyInner::Hybrid(HybridPublicKey::derive(
-                        self.kem,
-                        self.as_seed_bytes(),
-                    )?),
-                }),
+                Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
+                    Ok(RecipientPublicKey {
+                        kem: self.kem,
+                        inner: RecipientPublicKeyInner::Hybrid(HybridPublicKey::derive(
+                            self.kem,
+                            self.as_seed_bytes(),
+                        )?),
+                    })
+                }
                 _ => Err(Error::InternalInvariant),
             }
         }

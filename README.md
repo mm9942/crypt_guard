@@ -1,4 +1,4 @@
-# CryptGuard v2.0.4
+# CryptGuard v2.0.5
 
 [![Crates.io](https://img.shields.io/badge/crates.io-v2-blue.svg?style=for-the-badge)](https://crates.io/crates/crypt_guard)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard/blob/main/LICENSE)
@@ -15,12 +15,14 @@ The primary API produces one self-contained CGv2 envelope. Nonce handling,
 key derivation, and KEM encapsulation are all internal — the caller provides
 a public key and plaintext and receives a sealed `Envelope` back.
 
-Current release version: `2.0.4`. The Phase 4 safe-default upgrade remains the
+Current release version: `2.0.5`. The Phase 4 safe-default upgrade remains the
 primary supported path. The additive `crypt_guard::hpke::rfc9180` API provides
 vector-verified RFC 9180 setup for all five DHKEMs, all registered encryption
 AEADs, and Base/PSK/Auth/AuthPSK; it is intentionally distinct from CGv2.
-Separately, the default build exposes revision-pinned, experimental PQ HPKE APIs. The legacy API remains a vector-gated Base-mode API for two pinned
-`draft-ietf-hpke-pq-05` ML-KEM profiles. That active Internet-Draft is not an
+Separately, the default build exposes revision-pinned, experimental PQ HPKE APIs.
+The compatibility API retains two pinned `draft-ietf-hpke-pq-05` ML-KEM
+profiles, while the full namespace also exposes vector-verified concrete
+hybrids. That active Internet-Draft is not an
 RFC or a finalized IANA profile; its literal revision is part of the protocol
 identity.
 
@@ -122,8 +124,9 @@ framing.
 The additive default
 `crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full` namespace exposes the
 draft-05 registry (ML-KEM, hybrid KEM identifiers, HKDF/SHAKE/TurboSHAKE KDFs,
-and the registered AEADs). Capabilities are reported and unavailable hybrid
-combinations fail closed; no ML-KEM-only substitution is performed. The
+and the registered AEADs). MLKEM768-P256, MLKEM1024-P384, and
+MLKEM768-X25519 are vector-verified; no ML-KEM-only substitution is performed.
+The
 compatibility `crypt_guard::hpke_pq::draft_ietf_hpke_pq_05` module remains
 limited to these exact pinned Base-mode profiles:
 
@@ -211,14 +214,14 @@ To use only the new FIPS path without legacy code:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.4", default-features = true }
+crypt_guard = { version = "2.0.5", default-features = true }
 ```
 
 To include the legacy path for reading data encrypted with v1.x:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.4", features = ["legacy-pqclean"] }
+crypt_guard = { version = "2.0.5", features = ["legacy-pqclean"] }
 ```
 
 ---
@@ -276,7 +279,7 @@ API, manual nonce), enable the `legacy-pqclean` feature:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.4", features = ["legacy-pqclean"] }
+crypt_guard = { version = "2.0.5", features = ["legacy-pqclean"] }
 ```
 
 The old `Kyber<Encryption, Kyber1024, Message, AES>` types, the

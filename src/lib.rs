@@ -19,7 +19,7 @@
 //!
 //! ## Introduction
 //!
-//! Current release status: `2.0.4`. The safe-default Phase 4 upgrade is
+//! Current release status: `2.0.5`. The safe-default Phase 4 upgrade is
 //! implemented, externally consumer-tested, and test-green. This release also
 //! adds an opt-in, vector-gated API for two exact active-draft ML-KEM HPKE
 //! profiles; it does not claim that the draft is an RFC standard.

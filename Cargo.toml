@@ -1,7 +1,7 @@
 workspace = { members = [ "crypt_guard_proc"], exclude = ["old"] }
 [package]
 name = "crypt_guard"
-version = "2.0.4"
+version = "2.0.5"
 edition = "2021"
 description = "CryptGuard is a post-quantum cryptography framework with NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) plus legacy Kyber/Falcon/Dilithium, combined with AES and XChaCha20."
 license = "MIT"
@@ -67,7 +67,7 @@ sha2             = "0.10.8"
 chacha20         = "0.9.1"
 once_cell        = "1"
 # The proc-macro crate is released in lockstep with this crate's v2 line.
-crypt_guard_proc = { path = "./crypt_guard_proc", version = "2.0.4" }
+crypt_guard_proc = { path = "./crypt_guard_proc", version = "2.0.5" }
 zeroize          = { version = "1.8.1", features = ["derive"] }
 digest           = "0.10.7"
 generic-array    = "1.1.0"
@@ -96,7 +96,7 @@ turboshake = { version = "=0.7.1", default-features = false, features = ["zeroiz
 # NIST curves, and the RFC 7748 primitive for X25519.
 p256 = { version = "=0.13.2", default-features = false, features = ["arithmetic"] }
 p384 = { version = "=0.13.1", default-features = false, features = ["arithmetic"] }
-x25519-dalek = { version = "=2.0.1", default-features = false, features = ["zeroize"] }
+x25519-dalek = { version = "=2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
 ml-dsa  = { version = "0.1.1", optional = true, features = ["zeroize", "rand_core"] }
 slh-dsa = { version = "0.2.0-rc.5", optional = true }
 

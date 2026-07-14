@@ -1,6 +1,6 @@
 # Release Readiness
 
-This guide tracks what remains before publishing `2.0.4`.
+This guide tracks what remains before publishing `2.0.5`.
 
 ## Current status
 
@@ -11,12 +11,11 @@ Phase 4 is functionally complete:
 - the CGv2 envelope path is implemented
 - `Encryptor` / `Decryptor` staged builders are available
 - frozen legacy CGv2/HFv1 `api::hpke::{seal, open}` compatibility wrappers exist
-- the separate `hpke/` module has a partial RFC 9180 Base-mode core (labeled
-  key schedule, context state, nonce sequencing, exporter derivation, and
-  ChaCha20-Poly1305); it has no KEM setup or vector-verified complete suite
-- the default `hpke_pq::draft_ietf_hpke_pq_05` module exposes the two pinned,
-  vector-gated active-draft Base-mode profiles with separate `enc` transport;
-  it is explicitly not an RFC-standardized PQ HPKE profile
+- `hpke::rfc9180` implements vector-verified classic RFC 9180 setup for all
+  five DHKEMs, all registered encryption AEADs, and Base/PSK/Auth/AuthPSK
+- the default revision-pinned `hpke_pq` API exposes FIPS 203 ML-KEM profiles
+  and verified hybrid profiles with separate `enc` transport; it is explicitly
+  not an RFC-standardized PQ HPKE profile
 - content-axis and staged-builder misuse are covered by `trybuild`
 - CI has default, ML-only, and legacy-only lanes
 
@@ -33,7 +32,7 @@ RUSTC_WRAPPER= cargo clippy --lib
 
 Historical, pre-2.0.4 external-consumer verification passed from
 `/tmp/crypt_guard_consumer`. It is retained only as historical evidence and
-does not substitute for the 2.0.4 verification matrix above:
+does not substitute for the 2.0.5 verification matrix above:
 
 ```bash
 RUSTC_WRAPPER= cargo test
@@ -53,7 +52,7 @@ These should be closed before publishing:
 
 2. Confirm the release version.
 
-   The package manifest version is now `2.0.4`. Rerun the required matrix,
+   The package manifest version is now `2.0.5`. Rerun the required matrix,
    including the focused HPKE tests, after the patch bump before publishing.
 
 3. Keep release linting green.
@@ -70,8 +69,8 @@ These should be closed before publishing:
 5. Keep HPKE protocol families distinct.
 
    The legacy `api::hpke` names remain CGv2/HFv1 compatibility framing and
-   must not be advertised as RFC 9180 HPKE. The partial `hpke/` core is not an
-   interoperable suite because it has no KEM setup or complete vector evidence.
+   must not be advertised as RFC 9180 HPKE. The `hpke::rfc9180` API is the
+   separate interoperable suite API and never reinterprets CGv2 framing.
    The default draft-05 API has its own separate `enc` transport and
    profile identity; it must not serialize as CGv2, parse through `Envelope`,
    or reinterpret existing bytes. Applications select the reader from an
@@ -81,8 +80,8 @@ These should be closed before publishing:
 6. Keep the post-quantum claim precise.
 
    `draft-ietf-hpke-pq-05` is an active Internet-Draft, not a standardized RFC
-   profile. The default public Base-mode API is limited to its two pinned,
-   vector-gated profiles; it must retain its literal revision in code,
+   profile. The default public API is revision-pinned and vector-gated; it
+   must retain its literal revision in code,
    transport metadata, and release evidence.
 
 ## Accepted post-release design debt
@@ -98,9 +97,8 @@ ideal from the Obsidian assessment:
 - `hpke::rfc9180` provides the separate RFC 9180 stateful setup/context API,
   with complete classic-DHKEM and AEAD vector coverage. The distinct
   `draft-ietf-hpke-pq-05` default API exposes a revision-pinned registry and
-  vector-gated FIPS 203 ML-KEM profiles plus MLKEM768-P256 and MLKEM1024-P384
-  endpoint vectors. MLKEM768-X25519 remains explicitly unavailable until its
-  complete endpoint vectors pass. It makes
+  vector-gated FIPS 203 ML-KEM profiles plus MLKEM768-P256, MLKEM1024-P384,
+  and MLKEM768-X25519 endpoint vectors. It makes
   no RFC standardization claim.
 - `src/lib.rs` still preserves broad compatibility re-exports.
 - Legacy type identity still depends on `src/core/kyber` while implementation
@@ -109,7 +107,7 @@ ideal from the Obsidian assessment:
 
 ## Exit criteria
 
-For `2.0.4`:
+For `2.0.5`:
 
 - all release blockers above are closed
 - test matrix is green
@@ -118,7 +116,8 @@ For `2.0.4`:
 
 For publish:
 
-- release evidence establishes that `2.0.4` has no known correctness
+- release evidence establishes that `2.0.5` has no known correctness
   regressions in its verified scope
 - any remaining public API debt is documented as intentional compatibility debt
-- CI runs the three feature lanes successfully on the release branch
+- CI runs the default, no-default, and legacy compatibility lanes successfully
+  on the release branch

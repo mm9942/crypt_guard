@@ -32,23 +32,18 @@ The generic CGv2 envelope remains a separate, versioned protocol. No existing
 CGv2 bytes, `Encryptor`/`Decryptor` semantics, or `api::hpke` framing are
 silently reinterpreted as HPKE.
 
-## Current implementation status: v2.0.4
+## Current implementation status: v2.0.5
 
-Version 2.0.4 contains a **partial RFC 9180 core**, not a complete HPKE
-implementation or an interoperability claim:
+Version 2.0.5 contains a complete, vector-verified classic RFC 9180 API and a
+separate revision-pinned post-quantum HPKE draft API:
 
-- `crypt_guard::hpke` implements the RFC 9180 labeled key-schedule operations,
-  Base-mode schedule derivation, a non-`Clone` context with RFC nonce
-  sequencing and exporter derivation, and the registered ChaCha20-Poly1305
-  `Seal` / `Open` operation.
-- It does not implement `SetupBaseS` / `SetupBaseR`, KEM serialization and
-  shared-secret setup, complete AEAD coverage, or a vector-verified public
-  suite. Those missing pieces prevent a full RFC 9180 conformance claim.
-- The `hpke-pq-draft-05` feature exposes an additive, revision-named public
-  Base-mode API for the two pinned FIPS 203 ML-KEM-768/1024 draft profiles.
-  It remains experimental Internet-Draft work behind an explicit opt-in
-  feature—not standardized HPKE support—and must retain its pinned vectors,
-  literal draft revision, and promotion gates before any broader claim.
+- `crypt_guard::hpke::rfc9180` implements `SetupBaseS` / `SetupBaseR`,
+  PSK/Auth/AuthPSK, all five classic DHKEMs, all registered encryption AEADs,
+  separate `enc`, nonce sequencing, and exporter derivation.
+- The default `hpke_pq` namespace exposes revision-pinned FIPS 203 ML-KEM and
+  verified concrete hybrid draft profiles. It remains active Internet-Draft
+  work—not standardized HPKE support—and retains its pinned vectors and literal
+  draft revision.
 - CGv2 and the misnamed `api::hpke::{seal, open}` compatibility framing remain
   unchanged, separate, and explicitly non-HPKE.
 
@@ -59,7 +54,7 @@ implementation or an interoperability claim:
 | [FIPS 203, ML-KEM](https://csrc.nist.gov/pubs/fips/203/final) | NIST definition of ML-KEM-512/768/1024 | Key generation, encapsulation, decapsulation, fixed-size serialization, input validation, and known-answer tests. |
 | [NIST SP 800-227](https://csrc.nist.gov/pubs/sp/800/227/final) | Current NIST implementation/use guidance for KEMs | Validate inputs at the KEM boundary, preserve KEM failure handling, protect secret lifetimes, and use a KDF/AEAD composition rather than raw shared secrets. |
 | [RFC 9180, HPKE](https://www.rfc-editor.org/rfc/rfc9180.html) | Normative HPKE core | Implement Sections 4, 5, 6, and 7 exactly for every supported standard suite. |
-| [draft-ietf-hpke-pq-05](https://datatracker.ietf.org/doc/draft-ietf-hpke-pq-05) | Current ML-KEM and PQ/T HPKE mapping | Pin the exact draft revision and vector corpus; isolate it behind the explicit `hpke-pq-draft-05` feature/profile until it is finalized. |
+| [draft-ietf-hpke-pq-05](https://datatracker.ietf.org/doc/draft-ietf-hpke-pq-05) | Current ML-KEM and PQ/T HPKE mapping | Pin the exact draft revision and vector corpus; expose its revision-named API by default without claiming final standardization. |
 | [PQCA/PQCP rust-libcrux](https://github.com/pq-code-package/rust-libcrux) | Required ML-KEM backend | Use the published `libcrux-ml-kem` package, after version/API/vector review; do not extend the current RustCrypto `ml-kem` backend for the HPKE path. |
 
 The implementation owner records each pinned dependency version, Cargo feature
@@ -73,7 +68,7 @@ not itself establish protocol conformance; vector results do.
 2026-07-06 and expiring on 2027-01-07. It is a Standards Track work item, but
 it is not an RFC and its registry assignments, byte-level behavior, and suite
 recommendations remain subject to revision. Accordingly, `crypt_guard` keeps
-the exact Cargo feature and profile identifier **`hpke-pq-draft-05`**. The
+the exact revision-named profile identifier **`draft_ietf_hpke_pq_05`**. The
 identifier `draft-ietf-hpke-pq-05` is the specification name only; neither it
 nor a passed local test confers a permanent interoperability or standards claim.
 
@@ -114,7 +109,7 @@ profile is promoted.
   or checksum/byte-count change is a new corpus. It requires a new manifest
   entry, review of the spec and vector diff, rerunning every applicable vector
   and negative suite, and an explicit promotion decision. It may not overwrite
-  the draft-05 fixture or reuse the `hpke-pq-draft-05` profile name.
+  the draft-05 fixture or reuse the `draft_ietf_hpke_pq_05` profile name.
 
 ## 2. Checked-out gap inventory
 
@@ -263,14 +258,14 @@ No HPKE profile is enabled by default before all applicable gates pass.
   no-default-feature checks, legacy-read feature checks, doctests, and the
   existing typestate compile-fail suite.
 
-### 6.1 Explicit promotion gates for `hpke-pq-draft-05`
+### 6.1 Explicit promotion gates for `draft_ietf_hpke_pq_05`
 
 | Gate | Evidence required | Promotion effect |
 | --- | --- | --- |
 | V0 — corpus integrity | The vendored RFC and draft JSON files exactly match the byte counts and SHA-256 values in Section 1.1; the provenance manifest links each to its immutable commit URL; an offline test proves that no vector fetch occurs. | The corpus may be used by tests. A mismatch blocks implementation and release. |
 | V1 — RFC core | Every supported RFC 9180 vector case, including required intermediate values and exporter results, passes against the pinned RFC corpus; negative/context-sequencing tests pass. | A selected non-PQ suite may make the narrow RFC 9180 conformance claim for that exact suite only. |
-| V2 — draft profile | Every applicable ML-KEM Base-mode case in the pinned draft corpus passes with the `hpke-pq-draft-05` feature; FIPS 203 validation/KATs and the draft-specific negative tests pass; independent interoperation is recorded against the same draft revision. | The feature/profile may be released as **draft-ietf-hpke-pq-05 experimental support**, still non-default and still without an RFC or permanent-interoperability claim. |
-| V3 — public exposure | Security review, dependency/source review, semver review, full regression, and documentation review confirm the exact feature/profile name and draft warning. | The additive public API may be released. Failure leaves the code or feature non-public/non-default. |
+| V2 — draft profile | Every applicable ML-KEM and concrete-hybrid Base-mode case in the pinned draft corpus passes through the default revision-named API; FIPS 203 validation/KATs and the draft-specific negative tests pass; independent interoperation is recorded against the same draft revision. | The profile may be released as **draft-ietf-hpke-pq-05 experimental support**, still without an RFC or permanent-interoperability claim. |
+| V3 — public exposure | Security review, dependency/source review, semver review, full regression, and documentation review confirm the exact revision-named API and draft warning. | The default public API may be released. Failure leaves the code non-public. |
 | V4 — draft or RFC update | A new corpus is vendored under a new provenance entry; the exact source/diff is reviewed; V0 through V3 are repeated for the new revision. | The new revision receives a distinct versioned profile name (for example, `hpke-pq-draft-06`). The draft-05 profile and fixtures remain immutable; aliasing is allowed only after byte-level equivalence is demonstrated and approved. |
 
 ## 7. Delivery phases
