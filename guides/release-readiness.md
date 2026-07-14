@@ -30,7 +30,7 @@ RUSTC_WRAPPER= cargo test --no-default-features
 RUSTC_WRAPPER= cargo clippy --lib
 ```
 
-Historical, pre-2.0.4 external-consumer verification passed from
+Historical prior-release external-consumer verification passed from
 `/tmp/crypt_guard_consumer`. It is retained only as historical evidence and
 does not substitute for the 2.0.5 verification matrix above:
 
