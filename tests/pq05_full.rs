@@ -93,7 +93,7 @@ fn export_only_constructs_a_context_but_never_an_encryption_context() {
 
 #[test]
 fn unsupported_draft_kems_and_turboshake_are_typed_not_substituted() {
-    let unavailable = [Kem::MlKem768P256, Kem::MlKem1024P384, Kem::MlKem768X25519];
+    let unavailable = [Kem::MlKem1024P384, Kem::MlKem768X25519];
     for kem in unavailable {
         let suite = Suite::new(kem, Kdf::HkdfSha256, Aead::Aes128Gcm);
         assert!(matches!(suite.capability(), Capability::Unavailable(_)));

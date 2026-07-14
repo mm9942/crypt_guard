@@ -1849,7 +1849,8 @@ pub mod draft_ietf_hpke_pq_05_full {
                     | Kdf::TurboShake128
                     | Kdf::TurboShake256 => Capability::Available,
                 },
-                Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
+                Kem::MlKem768P256 => Capability::Available,
+                Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
                     Capability::Unavailable("concrete hybrid KEM is not yet implemented")
                 }
             }
@@ -2068,7 +2069,8 @@ pub mod draft_ietf_hpke_pq_05_full {
                 reason: "hybrid KEM not implemented",
             });
         }
-        let (pubkey, privk, _scalar) = derive_hybrid_key_pair(key.as_seed_bytes())?;
+        let (_pq_public, privk, _scalar) = derive_hybrid_key_pair(key.as_seed_bytes())?;
+        let recipient_public = HybridPublicKey::derive(kem, key.as_seed_bytes())?;
         let pqenc =
             MlKem768Encapsulation::from_bytes(&enc.bytes[..ML_KEM_768_ENCAPSULATED_KEY_BYTES])
                 .map_err(|_| Error::InvalidEncapsulation)?;
@@ -2081,9 +2083,48 @@ pub mod draft_ietf_hpke_pq_05_full {
             psk.as_bytes(),
             ss.raw_secret_bytes().as_slice(),
             &enc.bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..],
-            &pubkey.as_bytes()[ML_KEM_768_PUBLIC_KEY_BYTES..],
+            &recipient_public.as_bytes()[ML_KEM_768_PUBLIC_KEY_BYTES..],
         );
         Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_p256_hybrid_encapsulate(
+        recipient_seed: &[u8],
+        ikm_e: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Error> {
+        let private = HybridPrivateKey::from_seed_bytes(recipient_seed)?;
+        let public = HybridPublicKey::derive(Kem::MlKem768P256, private.as_seed_bytes())?;
+        let (encapsulation, shared_secret) =
+            hybrid_encapsulate(Kem::MlKem768P256, &public, Some(ikm_e))?;
+        let decapsulated = hybrid_decapsulate(Kem::MlKem768P256, &private, &encapsulation)?;
+        Ok((
+            encapsulation.as_bytes().to_vec(),
+            shared_secret.as_bytes().to_vec(),
+            decapsulated.as_bytes().to_vec(),
+        ))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_p256_hybrid_context_material(
+        recipient_seed: &[u8],
+        ikm_e: &[u8],
+        info: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Error> {
+        let (_, shared_secret, _) = test_p256_hybrid_encapsulate(recipient_seed, ikm_e)?;
+        let context = Context::from_shared_secret(
+            Suite::new(Kem::MlKem768P256, Kdf::HkdfSha256, Aead::Aes128Gcm),
+            &shared_secret,
+            info,
+            b"",
+            b"",
+            false,
+        )?;
+        Ok((
+            context.key.to_vec(),
+            context.base_nonce.to_vec(),
+            context.exporter_secret.to_vec(),
+        ))
     }
 
     fn derive_hybrid_key_pair(
@@ -2119,8 +2160,8 @@ pub mod draft_ietf_hpke_pq_05_full {
         sha3::Digest::update(&mut h, t);
         sha3::Digest::update(&mut h, ct);
         sha3::Digest::update(&mut h, ek);
-        // Concrete-hybrid combiner label from draft-irtf-cfrg-concrete-hybrid-kems.
-        sha3::Digest::update(&mut h, &[0x5c, 0x2e, 0x2f, 0x2f, 0x5e, 0x5c]);
+        // Concrete-hybrid label for the P-256 instantiation.
+        sha3::Digest::update(&mut h, b"MLKEM768-P256");
         h.finalize().into()
     }
 
@@ -3449,5 +3490,36 @@ mod tests {
                 decode(&export.exported_value),
             );
         }
+    }
+
+    #[test]
+    fn p256_hybrid_combiner_matches_the_pinned_shared_secret() {
+        let vectors: Vec<DraftVector> = serde_json::from_str(include_str!(
+            "../../tests/vectors/hpke-pq-draft-05-test-vectors.json"
+        ))
+        .expect("the pinned draft-05 vector corpus must remain valid JSON");
+        let vector = vectors
+            .into_iter()
+            .find(|vector| vector.kem_id == 0x0050 && vector.kdf_id == 0x0001)
+            .expect("the pinned corpus must contain the MLKEM768-P256 vector");
+        let (encapsulation, shared_secret, decapsulated_shared_secret) =
+            draft_ietf_hpke_pq_05_full::test_p256_hybrid_encapsulate(
+                &decode(&vector.sk_rm),
+                &decode(&vector.ikm_e),
+            )
+            .unwrap();
+        assert_eq!(encapsulation, decode(&vector.enc));
+        assert_eq!(shared_secret, decode(&vector.shared_secret));
+        assert_eq!(decapsulated_shared_secret, decode(&vector.shared_secret));
+        let (key, nonce, exporter_secret) =
+            draft_ietf_hpke_pq_05_full::test_p256_hybrid_context_material(
+                &decode(&vector.sk_rm),
+                &decode(&vector.ikm_e),
+                &decode(&vector.info),
+            )
+            .unwrap();
+        assert_eq!(key, decode(&vector.key));
+        assert_eq!(nonce, decode(&vector.base_nonce));
+        assert_eq!(exporter_secret, decode(&vector.exporter_secret));
     }
 }
