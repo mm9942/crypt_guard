@@ -23,7 +23,14 @@ sign-slhdsa     = ["dep:slh-dsa"]
 # This remains separate from the existing CGv2 ML-KEM backend. It exposes only
 # the two vector-gated Base-mode profiles; it is not an RFC-standardized HPKE
 # profile and makes no permanent interoperability claim.
-hpke-pq-draft-05 = ["dep:aes-gcm", "dep:libcrux-ml-kem", "dep:sha3"]
+hpke-pq-draft-05 = [
+    "dep:libcrux-ml-kem",
+    "dep:sha3",
+    "dep:p256",
+    "dep:p384",
+    "dep:x25519-dalek",
+    "dep:turboshake",
+]
 # preview         = ["dep:hqc", "dep:falcon-rs"]
 
 # ── Legacy pqcrypto path ───────────────────────────────────────────────────────
@@ -81,16 +88,27 @@ chacha20poly1305 = "0.10.1"
 chrono           = "0.4.37"
 # hkdf is unconditional: the KDF module is always compiled in the new path
 hkdf             = "0.13.0"
+hpke             = { version = "=0.13.0", default-features = false, features = ["std", "x25519", "p256", "p384", "p521"] }
+# Pure-Rust RFC 7748 X448 backend for RFC 9180 DHKEM(X448, HKDF-SHA512).
+# Keep the feature closure narrow: no std/omnes umbrella and no FFI backend.
+crrl             = { version = "=0.9.0", default-features = false, features = ["x448"] }
 
 # ── Optional: New FIPS backends ───────────────────────────────────────────────
 ml-kem  = { version = "0.3.2", optional = true, features = ["zeroize"] }
 # PQCA/PQCP ML-KEM backend for the standards-track HPKE path. Pin exactly so
 # the reviewed validation and serialization contract cannot change unnoticed.
-libcrux-ml-kem = { version = "=0.0.9", optional = true, default-features = false, features = ["std", "mlkem768", "mlkem1024"] }
-# Used only by the explicitly experimental draft-ietf-hpke-pq-05 path.  These
-# are the RFC 9180 registered AES-GCM AEADs, not the crate's CGv2 GCM-SIV API.
-aes-gcm = { version = "=0.11.0", optional = true }
+libcrux-ml-kem = { version = "=0.0.9", optional = true, default-features = false, features = ["std", "mlkem512", "mlkem768", "mlkem1024"] }
+# RFC 9180 registers AES-128-GCM and AES-256-GCM alongside
+# ChaCha20-Poly1305. The HPKE context core supports all three suites.
+aes-gcm = { version = "=0.11.0" }
 sha3 = { version = "=0.11.0", optional = true }
+turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"], optional = true }
+# Direct, pure-Rust traditional components for the revision-pinned concrete
+# hybrid KEMs.  Keep their feature closure minimal: arithmetic only for the
+# NIST curves, and the RFC 7748 primitive for X25519.
+p256 = { version = "=0.13.2", optional = true, default-features = false, features = ["arithmetic"] }
+p384 = { version = "=0.13.1", optional = true, default-features = false, features = ["arithmetic"] }
+x25519-dalek = { version = "=2.0.1", optional = true, default-features = false, features = ["zeroize"] }
 ml-dsa  = { version = "0.1.1", optional = true, features = ["zeroize", "rand_core"] }
 slh-dsa = { version = "0.2.0-rc.5", optional = true }
 
@@ -114,6 +132,7 @@ flate2  = { version = "1.0.35", optional = true }
 walkdir = { version = "2.5.0",  optional = true }
 zip     = { version = "2.2.2",  optional = true }
 rand_core_010 = { version = "0.10", package = "rand_core" }
+rand_core_09 = { version = "0.9.5", package = "rand_core", features = ["os_rng"] }
 sha2_011 = { version = "0.11", package = "sha2" }
 getrandom = { version = "0.4.2", features = ["std"] }
 

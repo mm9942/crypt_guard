@@ -1,15 +1,17 @@
 //! RFC 9180 HPKE domain-separation, KDF, and context-core primitives.
 //!
-//! This module deliberately contains only the foundational, interoperable
-//! pieces of HPKE: registered suite identifiers, the `LabeledExtract` /
-//! `LabeledExpand` operations from RFC 9180 §4, the secret/state core of a
-//! Base-mode context, and RFC 9180 `Seal` / `Open` for the registered
-//! ChaCha20-Poly1305 AEAD. It does not provide a KEM or `SetupBaseS` /
-//! `SetupBaseR`; callers must not present this module as a complete
-//! interoperable HPKE implementation.
+//! This module contains RFC 9180 HPKE primitives and a complete, separately
+//! named [`rfc9180`] setup API. The setup API supports all five RFC 9180
+//! DHKEMs, every registered encryption AEAD, and the Base, PSK, Auth, and
+//! AuthPSK modes. The lower-level key-schedule/core types remain available for
+//! callers that need their explicit state boundaries.
 
 use std::{error::Error, fmt};
 
+use aes_gcm::{
+    aead::{Aead as AesAead, KeyInit as AesKeyInit, Payload as AesPayload},
+    Aes128Gcm, Aes256Gcm, Nonce as AesGcmNonce,
+};
 use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
     ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce,
@@ -17,6 +19,14 @@ use chacha20poly1305::{
 use hkdf::Hkdf;
 use sha2_011::{Sha256, Sha384, Sha512};
 use zeroize::Zeroizing;
+
+/// Complete RFC 9180 setup APIs backed by the pure-Rust `hpke` crate.
+///
+/// This layer supports all five RFC 9180 DHKEMs (P-256, P-384, P-521, X25519,
+/// and X448), all registered encryption AEADs, and all four setup modes.
+/// P-256 through X25519 use the pure-Rust RustCrypto HPKE backend; X448 uses
+/// the separately tested pure-Rust `crrl` implementation.
+pub mod rfc9180;
 
 const HPKE_VERSION_LABEL: &[u8] = b"HPKE-v1";
 
@@ -45,7 +55,11 @@ pub enum HpkeError {
     /// The selected AEAD is RFC 9180's Export-Only sentinel and cannot seal
     /// or open ciphertexts.
     ExportOnlyAead,
-    /// The selected registered AEAD has no implementation in this module.
+    /// The selected AEAD has no implementation in this module.
+    ///
+    /// Every encryption AEAD registered by RFC 9180 is implemented. This
+    /// compatibility variant is retained for a future identifier added by a
+    /// later registry revision.
     UnsupportedAead { aead_id: AeadId },
     /// The context's stored AEAD key does not have the selected algorithm's
     /// mandated length.
@@ -315,8 +329,8 @@ impl KeySchedule {
     ///
     /// This transfers, rather than copies, the derived key, base nonce, and
     /// exporter secret into a non-`Clone` context. The resulting context has
-    /// RFC 9180 `Seal` / `Open` support only when its selected AEAD is
-    /// ChaCha20-Poly1305; it has no public nonce API.
+    /// RFC 9180 `Seal` / `Open` support for every registered encryption AEAD;
+    /// it has no public nonce API.
     pub fn into_base_context(self) -> BaseContext {
         BaseContext::from_key_schedule(self)
     }
@@ -327,8 +341,8 @@ impl KeySchedule {
 /// A KEM integration creates a [`KeySchedule`] from its already-established
 /// shared secret, then consumes it with [`KeySchedule::into_base_context`].
 /// This type owns the derived AEAD key, base nonce, exporter secret, and
-/// sequence number. It exposes `Seal` / `Open` only for RFC 9180's registered
-/// ChaCha20-Poly1305 AEAD and deliberately has no manual nonce API.
+/// sequence number. It exposes `Seal` / `Open` for RFC 9180's registered
+/// encryption AEADs and deliberately has no manual nonce API.
 /// Consequently it is not `SetupBaseS` / `SetupBaseR` and is not by itself an
 /// interoperable HPKE encryption context.
 ///
@@ -381,21 +395,14 @@ impl BaseContext {
 
     /// Encrypt `plaintext` with RFC 9180 `Seal(seq, aad, pt)`.
     ///
-    /// This context supports only the registered ChaCha20-Poly1305 AEAD. The
+    /// This context supports every registered encryption AEAD. The
     /// caller-provided `aad` is passed directly to that AEAD and is therefore
     /// authenticated but not encrypted. The context increments its sequence
     /// number only after the AEAD operation has succeeded.
     pub fn seal(&mut self, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, HpkeError> {
-        let (cipher, nonce) = self.chacha20poly1305_for_current_sequence()?;
-        let ciphertext = cipher
-            .encrypt(
-                &nonce,
-                Payload {
-                    msg: plaintext,
-                    aad,
-                },
-            )
-            .map_err(|_| HpkeError::AuthenticationFailed)?;
+        self.ensure_encrypting_aead()?;
+        let nonce = self.nonce_for_current_sequence()?;
+        let ciphertext = self.seal_with_aead(&nonce, aad, plaintext)?;
 
         self.advance_after_success()?;
         Ok(ciphertext)
@@ -408,16 +415,9 @@ impl BaseContext {
     /// sequence unchanged, so the caller may retry the same message with the
     /// correct ciphertext or AAD; a successful open advances it exactly once.
     pub fn open(&mut self, aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, HpkeError> {
-        let (cipher, nonce) = self.chacha20poly1305_for_current_sequence()?;
-        let plaintext = cipher
-            .decrypt(
-                &nonce,
-                Payload {
-                    msg: ciphertext,
-                    aad,
-                },
-            )
-            .map_err(|_| HpkeError::AuthenticationFailed)?;
+        self.ensure_encrypting_aead()?;
+        let nonce = self.nonce_for_current_sequence()?;
+        let plaintext = self.open_with_aead(&nonce, aad, ciphertext)?;
 
         self.advance_after_success()?;
         Ok(plaintext)
@@ -460,38 +460,186 @@ impl BaseContext {
         self.key.as_ref()
     }
 
-    /// Prepare the sole AEAD implementation supported by this foundational
-    /// module. The length checks make the fixed 96-bit nonce contract explicit
-    /// instead of relying on slice-to-array panics.
-    fn chacha20poly1305_for_current_sequence(
+    fn ensure_encrypting_aead(&self) -> Result<(), HpkeError> {
+        if self.suite.aead_id == AeadId::ExportOnly {
+            Err(HpkeError::ExportOnlyAead)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Encrypt with the selected AEAD after exact key and nonce validation.
+    /// The `ExportOnly` sentinel intentionally does not have an AEAD.
+    fn seal_with_aead(
         &self,
-    ) -> Result<(ChaCha20Poly1305, ChaCha20Poly1305Nonce), HpkeError> {
+        nonce_bytes: &[u8],
+        aad: &[u8],
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, HpkeError> {
         match self.suite.aead_id {
-            AeadId::ExportOnly => return Err(HpkeError::ExportOnlyAead),
-            AeadId::ChaCha20Poly1305 => {}
-            aead_id => return Err(HpkeError::UnsupportedAead { aead_id }),
+            AeadId::ExportOnly => Err(HpkeError::ExportOnlyAead),
+            AeadId::AesGcm128 => {
+                let cipher = self.aes128gcm()?;
+                let nonce = self.aes_gcm_nonce(nonce_bytes)?;
+                cipher
+                    .encrypt(
+                        &nonce,
+                        AesPayload {
+                            msg: plaintext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
+            AeadId::AesGcm256 => {
+                let cipher = self.aes256gcm()?;
+                let nonce = self.aes_gcm_nonce(nonce_bytes)?;
+                cipher
+                    .encrypt(
+                        &nonce,
+                        AesPayload {
+                            msg: plaintext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
+            AeadId::ChaCha20Poly1305 => {
+                let (cipher, nonce) = self.chacha20poly1305(nonce_bytes)?;
+                cipher
+                    .encrypt(
+                        &nonce,
+                        Payload {
+                            msg: plaintext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
         }
+    }
 
+    /// Decrypt with the selected AEAD. Authentication failures are opaque.
+    fn open_with_aead(
+        &self,
+        nonce_bytes: &[u8],
+        aad: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, HpkeError> {
+        match self.suite.aead_id {
+            AeadId::ExportOnly => Err(HpkeError::ExportOnlyAead),
+            AeadId::AesGcm128 => {
+                let cipher = self.aes128gcm()?;
+                let nonce = self.aes_gcm_nonce(nonce_bytes)?;
+                cipher
+                    .decrypt(
+                        &nonce,
+                        AesPayload {
+                            msg: ciphertext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
+            AeadId::AesGcm256 => {
+                let cipher = self.aes256gcm()?;
+                let nonce = self.aes_gcm_nonce(nonce_bytes)?;
+                cipher
+                    .decrypt(
+                        &nonce,
+                        AesPayload {
+                            msg: ciphertext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
+            AeadId::ChaCha20Poly1305 => {
+                let (cipher, nonce) = self.chacha20poly1305(nonce_bytes)?;
+                cipher
+                    .decrypt(
+                        &nonce,
+                        Payload {
+                            msg: ciphertext,
+                            aad,
+                        },
+                    )
+                    .map_err(|_| HpkeError::AuthenticationFailed)
+            }
+        }
+    }
+
+    fn aes128gcm(&self) -> Result<Aes128Gcm, HpkeError> {
+        self.validate_key_length(AeadId::AesGcm128)?;
+        Aes128Gcm::new_from_slice(self.aead_key()).map_err(|_| HpkeError::InvalidAeadKeyLength {
+            aead_id: AeadId::AesGcm128,
+            actual: self.aead_key().len(),
+            required: AeadId::AesGcm128.key_len(),
+        })
+    }
+
+    fn aes256gcm(&self) -> Result<Aes256Gcm, HpkeError> {
+        self.validate_key_length(AeadId::AesGcm256)?;
+        Aes256Gcm::new_from_slice(self.aead_key()).map_err(|_| HpkeError::InvalidAeadKeyLength {
+            aead_id: AeadId::AesGcm256,
+            actual: self.aead_key().len(),
+            required: AeadId::AesGcm256.key_len(),
+        })
+    }
+
+    fn chacha20poly1305(
+        &self,
+        nonce_bytes: &[u8],
+    ) -> Result<(ChaCha20Poly1305, ChaCha20Poly1305Nonce), HpkeError> {
+        self.validate_key_length(AeadId::ChaCha20Poly1305)?;
+        let key: &chacha20poly1305::Key = self.aead_key().into();
+        let nonce = self.validate_chacha20poly1305_nonce(nonce_bytes)?;
+        Ok((ChaCha20Poly1305::new(key), nonce))
+    }
+
+    fn validate_key_length(&self, aead_id: AeadId) -> Result<(), HpkeError> {
         let key_bytes = self.aead_key();
-        if key_bytes.len() != AeadId::ChaCha20Poly1305.key_len() {
+        if key_bytes.len() != aead_id.key_len() {
             return Err(HpkeError::InvalidAeadKeyLength {
-                aead_id: AeadId::ChaCha20Poly1305,
+                aead_id,
                 actual: key_bytes.len(),
-                required: AeadId::ChaCha20Poly1305.key_len(),
+                required: aead_id.key_len(),
             });
         }
-        let key: &chacha20poly1305::Key = key_bytes.into();
-        let nonce_bytes = self.nonce_for_current_sequence()?;
-        if nonce_bytes.len() != AeadId::ChaCha20Poly1305.nonce_len() {
-            return Err(HpkeError::InvalidAeadNonceLength {
-                aead_id: AeadId::ChaCha20Poly1305,
-                actual: nonce_bytes.len(),
-                required: AeadId::ChaCha20Poly1305.nonce_len(),
-            });
-        }
-        let nonce: &ChaCha20Poly1305Nonce = nonce_bytes.as_slice().into();
+        Ok(())
+    }
 
-        Ok((ChaCha20Poly1305::new(key), nonce.to_owned()))
+    fn aes_gcm_nonce(
+        &self,
+        nonce_bytes: &[u8],
+    ) -> Result<AesGcmNonce<aes_gcm::aead::consts::U12>, HpkeError> {
+        self.validate_nonce_length(nonce_bytes)?;
+        AesGcmNonce::try_from(nonce_bytes).map_err(|_| HpkeError::InvalidAeadNonceLength {
+            aead_id: self.suite.aead_id,
+            actual: nonce_bytes.len(),
+            required: self.suite.aead_id.nonce_len(),
+        })
+    }
+
+    fn validate_chacha20poly1305_nonce(
+        &self,
+        nonce_bytes: &[u8],
+    ) -> Result<ChaCha20Poly1305Nonce, HpkeError> {
+        self.validate_nonce_length(nonce_bytes)?;
+        let nonce: &ChaCha20Poly1305Nonce = nonce_bytes.into();
+        Ok(nonce.to_owned())
+    }
+
+    fn validate_nonce_length(&self, nonce_bytes: &[u8]) -> Result<(), HpkeError> {
+        let aead_id = self.suite.aead_id;
+        if nonce_bytes.len() != aead_id.nonce_len() {
+            return Err(HpkeError::InvalidAeadNonceLength {
+                aead_id,
+                actual: nonce_bytes.len(),
+                required: aead_id.nonce_len(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -526,6 +674,21 @@ impl HpkeSuite {
             kdf_id,
             aead_id,
         }
+    }
+
+    /// The KEM identifier selected for this suite.
+    pub const fn kem_id(self) -> KemId {
+        self.kem_id
+    }
+
+    /// The KDF identifier selected for this suite.
+    pub const fn kdf_id(self) -> KdfId {
+        self.kdf_id
+    }
+
+    /// The AEAD identifier selected for this suite.
+    pub const fn aead_id(self) -> AeadId {
+        self.aead_id
     }
 
     /// Build `"HPKE" || I2OSP(kem_id, 2) || I2OSP(kdf_id, 2) ||
@@ -1074,18 +1237,10 @@ mod tests {
     }
 
     #[test]
-    fn base_context_rejects_export_only_and_unimplemented_registered_aeads() {
+    fn base_context_rejects_export_only_without_consuming_sequence() {
         let mut export_only = base_context_for(AeadId::ExportOnly);
         assert_eq!(export_only.seal(b"", b""), Err(HpkeError::ExportOnlyAead));
         assert_eq!(export_only.open(b"", b""), Err(HpkeError::ExportOnlyAead));
-
-        let mut aes_gcm = base_context_for(AeadId::AesGcm128);
-        assert_eq!(
-            aes_gcm.seal(b"", b""),
-            Err(HpkeError::UnsupportedAead {
-                aead_id: AeadId::AesGcm128,
-            })
-        );
-        assert_eq!(aes_gcm.sequence, [0_u8; 12]);
+        assert_eq!(export_only.sequence, [0_u8; 12]);
     }
 }

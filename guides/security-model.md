@@ -43,11 +43,10 @@ HPKE, fall back between readers, or reinterpret existing CGv2 bytes as HPKE.
 - The legacy helper protects `info` and `aad` inside its encrypted HFv1
   payload framing, not as RFC 9180 setup `info` or AEAD AAD. It will not be
   converted in place.
-- `crypt_guard::hpke` currently provides a partial RFC 9180 core (labeled key
-  schedule, Base-mode context, nonce sequencing, exporter derivation, and
-  ChaCha20-Poly1305) but no KEM setup or vector-verified interoperable suite.
-  A complete HPKE API remains additive, with its own `enc`, suite, and
-  transport boundary.
+- `crypt_guard::hpke::rfc9180` is the additive, vector-verified RFC 9180 API:
+  it has separate `enc`, suite, and transport values; all five DHKEMs; the
+  three registered encryption AEADs; and Base/PSK/Auth/AuthPSK. It never
+  reinterprets a CGv2/HFv1 payload.
 - The current `draft-ietf-hpke-pq-05` ML-KEM mapping is an active
   Internet-Draft, not an RFC or standardized profile.
 - When `hpke-pq-draft-05` is enabled, the additive

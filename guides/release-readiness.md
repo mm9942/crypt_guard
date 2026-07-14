@@ -95,11 +95,12 @@ ideal from the Obsidian assessment:
   require them.
 - `api::hpke` is frozen legacy CGv2/HFv1 framing: its `info` and `aad` remain
   inside encrypted plaintext and it will not be converted into real HPKE.
-- `hpke/` provides the beginning of a separate RFC 9180 stateful context, but
-  it still requires KEM setup and complete vector evidence before any full RFC
-  9180 suite claim. The distinct `draft-ietf-hpke-pq-05` feature is limited to
-  its vector-gated experimental Base-mode profiles and makes no RFC
-  standardization claim.
+- `hpke::rfc9180` provides the separate RFC 9180 stateful setup/context API,
+  with complete classic-DHKEM and AEAD vector coverage. The distinct
+  `draft-ietf-hpke-pq-05` feature exposes a revision-pinned registry and
+  vector-gated FIPS 203 ML-KEM profiles; concrete hybrid descriptors remain
+  explicitly unavailable until their complete endpoint vectors pass. It makes
+  no RFC standardization claim.
 - `src/lib.rs` still preserves broad compatibility re-exports.
 - Legacy type identity still depends on `src/core/kyber` while implementation
   lives under `src/legacy`.

@@ -13,8 +13,11 @@ legacy-only.
   Opt-in only. Preserves the older Kyber/Falcon/Dilithium compatibility surface.
 - `hpke-pq-draft-05`
   Opt-in and experimental. Enables the public, revision-named
-  `hpke_pq::draft_ietf_hpke_pq_05` Base-mode API for the two pinned FIPS 203
-  ML-KEM-768/1024 profiles. It is gated by the vendored draft-05 vectors. The
+  `hpke_pq::draft_ietf_hpke_pq_05` compatibility Base-mode API plus the
+  revision-pinned `draft_ietf_hpke_pq_05_full` registry. The currently
+  operational profiles are FIPS 203 ML-KEM-512/768/1024; hybrid descriptors
+  remain typed fail-closed until their complete vectors are implemented. It is
+  gated by the vendored draft-05 vectors. The
   active Internet-Draft is not an RFC or a finalized IANA profile, so this is
   not a standardized PQ HPKE feature.
 

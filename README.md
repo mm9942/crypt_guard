@@ -16,13 +16,11 @@ key derivation, and KEM encapsulation are all internal — the caller provides
 a public key and plaintext and receives a sealed `Envelope` back.
 
 Current release version: `2.0.4`. The Phase 4 safe-default upgrade remains the
-primary supported path. This release also contains a **partial** RFC 9180 core:
-the labeled key schedule, a non-cloneable Base-mode context, RFC nonce
-sequencing, exporter derivation, and the registered ChaCha20-Poly1305 AEAD are
-implemented. It does **not** yet provide KEM setup or a vector-verified,
-interoperable HPKE suite, so `crypt_guard` makes no full RFC 9180 conformance
-claim. Separately, the opt-in `hpke-pq-draft-05` feature exposes a
-vector-gated Base-mode API for the two pinned
+primary supported path. The additive `crypt_guard::hpke::rfc9180` API provides
+vector-verified RFC 9180 setup for all five DHKEMs, all registered encryption
+AEADs, and Base/PSK/Auth/AuthPSK; it is intentionally distinct from CGv2.
+Separately, the opt-in `hpke-pq-draft-05` feature exposes revision-pinned,
+experimental PQ HPKE APIs. The legacy API remains a vector-gated Base-mode API for two pinned
 `draft-ietf-hpke-pq-05` ML-KEM profiles. That active Internet-Draft is not an
 RFC or a finalized IANA profile; its literal revision is part of the protocol
 identity.
@@ -114,16 +112,21 @@ envelope is self-describing and forwards-compatible.
 The `crypt_guard::api::hpke` module is retained as a source-compatible legacy
 CGv2 framing API. Its `info` and `aad` arguments are encoded inside an encrypted
 HFv1 payload framing; they do not provide RFC 9180 HPKE setup or AEAD-AAD
-semantics. The separate `crypt_guard::hpke` module contains only the partial
-RFC 9180 core described above; it is not a KEM setup or interoperability API.
+semantics. The separate `crypt_guard::hpke::rfc9180` module is the versioned
+RFC 9180 setup and interoperability API; it is independent from this legacy
+framing.
 
 ---
 
 ## Experimental `draft-ietf-hpke-pq-05` Base mode
 
 With the non-default `hpke-pq-draft-05` feature, the additive
-`crypt_guard::hpke_pq::draft_ietf_hpke_pq_05` module exposes only these exact,
-pinned Base-mode profiles:
+`crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full` namespace exposes the
+draft-05 registry (ML-KEM, hybrid KEM identifiers, HKDF/SHAKE/TurboSHAKE KDFs,
+and the registered AEADs). Capabilities are reported and unavailable hybrid
+combinations fail closed; no ML-KEM-only substitution is performed. The
+compatibility `crypt_guard::hpke_pq::draft_ietf_hpke_pq_05` module remains
+limited to these exact pinned Base-mode profiles:
 
 - ML-KEM-768 / HKDF-SHA256 / AES-128-GCM
 - ML-KEM-1024 / HKDF-SHA384 / AES-256-GCM

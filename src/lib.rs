@@ -216,6 +216,11 @@ pub mod kem;
 pub mod protocol;
 /// SignAlgorithm trait and ML-DSA/SLH-DSA implementations (FIPS 204/205).
 pub mod sign;
+/// Application-layer, explicitly versioned signatures over HPKE transport bindings.
+///
+/// This is not RFC 9180 Auth mode. See [`signed_hpke`] for the trust-boundary
+/// and verification contract.
+pub mod signed_hpke;
 
 /// Legacy pqcrypto-backed KEM + signature path (Kyber/Falcon/Dilithium).
 /// Only compiled when the `legacy-pqclean` feature is active.

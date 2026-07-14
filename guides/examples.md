@@ -19,12 +19,12 @@ not as the primary API.
 historical CGv2/HFv1 compatibility format. Its `info` and `aad` values are
 framed inside encrypted plaintext; it is not RFC 9180 HPKE.
 
-New applications must not label this output as HPKE. The unfeatured
-`crypt_guard::hpke` module is only a partial RFC 9180 core and has no KEM
-setup. The separately feature-gated draft-05 transport API below must still
-store an application-owned protocol/version/profile discriminator with each
-payload and dispatch to exactly one reader. Do not use trial decryption or
-CGv2 fallback as protocol detection.
+New applications must not label this output as HPKE. Use the separate
+`crypt_guard::hpke::rfc9180` API for classic RFC 9180 HPKE. The feature-gated
+draft-05 PQ transport API below must still store an application-owned
+protocol/version/profile discriminator with each payload and dispatch to
+exactly one reader. Do not use trial decryption or CGv2 fallback as protocol
+detection.
 
 The ML-KEM profile tracked as `draft-ietf-hpke-pq-05` is an active
 Internet-Draft, not a standardized RFC profile.

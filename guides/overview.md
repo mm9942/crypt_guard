@@ -4,10 +4,10 @@
 one authenticated envelope format.
 
 The current crate version is `2.0.4`. The safe-default Phase 4 upgrade remains
-the supported default. Version 2.0.4 also carries a partial RFC 9180 core
-(labeled key schedule, Base-mode context, nonce sequencing, export, and
-ChaCha20-Poly1305 operations), but it does not yet implement KEM setup or make
-a vector-verified interoperable HPKE conformance claim.
+the supported default. The additive `hpke::rfc9180` API implements the five
+classic RFC 9180 DHKEMs, the three registered encryption AEADs, and all four
+RFC setup modes against the pinned RFC vector corpus; it remains separate from
+the crate's CGv2 envelope.
 
 The opt-in `hpke-pq-draft-05` feature separately exposes a vector-gated,
 revision-named Base-mode API at `hpke_pq::draft_ietf_hpke_pq_05` for the two
