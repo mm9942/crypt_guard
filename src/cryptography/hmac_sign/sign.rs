@@ -56,7 +56,7 @@ impl Sign {
     pub fn hmac(&mut self) -> Vec<u8> {
         match &self.status {
             Operation::Sign => self.generate_hmac(),
-            Operation::Verify => self.verify_hmac().unwrap(),
+            Operation::Verify => self.verify_hmac().unwrap_or_default(),
         }
     }
 

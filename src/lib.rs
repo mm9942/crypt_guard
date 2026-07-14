@@ -19,15 +19,16 @@
 //!
 //! ## Introduction
 //!
-//! Current release status: `2.0.0`. The safe-default Phase 4 upgrade is
-//! implemented, externally consumer-tested, and test-green. Before publishing,
-//! close the release hygiene gates tracked in `guides/release-readiness.md`.
+//! Current release status: `2.0.4`. The safe-default Phase 4 upgrade is
+//! implemented, externally consumer-tested, and test-green. This release also
+//! adds an opt-in, vector-gated API for two exact active-draft ML-KEM HPKE
+//! profiles; it does not claim that the draft is an RFC standard.
 //!
 //! CryptGuard is a post-quantum sealing library built on the NIST FIPS 203/204/205
 //! final standards. The primary flow is:
 //!
 //! ```text
-//! ML-KEM (FIPS 203) -> HKDF -> Authenticated Envelope (HPKE-shaped, RFC 9180)
+//! ML-KEM (FIPS 203) -> HKDF -> CGv2 authenticated envelope
 //! ```
 //!
 //! The v2 line replaces the old pqcrypto Kyber / Falcon / Dilithium path with
@@ -49,6 +50,9 @@
 //!   `Message` instance is a compile error (E0599).
 //! - **Legacy Kyber / Falcon / Dilithium** kept behind `legacy-pqclean` feature
 //!   so v1.x data remains decryptable.
+//! - **Experimental draft HPKE**, behind `hpke-pq-draft-05`, at
+//!   `hpke_pq::draft_ietf_hpke_pq_05`. This is a pinned
+//!   `draft-ietf-hpke-pq-05` mapping, not an RFC-standardized PQ HPKE profile.
 //!
 //! ## Safe Default: `Encryptor` / `Decryptor`
 //!
@@ -84,11 +88,13 @@
 //! # }
 //! ```
 //!
-//! ## Protocol: HPKE-Shaped CGv2 Envelope
+//! ## Protocol: CGv2 authenticated envelope (not RFC 9180 HPKE)
 //!
-//! The envelope structure mirrors **HPKE (RFC 9180)** as deployed by Cloudflare,
-//! AWS, and Google for post-quantum TLS key establishment. The sender output is
-//! a single blob, not a `(ciphertext, kem_secret)` tuple:
+//! The current envelope is a crate-specific CGv2 construction. Although it uses
+//! a KEM, HKDF, and AEAD, it is **not** [RFC 9180 HPKE]: it does not implement
+//! RFC 9180's KEM interface, labeled key schedule, AEAD nonce sequencing, or
+//! wire format, and is not interoperable with RFC 9180 implementations. The
+//! sender output is a single blob, not a `(ciphertext, kem_secret)` tuple:
 //!
 //! ```text
 //! Sender:
@@ -192,11 +198,21 @@ pub mod utils;
 pub mod api;
 /// Builder-style API for encryption/decryption, keygen, and signature flows
 pub mod builder;
+/// RFC 9180 HPKE suite identifiers and labeled HKDF primitives.
+pub mod hpke;
+/// Experimental, vector-gated `draft-ietf-hpke-pq-05` Base-mode HPKE API.
+///
+/// This feature-gated module is intentionally separate from CGv2 and is not
+/// an RFC-standardized post-quantum HPKE profile.  Its only public surface is
+/// `hpke_pq::draft_ietf_hpke_pq_05`, whose revision-specific name is part of
+/// the protocol identity.
+#[cfg(feature = "hpke-pq-draft-05")]
+pub mod hpke_pq;
 /// HKDF-SHA256/512 key schedule with domain separation.
 pub mod kdf;
 /// ML-KEM backend trait and ML-KEM-512/768/1024 implementations (FIPS 203).
 pub mod kem;
-/// CGv2 authenticated envelope protocol (Phase 3).
+/// CGv2 authenticated envelope protocol.
 pub mod protocol;
 /// SignAlgorithm trait and ML-DSA/SLH-DSA implementations (FIPS 204/205).
 pub mod sign;
@@ -230,8 +246,8 @@ pub use crate::{
 // existing call sites using `crypt_guard::kdf::Falcon1024` etc. keep working.
 #[cfg(feature = "legacy-pqclean")]
 pub use crate::core::kdf as legacy_kdf;
-// HPKE-style single-shot layer (RFC 9180 SealBase/OpenBase shape) on top of the
-// authenticated envelope. Exposed at the crate root with `hpke_`-prefixed names.
+// Legacy CGv2 compatibility framing. These `hpke_`-prefixed re-exports are not
+// RFC 9180 HPKE and retain their names only for source compatibility.
 pub use api::{open as hpke_open, seal as hpke_seal};
 pub use api::{
     AuthenticatedAead, Decryptor, DecryptorBuilder, Encryptor, EncryptorBuilder, MissingPlaintext,

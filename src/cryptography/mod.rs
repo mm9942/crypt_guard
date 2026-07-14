@@ -7,6 +7,7 @@ mod cryptographic;
 use crate::{error::CryptError, FileMetadata};
 use std::fmt;
 use std::path::PathBuf;
+use zeroize::Zeroize;
 
 /// Represents the AES cipher for encryption and decryption processes.
 /// It holds cryptographic information and a shared secret for operations.
@@ -14,6 +15,12 @@ use std::path::PathBuf;
 pub struct CipherAES {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
+}
+
+impl Drop for CipherAES {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
 }
 
 impl fmt::Display for CipherAES {
@@ -33,6 +40,12 @@ pub struct CipherAesGcmSiv {
     pub iv: Vec<u8>,
 }
 
+impl Drop for CipherAesGcmSiv {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAesGcmSiv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -50,6 +63,12 @@ pub struct CipherAesCtr {
     pub iv: Vec<u8>,
 }
 
+impl Drop for CipherAesCtr {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAesCtr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -64,6 +83,12 @@ impl fmt::Display for CipherAesCtr {
 pub struct CipherAesXts {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
+}
+
+impl Drop for CipherAesXts {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
 }
 
 impl fmt::Display for CipherAesXts {
@@ -85,6 +110,12 @@ pub struct CipherChaCha {
     pub sharedsecret: Vec<u8>,
 }
 
+impl Drop for CipherChaCha {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherChaCha {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -102,6 +133,12 @@ pub struct CipherChaChaPoly {
     pub infos: CryptographicInformation,
     pub nonce: [u8; 24],
     pub sharedsecret: Vec<u8>,
+}
+
+impl Drop for CipherChaChaPoly {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
 }
 
 impl fmt::Display for CipherChaChaPoly {

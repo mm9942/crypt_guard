@@ -19,7 +19,9 @@ use aes_gcm_siv::{
     Aes256GcmSiv, Nonce,
 };
 use hex;
+use hmac::{Hmac, Mac};
 use rand::{rngs::OsRng, RngCore};
+use sha2::Sha256;
 use std::result::Result;
 
 /// Generates a 12-byte iv using OS-level randomness.
@@ -30,6 +32,24 @@ pub fn generate_iv() -> [u8; 12] {
     let mut iv = [0u8; 12];
     OsRng.fill_bytes(&mut iv);
     iv
+}
+
+fn derive_legacy_aes_gcm_siv_key(sharedsecret: &[u8], iv: &[u8]) -> Result<[u8; 32], CryptError> {
+    type HmacSha256 = Hmac<Sha256>;
+    let mut extract =
+        <HmacSha256 as Mac>::new_from_slice(iv).expect("HMAC-SHA256 accepts any key length");
+    extract.update(sharedsecret);
+    let prk = extract.finalize().into_bytes();
+
+    let mut expand =
+        <HmacSha256 as Mac>::new_from_slice(&prk).expect("HMAC-SHA256 accepts any key length");
+    expand.update(b"crypt_guard:legacy:aes-gcm-siv:key");
+    expand.update(&[1]);
+    let okm = expand.finalize().into_bytes();
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&okm[..32]);
+    Ok(key)
 }
 
 /// The main struct for handling cryptographic operations with ChaCha20 algorithm.
@@ -109,7 +129,8 @@ impl CipherAesGcmSiv {
     fn encryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let plaintext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
+        let derived_key = derive_legacy_aes_gcm_siv_key(&self.sharedsecret, &self.iv)?;
+        let key = GenericArray::from_slice(&derived_key);
         let cipher = Aes256GcmSiv::new(key);
         let iv = Nonce::from_slice(&self.iv);
         let mut hmac = Sign::new(
@@ -129,12 +150,18 @@ impl CipherAesGcmSiv {
     fn decryption(&self) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let ciphertext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
-        let cipher = Aes256GcmSiv::new(key);
         let iv = Nonce::from_slice(&self.iv);
-        let decrypted = cipher
-            .decrypt(iv, &*ciphertext.to_vec())
-            .map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let derived_key = derive_legacy_aes_gcm_siv_key(&self.sharedsecret, &self.iv)?;
+        let cipher = Aes256GcmSiv::new(GenericArray::from_slice(&derived_key));
+        let decrypted = match cipher.decrypt(iv, &*ciphertext.to_vec()) {
+            Ok(decrypted) => decrypted,
+            Err(_) => {
+                let legacy_cipher = Aes256GcmSiv::new(GenericArray::from_slice(&self.sharedsecret));
+                legacy_cipher
+                    .decrypt(iv, &*ciphertext.to_vec())
+                    .map_err(|e| CryptError::new(e.to_string().as_str()))?
+            }
+        };
         //println!("decrypted: {:?}", &decrypted);
         let mut hmac = Sign::new(
             decrypted.to_vec(),

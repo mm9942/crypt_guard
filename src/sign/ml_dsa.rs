@@ -53,7 +53,7 @@ pub struct MlDsaSigningKey(Vec<u8>);
 
 impl MlDsaSigningKey {
     /// Construct from raw bytes.
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
     /// Access the raw bytes.
@@ -74,7 +74,7 @@ pub struct MlDsaVerifyingKey(Vec<u8>);
 
 impl MlDsaVerifyingKey {
     /// Construct from raw bytes.
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
     /// Access the raw bytes.
@@ -92,6 +92,13 @@ impl MlDsaVerifyingKey {
 /// `Send + Sync`.
 #[derive(Clone, Debug)]
 pub struct MlDsaSignature(Vec<u8>);
+
+impl MlDsaSignature {
+    /// Construct from raw bytes.
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
 
 /// Borrow the raw signature bytes of an [`MlDsaSignature`].
 ///

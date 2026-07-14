@@ -1,0 +1,5 @@
+# SHA-256 manifest for vendored HPKE test vectors.
+#
+# Format: <64 lowercase hexadecimal SHA-256 characters> *<basename>
+61fc662f01996cd06d713dacf5e133167bd309a1f329442d53f1e21a47b3ede6 *rfc9180-test-vectors.json
+35c59f4a0132e5631e50ac039d8ca3a72e99f5e92dfd94d45338d6ae243f613c *hpke-pq-draft-05-test-vectors.json

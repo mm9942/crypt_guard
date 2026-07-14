@@ -55,7 +55,7 @@ pub struct SlhDsaSigningKey(Vec<u8>);
 
 impl SlhDsaSigningKey {
     /// Construct from raw bytes.
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
     /// Access the raw bytes.
@@ -73,7 +73,7 @@ pub struct SlhDsaVerifyingKey(Vec<u8>);
 
 impl SlhDsaVerifyingKey {
     /// Construct from raw bytes.
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
     /// Access the raw bytes.
@@ -92,6 +92,13 @@ impl SlhDsaVerifyingKey {
 /// `Send + Sync`.
 #[derive(Clone, Debug)]
 pub struct SlhDsaSignature(Vec<u8>);
+
+impl SlhDsaSignature {
+    /// Construct from raw bytes.
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
 
 /// Borrow the raw signature bytes of an [`SlhDsaSignature`].
 ///

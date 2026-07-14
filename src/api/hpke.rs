@@ -1,10 +1,16 @@
-//! HPKE-style (RFC 9180) single-shot `seal` / `open` API.
+//! Legacy CGv2/HFv1 compatibility `seal` / `open` API.
 //!
 //! # Responsibility scope
-//! This module presents an ergonomic single-shot API that mirrors the shape of RFC 9180's
-//! `SealBase` / `OpenBase` over the existing CGv2 [`Envelope`] protocol. It accepts
-//! caller-supplied `info` (setup-time context) and `aad` (per-message additional authenticated
-//! data) and threads them through the encryption in a fully authenticated way.
+//! This module preserves a historical single-shot API over the existing CGv2
+//! [`Envelope`] protocol. Despite its module and crate-root `hpke_*` names, it
+//! is **not** RFC 9180 HPKE and must not be used for RFC 9180 interoperability.
+//! It accepts caller-supplied `info` and `aad`, serializes them into an encrypted
+//! HFv1 payload framing, and verifies those values after decryption.
+//!
+//! In particular, this module does not implement RFC 9180's KEM interface,
+//! labeled extract/expand key schedule, sequence-number nonce construction, or
+//! AEAD-AAD treatment of `aad`. A standards-conformant HPKE API will be exposed
+//! separately rather than changing this compatibility API's behavior.
 //!
 //! # Key types exported
 //! - [`seal`] — single-shot encrypt: produces an [`Envelope`].
@@ -39,9 +45,10 @@
 //! On `open` the framing is parsed, `info` and `aad` are verified to match the caller's
 //! values, and the original plaintext is returned.
 //!
-//! # TODO — HPKE key-schedule alignment
-//! To align fully with RFC 9180's labeled extract/expand + `suite_id` domain separation,
-//! the following changes are needed (tracked as Phase 5/6 work):
+//! # Migration boundary
+//! A standards-conformant implementation needs a new API and wire boundary; it
+//! cannot be obtained by treating this framing as an RFC 9180 compatibility layer.
+//! The required work includes:
 //!
 //! 1. **Thread `info` into the key schedule**: pass `info` as the `info` argument to
 //!    `HKDF-Expand` alongside the label, replacing the current plain label string in
@@ -57,8 +64,8 @@
 //! 3. **suite_id domain separation**: prepend `b"HPKE" || I2OSP(kem_id,2) || I2OSP(kdf_id,2)
 //!    || I2OSP(aead_id,2)` to every HKDF call (RFC 9180 §4 `LabeledExtract`).
 //!
-//! When those changes land, the framing prefix used here should be removed in favour of true
-//! AEAD-AAD binding, and this module updated accordingly.
+//! The HFv1 framing remains here for source and data compatibility. It must not
+//! be repurposed as a standards-conformant HPKE encoding.
 //!
 //! # Concurrency
 //! Both functions are stateless and `Send + Sync`. The underlying ML-KEM and AEAD operations
@@ -115,7 +122,7 @@ use crate::{
 
 // ── Framing constants ──────────────────────────────────────────────────────────
 
-/// 4-byte magic marker that opens the HPKE framing prefix.
+/// 4-byte magic marker that opens the legacy HFv1 framing prefix.
 ///
 /// Chosen to be distinct from all CGv2 envelope magic (`b"CGv2"`) so that a
 /// raw envelope cannot be confused with a framed payload.
@@ -123,10 +130,10 @@ const HPKE_FRAME_MAGIC: &[u8; 4] = b"HFv1";
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Single-shot HPKE-style seal: encrypt `plaintext` for `recipient_pk`.
+/// Single-shot legacy CGv2 seal: encrypt `plaintext` for `recipient_pk`.
 ///
 /// # Description
-/// Mirrors RFC 9180 `SealBase(pkR, info, aad, pt)`. The function:
+/// This is a CGv2 compatibility helper, not RFC 9180 `SealBase`. The function:
 ///
 /// 1. Serialises `info` and `aad` into a 4-field framing header that is prepended to
 ///    `plaintext` (see module-level docs for the byte layout).
@@ -146,7 +153,7 @@ const HPKE_FRAME_MAGIC: &[u8; 4] = b"HFv1";
 /// - `recipient_pk` (`&[u8]`): recipient's ML-KEM public key bytes.
 /// - `info` (`&[u8]`): setup-time context bound to the whole session (application
 ///   version, protocol name, identities). Authenticated but **encrypted** in this
-///   implementation; see module-level TODO for the HPKE key-schedule alignment plan.
+///   implementation; it is not incorporated into an RFC 9180 key schedule.
 /// - `aad` (`&[u8]`): per-message additional authenticated data (request ID, sequence
 ///   number, framing metadata). Authenticated but **encrypted** in this implementation.
 /// - `plaintext` (`&[u8]`): the message to encrypt.
@@ -202,10 +209,10 @@ where
         .seal()
 }
 
-/// Single-shot HPKE-style open: decrypt and authenticate an [`Envelope`].
+/// Single-shot legacy CGv2 open: decrypt and authenticate an [`Envelope`].
 ///
 /// # Description
-/// Mirrors RFC 9180 `OpenBase(enc, skR, info, aad, ct)`. The function:
+/// This is a CGv2 compatibility helper, not RFC 9180 `OpenBase`. The function:
 ///
 /// 1. Calls the existing [`Decryptor`] builder to KEM-decapsulate, derive the session
 ///    key, and AEAD-open the envelope.

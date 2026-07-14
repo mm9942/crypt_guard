@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     result::Result,
 };
+use zeroize::Zeroize;
 
 /// Trait for implementing key management functions. This trait provides
 /// an interface for key pair generation, encapsulation/decapsulation of secrets,
@@ -248,6 +249,13 @@ pub struct KeyControl<T: KyberKeyFunctions> {
     pub ciphertext: Vec<u8>,
     pub shared_secret: Vec<u8>,
     _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: KyberKeyFunctions> Drop for KeyControl<T> {
+    fn drop(&mut self) {
+        self.secret_key.zeroize();
+        self.shared_secret.zeroize();
+    }
 }
 
 impl<T: KyberKeyFunctions> KeyControl<T> {

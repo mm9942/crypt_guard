@@ -368,6 +368,18 @@ mod inner {
         mac.finalize().into_bytes().to_vec()
     }
 
+    /// Verify HMAC-SHA256 over `data` without leaking prefix matches through timing.
+    fn hmac_verify(key: &[u8], data: &[u8], tag: &[u8]) -> Result<(), CryptError> {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+        let mut mac =
+            <HmacSha256 as Mac>::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
+        mac.update(data);
+        mac.verify_slice(tag)
+            .map_err(|_| CryptError::AuthenticationFailed)
+    }
+
     /// Generate `len` random bytes (empty when `len == 0`).
     fn gen_nonce(len: usize) -> Vec<u8> {
         use rand::RngCore;
@@ -596,9 +608,7 @@ mod inner {
             let mac_key = derive_mac_key(session_key.as_ref(), kem_ct)?;
             let mut mac_input = aad;
             mac_input.extend_from_slice(body_with_iv);
-            if hmac_compute(mac_key.as_ref(), &mac_input) != tag {
-                return Err(CryptError::AuthenticationFailed);
-            }
+            hmac_verify(mac_key.as_ref(), &mac_input, tag)?;
 
             let (iv, body) = body_with_iv.split_at(16);
             let cipher = Aes256CbcDec::new(
@@ -665,9 +675,7 @@ mod inner {
             let mac_key = derive_mac_key(session_key.as_ref(), kem_ct)?;
             let mut mac_input = aad;
             mac_input.extend_from_slice(body);
-            if hmac_compute(mac_key.as_ref(), &mac_input) != tag {
-                return Err(CryptError::AuthenticationFailed);
-            }
+            hmac_verify(mac_key.as_ref(), &mac_input, tag)?;
             if nonce.len() != Self::NONCE_LEN {
                 return Err(CryptError::InvalidNonce);
             }
@@ -732,9 +740,7 @@ mod inner {
             let mac_key = derive_mac_key(session_key.as_ref(), kem_ct)?;
             let mut mac_input = aad;
             mac_input.extend_from_slice(body);
-            if hmac_compute(mac_key.as_ref(), &mac_input) != tag {
-                return Err(CryptError::AuthenticationFailed);
-            }
+            hmac_verify(mac_key.as_ref(), &mac_input, tag)?;
             if nonce.len() != Self::NONCE_LEN {
                 return Err(CryptError::InvalidNonce);
             }
@@ -814,9 +820,7 @@ mod inner {
             let mac_key = derive_mac_key(k2.as_ref(), kem_ct)?;
             let mut mac_input = aad;
             mac_input.extend_from_slice(body_with_len);
-            if hmac_compute(mac_key.as_ref(), &mac_input) != tag {
-                return Err(CryptError::AuthenticationFailed);
-            }
+            hmac_verify(mac_key.as_ref(), &mac_input, tag)?;
 
             let orig_len = u64::from_le_bytes(
                 body_with_len[..8]
