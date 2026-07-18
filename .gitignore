@@ -1,9 +1,14 @@
 target/
+*.log
+*.md
+!README.md
 .github/
 Falcon1024/
 key/
 .claude/
 .remember/
+.cargo/
+.agents/
 old/
 old/.cargo-home/
 test.log
