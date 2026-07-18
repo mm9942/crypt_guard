@@ -15,11 +15,11 @@ use core::convert::TryInto;
 use std::{error::Error as StdError, fmt};
 
 pub use crate::hpke_pq::draft_ietf_hpke_pq_05_full::{
-    generate_recipient_key_pair, setup_base_receiver as setup_base_receiver_inner,
-    setup_base_sender as setup_base_sender_inner, setup_psk_receiver as setup_psk_receiver_inner,
-    setup_psk_sender as setup_psk_sender_inner, Aead, Capability, Encapsulation, Error, Kdf, Kem,
-    RecipientContext, RecipientKeyPair, RecipientPrivateKey, RecipientPublicKey, SenderContext,
-    Suite,
+    derive_recipient_key_pair, generate_recipient_key_pair,
+    setup_base_receiver as setup_base_receiver_inner, setup_base_sender as setup_base_sender_inner,
+    setup_psk_receiver as setup_psk_receiver_inner, setup_psk_sender as setup_psk_sender_inner,
+    Aead, Capability, Encapsulation, Error, Kdf, Kem, RecipientContext, RecipientKeyPair,
+    RecipientPrivateKey, RecipientPublicKey, SenderContext, Suite,
 };
 
 /// The revision implemented by this crate's PQ KEM adapter.
@@ -310,6 +310,13 @@ fn suite_from_ids(kem: u16, kdf: u16, aead: u16) -> Result<Suite, EnvelopeError>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn derived_key_pair_is_publicly_reexported() {
+        let derive: fn(Kem, &[u8]) -> Result<RecipientKeyPair, Error> =
+            crate::pq_hpke::derive_recipient_key_pair;
+        let _ = derive;
+    }
 
     #[test]
     fn default_profile_round_trip_binds_info_and_aad() {
