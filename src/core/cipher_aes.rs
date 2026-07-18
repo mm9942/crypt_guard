@@ -1,30 +1,26 @@
 //use super::*;
 use crate::{
-    *,
-    error::CryptError,
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
     core::{
         // removed unused KyberKeyFunctions per clippy
         KeyControlVariant,
-    }
+    },
+    cryptography::{
+        hmac_sign::{Operation, Sign, SignType},
+        *,
+    },
+    error::CryptError,
+    *,
 };
 use aes::{
-    cipher::{
-        BlockEncrypt, 
-        BlockDecrypt, 
-        generic_array::GenericArray,
-        KeyInit
-    },
-    Aes256,
-    Aes128,
+    cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit},
+    Aes128, Aes256,
 };
-use std::{
-    path::PathBuf, 
-    result::Result, 
-    fs
-};
+use std::{fs, path::PathBuf, result::Result};
 
-use cbc::{cipher::{KeyIvInit, BlockDecryptMut, BlockEncryptMut}, Encryptor as CbcEncryptor, Decryptor as CbcDecryptor};
+use cbc::{
+    cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit},
+    Decryptor as CbcDecryptor, Encryptor as CbcEncryptor,
+};
 
 use block_padding::Pkcs7;
 use rand::Rng;
@@ -41,20 +37,23 @@ impl CipherAES {
     ///
     /// # Returns
     /// A new instance of `CipherAES`.
-	pub fn new(infos: CryptographicInformation) -> Self {
-		CipherAES { infos, sharedsecret: Vec::new() }
-	}
-	
+    pub fn new(infos: CryptographicInformation) -> Self {
+        CipherAES {
+            infos,
+            sharedsecret: Vec::new(),
+        }
+    }
+
     /// Retrieves the current data intended for encryption or decryption.
     ///
     /// # Returns
     /// The data as a vector of bytes (`Vec<u8>`) or a `CryptError` if the content cannot be accessed.
     pub fn get_data(&self) -> Result<Vec<u8>, CryptError> {
-		let data = &self.infos.content()?;
-		let data = data.to_vec();
-		Ok(data)
-	}
-	    
+        let data = &self.infos.content()?;
+        let data = data.to_vec();
+        Ok(data)
+    }
+
     /// Sets the shared secret key used for AES encryption and decryption.
     ///
     /// # Parameters
@@ -63,10 +62,10 @@ impl CipherAES {
     /// # Returns
     /// A mutable reference to the `CipherAES` instance, allowing for chaining of operations.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
-		self.sharedsecret = sharedsecret;
-		self
-	}
-	    
+        self.sharedsecret = sharedsecret;
+        self
+    }
+
     /// Retrieves the shared secret key.
     ///
     /// # Returns
@@ -74,28 +73,33 @@ impl CipherAES {
     pub fn sharedsecret(&self) -> Result<&Vec<u8>, CryptError> {
         Ok(&self.sharedsecret)
     }
-    
+
     /// Retrieves the shared secret key.
     ///
     /// # Returns
     /// A reference to the shared secret as a byte vector or a `CryptError` if it cannot be accessed.
     fn encryption(&mut self) -> Result<Vec<u8>, CryptError> {
-	    let file_contained = self.infos.contains_file()?;
-	    if file_contained && self.infos.metadata.content_type == ContentType::File {
-	        self.infos.content = fs::read(self.infos.location()?).unwrap();
-	    }
+        let file_contained = self.infos.contains_file()?;
+        if file_contained && self.infos.metadata.content_type == ContentType::File {
+            self.infos.content = fs::read(self.infos.location()?).unwrap();
+        }
         let encrypted_data = self.encrypt_aes()?;
-    	// println!("Encrypted Data: {:?}", encrypted_data);
+        // println!("Encrypted Data: {:?}", encrypted_data);
 
         let passphrase = self.infos.passphrase()?.to_vec();
-        let mut hmac = Sign::new(encrypted_data, passphrase, Operation::Sign, SignType::Sha512);
+        let mut hmac = Sign::new(
+            encrypted_data,
+            passphrase,
+            Operation::Sign,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
         if self.infos.safe()? {
             self.infos.set_data(&data)?;
             self.infos.safe_file()?;
         }
         Ok(data)
-	}
+    }
 
     /// Saves the ciphertext to a file specified within the cryptographic information's location.
     ///
@@ -104,17 +108,21 @@ impl CipherAES {
     ///
     /// # Returns
     /// An `Ok(())` upon successful save or a `CryptError` if saving fails.
+    #[allow(dead_code)]
     fn save_ciphertext(&self, _encrypted_data: &[u8]) -> Result<(), CryptError> {
-    	use std::{fs::File, io::Write};
-        
+        use std::{fs::File, io::Write};
+
         if let Some(file_metadata) = &self.infos.location {
             let file_path = file_metadata.parent()?;
             let filename = format!("{}/ciphertext.pem", file_path.as_os_str().to_str().unwrap());
             let file_path_with_enc = PathBuf::from(filename);
-            
-            let mut buffer = File::create(file_path_with_enc).map_err(|_| CryptError::WriteError)?;
-        	buffer.write_all(self.sharedsecret()?).map_err(|_| CryptError::WriteError)?;
-            
+
+            let mut buffer =
+                File::create(file_path_with_enc).map_err(|_| CryptError::WriteError)?;
+            buffer
+                .write_all(self.sharedsecret()?)
+                .map_err(|_| CryptError::WriteError)?;
+
             Ok(())
         } else {
             Err(CryptError::PathError)
@@ -125,7 +133,7 @@ impl CipherAES {
     ///
     /// # Returns
     /// A result containing the encrypted data as a byte vector or a `CryptError` if encryption fails.
-	fn encrypt_aes(&mut self) -> Result<Vec<u8>, CryptError> {
+    fn encrypt_aes(&mut self) -> Result<Vec<u8>, CryptError> {
         let block_size = 16;
         let mut padded_data = self.get_data()?;
 
@@ -137,7 +145,10 @@ impl CipherAES {
         let sharedsecret = self.sharedsecret()?;
         let cipher = Aes256::new(GenericArray::from_slice(sharedsecret));
 
-        for (chunk, encrypted_chunk) in padded_data.chunks(block_size).zip(encrypted_data.chunks_mut(block_size)) {
+        for (chunk, encrypted_chunk) in padded_data
+            .chunks(block_size)
+            .zip(encrypted_data.chunks_mut(block_size))
+        {
             let mut block = GenericArray::clone_from_slice(chunk);
             cipher.encrypt_block(&mut block);
             encrypted_chunk.copy_from_slice(&block);
@@ -146,6 +157,7 @@ impl CipherAES {
         Ok(encrypted_data)
     }
 
+    #[allow(dead_code)]
     fn generate_cbc_iv(&mut self) -> Result<Vec<u8>, CryptError> {
         let mut iv = vec![0u8; 16];
         let mut rng = rand::thread_rng();
@@ -158,18 +170,19 @@ impl CipherAES {
     pub fn aes_cbc_encrypt(&mut self) -> Result<Vec<u8>, CryptError> {
         let data = self.get_data()?;
         let key = GenericArray::from_slice(&self.sharedsecret);
-        let mut iv = vec![0u8; 16];  // AES block size
+        let mut iv = vec![0u8; 16]; // AES block size
         rand::thread_rng().fill(&mut iv[..]);
         let iv_arr = GenericArray::from_slice(&iv);
 
         let cipher = Aes128CbcEnc::new(key, iv_arr);
         let mut buffer = data.to_owned(); // Use to_owned() to duplicate data
-        let ciphertext = cipher.encrypt_padded_mut::<Pkcs7>(&mut buffer, data.len())
+        let ciphertext = cipher
+            .encrypt_padded_mut::<Pkcs7>(&mut buffer, data.len())
             .map_err(|_| CryptError::EncryptionFailed)?;
 
         // Prepend IV to the ciphertext to use it during decryption
         let mut result = iv;
-        result.extend_from_slice(&ciphertext);
+        result.extend_from_slice(ciphertext);
         Ok(result)
     }
 
@@ -177,7 +190,7 @@ impl CipherAES {
     /// Assumes the IV is prepended to the ciphertext.
     pub fn aes_cbc_decrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
         if ciphertext.len() < 16 {
-            return Err(CryptError::InvalidDataLength);  // Ensure there's enough data for the IV
+            return Err(CryptError::InvalidDataLength); // Ensure there's enough data for the IV
         }
 
         let (iv, encrypted_data) = ciphertext.split_at(16);
@@ -186,7 +199,8 @@ impl CipherAES {
 
         let cipher = Aes128CbcDec::new(key, iv_arr);
         let mut buffer = encrypted_data.to_vec();
-        cipher.decrypt_padded_mut::<Pkcs7>(&mut buffer)
+        cipher
+            .decrypt_padded_mut::<Pkcs7>(&mut buffer)
             .map_err(|_| CryptError::DecryptionFailed)?;
 
         Ok(buffer)
@@ -197,17 +211,21 @@ impl CipherAES {
     /// # Returns
     /// The decrypted data as a byte vector or a `CryptError` if decryption fails.
     fn decryption(&mut self) -> Result<Vec<u8>, CryptError> {
-	    let file_contained = self.infos.contains_file()?;
-	    if file_contained && self.infos.metadata.content_type == ContentType::File {
-	        self.infos.content = fs::read(self.infos.location()?).unwrap();
+        let file_contained = self.infos.contains_file()?;
+        if file_contained && self.infos.metadata.content_type == ContentType::File {
+            self.infos.content = fs::read(self.infos.location()?).unwrap();
+        }
 
-	    }
-
-	    let encrypted_data_with_hmac = self.infos.content()?.to_vec();
+        let encrypted_data_with_hmac = self.infos.content()?.to_vec();
         let passphrase = self.infos.passphrase()?.to_vec();
         // println!("Data Length: {}", encrypted_data_with_hmac.len());
 
-        let mut verifier = Sign::new(encrypted_data_with_hmac, passphrase, Operation::Verify, SignType::Sha512);
+        let mut verifier = Sign::new(
+            encrypted_data_with_hmac,
+            passphrase,
+            Operation::Verify,
+            SignType::Sha512,
+        );
         let verified_data = verifier.hmac();
 
         self.infos.set_data(&verified_data)?;
@@ -238,20 +256,22 @@ impl CipherAES {
         let sharedsecret = self.sharedsecret()?;
         let cipher = Aes256::new(GenericArray::from_slice(sharedsecret));
 
-        for (chunk, decrypted_chunk) in data.chunks(block_size).zip(decrypted_data.chunks_mut(block_size)) {
+        for (chunk, decrypted_chunk) in data
+            .chunks(block_size)
+            .zip(decrypted_data.chunks_mut(block_size))
+        {
             let mut block = GenericArray::clone_from_slice(chunk);
             cipher.decrypt_block(&mut block);
             decrypted_chunk.copy_from_slice(&block);
         }
 
-	    if let Some(&padding_length) = decrypted_data.last() {
-	        decrypted_data.truncate(decrypted_data.len() - padding_length as usize);
-	    }
-    	
+        if let Some(&padding_length) = decrypted_data.last() {
+            decrypted_data.truncate(decrypted_data.len() - padding_length as usize);
+        }
+
         Ok(decrypted_data)
     }
 }
-
 
 impl CryptographicFunctions for CipherAES {
     /// Performs the encryption process using a public key.
@@ -269,7 +289,7 @@ impl CryptographicFunctions for CipherAES {
 
         Ok((self.encryption()?, ciphertext))
     }
-    
+
     /// Performs the decryption process using a secret key and ciphertext.
     ///
     /// # Parameters
@@ -278,7 +298,7 @@ impl CryptographicFunctions for CipherAES {
     ///
     /// # Returns
     /// The decrypted data as a byte vector or a `CryptError` if decryption fails.
-    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError>{
+    fn decrypt(&mut self, secret_key: Vec<u8>, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         // println!("shared secret: {:?}\nLength: {}", sharedsecret, sharedsecret.len());

@@ -2,11 +2,12 @@
 pub mod hmac_sign;
 
 /// The `cryptographic` module encapsulates core cryptographic operations, including key management, encryption, decryption, and cryptographic utility functions.
-mod cryptographic; 
+mod cryptographic;
 
-use std::path::PathBuf;
 use crate::{error::CryptError, FileMetadata};
 use std::fmt;
+use std::path::PathBuf;
+use zeroize::Zeroize;
 
 /// Represents the AES cipher for encryption and decryption processes.
 /// It holds cryptographic information and a shared secret for operations.
@@ -16,9 +17,19 @@ pub struct CipherAES {
     pub sharedsecret: Vec<u8>,
 }
 
+impl Drop for CipherAES {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAES {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAES with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherAES with the following Cryptographic Informations: {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -29,9 +40,19 @@ pub struct CipherAesGcmSiv {
     pub iv: Vec<u8>,
 }
 
+impl Drop for CipherAesGcmSiv {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAesGcmSiv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAesGcmSiv with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherAesGcmSiv with the following Cryptographic Informations: {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -42,9 +63,19 @@ pub struct CipherAesCtr {
     pub iv: Vec<u8>,
 }
 
+impl Drop for CipherAesCtr {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAesCtr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAesCtr with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherAesCtr with the following Cryptographic Informations: {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -54,9 +85,19 @@ pub struct CipherAesXts {
     pub sharedsecret: Vec<u8>,
 }
 
+impl Drop for CipherAesXts {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherAesXts {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherAesXts with the following Cryptographic Informations: {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherAesXts with the following Cryptographic Informations: {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -69,9 +110,19 @@ pub struct CipherChaCha {
     pub sharedsecret: Vec<u8>,
 }
 
+impl Drop for CipherChaCha {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherChaCha {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherChaCha with the following Cryptographic Informations {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherChaCha with the following Cryptographic Informations {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -84,9 +135,19 @@ pub struct CipherChaChaPoly {
     pub sharedsecret: Vec<u8>,
 }
 
+impl Drop for CipherChaChaPoly {
+    fn drop(&mut self) {
+        self.sharedsecret.zeroize();
+    }
+}
+
 impl fmt::Display for CipherChaChaPoly {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CipherChaCha with the following Cryptographic Informations {}", self.infos.metadata)
+        write!(
+            f,
+            "CipherChaCha with the following Cryptographic Informations {}",
+            self.infos.metadata
+        )
     }
 }
 
@@ -184,7 +245,11 @@ pub struct CryptographicMetadata {
 
 impl fmt::Display for CryptographicMetadata {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Process: {}\nEncryption Type: {}\nKey Type: {}\nContent Type: {}", self.process, self.encryption_type, self.key_type, self.content_type)
+        write!(
+            f,
+            "Process: {}\nEncryption Type: {}\nKey Type: {}\nContent Type: {}",
+            self.process, self.encryption_type, self.key_type, self.content_type
+        )
     }
 }
 
@@ -200,13 +265,27 @@ pub struct CryptographicInformation {
     pub location: Option<FileMetadata>,
 }
 
-impl fmt::Display for CryptographicInformation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Cryptographic Information:\n\
-                   -\tMetadata:\t\t{}\n\
-                   -\tContent Length:\t{} bytes\n",
-                   self.metadata,
-                   self.content.len())
+impl Drop for CryptographicInformation {
+    /// Wipes the secret-bearing fields when the value is dropped.
+    ///
+    /// `content` (plaintext on the encrypt side) and `passphrase` are zeroized
+    /// so that neither lingers in freed heap memory. Non-secret metadata is left
+    /// untouched.
+    fn drop(&mut self) {
+        self.content.zeroize();
+        self.passphrase.zeroize();
     }
 }
- 
+
+impl fmt::Display for CryptographicInformation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Cryptographic Information:\n\
+                   -\tMetadata:\t\t{}\n\
+                   -\tContent Length:\t{} bytes\n",
+            self.metadata,
+            self.content.len()
+        )
+    }
+}

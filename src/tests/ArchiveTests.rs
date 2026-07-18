@@ -1,9 +1,13 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
 // removed unused Path import per clippy
-use tempfile::tempdir;
-use crate::{*, archive::{Archive, ArchiveOperation}, zip_manager::*};
+use crate::{
+    archive::{Archive, ArchiveOperation},
+    zip_manager::*,
+    *,
+};
 use ::zip::read::ZipArchive;
+use tempfile::tempdir;
 
 #[test]
 fn test_archive_util_archive_without_deletion() {
@@ -15,7 +19,8 @@ fn test_archive_util_archive_without_deletion() {
     let test_file_path = temp_dir_path.join("test_file.txt");
     {
         let mut test_file = File::create(&test_file_path).expect("Failed to create test file");
-        writeln!(test_file, "This is a test file for archiving.").expect("Failed to write to test file");
+        writeln!(test_file, "This is a test file for archiving.")
+            .expect("Failed to write to test file");
     }
 
     // Ensure the file exists
@@ -29,7 +34,10 @@ fn test_archive_util_archive_without_deletion() {
     assert!(archive_path.exists(), "Archive file was not created.");
 
     // Verify the original directory still exists
-    assert!(temp_dir_path.exists(), "Original directory was deleted despite delete_dir=false.");
+    assert!(
+        temp_dir_path.exists(),
+        "Original directory was deleted despite delete_dir=false."
+    );
 
     // Cleanup: Remove the archive file
     fs::remove_file(archive_path).expect("Failed to remove archive file.");
@@ -45,7 +53,11 @@ fn test_archive_util_archive_with_deletion() {
     let test_file_path = temp_dir_path.join("test_file.txt");
     {
         let mut test_file = File::create(&test_file_path).expect("Failed to create test file");
-        writeln!(test_file, "This is a test file for archiving with deletion.").expect("Failed to write to test file");
+        writeln!(
+            test_file,
+            "This is a test file for archiving with deletion."
+        )
+        .expect("Failed to write to test file");
     }
 
     // Ensure the file exists
@@ -59,7 +71,10 @@ fn test_archive_util_archive_with_deletion() {
     assert!(archive_path.exists(), "Archive file was not created.");
 
     // Verify the original directory has been deleted
-    assert!(!temp_dir_path.exists(), "Original directory was not deleted despite delete_dir=true.");
+    assert!(
+        !temp_dir_path.exists(),
+        "Original directory was not deleted despite delete_dir=true."
+    );
 
     // Cleanup: Remove the archive file
     fs::remove_file(archive_path).expect("Failed to remove archive file.");
@@ -75,7 +90,8 @@ fn test_archive_util_extract_without_deletion() {
     let test_file_path = archive_temp_dir_path.join("test_file.txt");
     {
         let mut test_file = File::create(&test_file_path).expect("Failed to create test file");
-        writeln!(test_file, "This is a test file for extraction.").expect("Failed to write to test file");
+        writeln!(test_file, "This is a test file for extraction.")
+            .expect("Failed to write to test file");
     }
 
     // Archive the directory without deleting the source
@@ -90,20 +106,36 @@ fn test_archive_util_extract_without_deletion() {
 
     // Determine the extraction directory
     let extraction_dir = archive_temp_dir_path;
-    assert!(extraction_dir.exists(), "Extraction directory does not exist.");
+    assert!(
+        extraction_dir.exists(),
+        "Extraction directory does not exist."
+    );
 
     // Verify the extracted file exists
     let extracted_file_path = extraction_dir.join("test_file.txt");
-    assert!(extracted_file_path.exists(), "Extracted file does not exist.");
+    assert!(
+        extracted_file_path.exists(),
+        "Extracted file does not exist."
+    );
 
     // Verify the contents of the extracted file
     let mut contents = String::new();
-    let mut extracted_file = File::open(&extracted_file_path).expect("Failed to open extracted file.");
-    extracted_file.read_to_string(&mut contents).expect("Failed to read extracted file.");
-    assert_eq!(contents.trim(), "This is a test file for extraction.", "Extracted file contents do not match.");
+    let mut extracted_file =
+        File::open(&extracted_file_path).expect("Failed to open extracted file.");
+    extracted_file
+        .read_to_string(&mut contents)
+        .expect("Failed to read extracted file.");
+    assert_eq!(
+        contents.trim(),
+        "This is a test file for extraction.",
+        "Extracted file contents do not match."
+    );
 
     // Verify the archive file still exists
-    assert!(archive_path.exists(), "Archive file was deleted despite delete_archive=false.");
+    assert!(
+        archive_path.exists(),
+        "Archive file was deleted despite delete_archive=false."
+    );
 
     // Cleanup: Remove the archive file
     fs::remove_file(archive_path).expect("Failed to remove archive file.");
@@ -119,7 +151,11 @@ fn test_archive_util_extract_with_deletion() {
     let test_file_path = archive_temp_dir_path.join("test_file.txt");
     {
         let mut test_file = File::create(&test_file_path).expect("Failed to create test file");
-        writeln!(test_file, "This is a test file for extraction with deletion.").expect("Failed to write to test file");
+        writeln!(
+            test_file,
+            "This is a test file for extraction with deletion."
+        )
+        .expect("Failed to write to test file");
     }
 
     // Archive the directory and delete the source
@@ -134,20 +170,36 @@ fn test_archive_util_extract_with_deletion() {
 
     // Determine the extraction directory
     let extraction_dir = archive_temp_dir_path.clone();
-    assert!(extraction_dir.exists(), "Extraction directory does not exist.");
+    assert!(
+        extraction_dir.exists(),
+        "Extraction directory does not exist."
+    );
 
     // Verify the extracted file exists
     let extracted_file_path = extraction_dir.join("test_file.txt");
-    assert!(extracted_file_path.exists(), "Extracted file does not exist.");
+    assert!(
+        extracted_file_path.exists(),
+        "Extracted file does not exist."
+    );
 
     // Verify the contents of the extracted file
     let mut contents = String::new();
-    let mut extracted_file = File::open(&extracted_file_path).expect("Failed to open extracted file.");
-    extracted_file.read_to_string(&mut contents).expect("Failed to read extracted file.");
-    assert_eq!(contents.trim(), "This is a test file for extraction with deletion.", "Extracted file contents do not match.");
+    let mut extracted_file =
+        File::open(&extracted_file_path).expect("Failed to open extracted file.");
+    extracted_file
+        .read_to_string(&mut contents)
+        .expect("Failed to read extracted file.");
+    assert_eq!(
+        contents.trim(),
+        "This is a test file for extraction with deletion.",
+        "Extracted file contents do not match."
+    );
 
     // Verify the archive file has been deleted
-    assert!(!archive_path.exists(), "Archive file was not deleted despite delete_archive=true.");
+    assert!(
+        !archive_path.exists(),
+        "Archive file was not deleted despite delete_archive=true."
+    );
 }
 
 #[test]
@@ -192,7 +244,8 @@ fn test_archive_and_extract() {
     assert!(extracted_file_path.exists());
 
     let mut contents = String::new();
-    let mut extracted_file = File::open(&extracted_file_path).expect("Failed to open extracted file");
+    let mut extracted_file =
+        File::open(&extracted_file_path).expect("Failed to open extracted file");
     extracted_file
         .read_to_string(&mut contents)
         .expect("Failed to read extracted file");
@@ -261,8 +314,11 @@ fn test_archive_and_extract_with_delete_dir() {
     {
         let mut temp_file = File::create(&temp_file_path)
             .expect("Failed to create temp file for delete_dir=true test");
-        writeln!(temp_file, "This file will be archived and then the directory deleted.")
-            .expect("Failed to write to temp file");
+        writeln!(
+            temp_file,
+            "This file will be archived and then the directory deleted."
+        )
+        .expect("Failed to write to temp file");
     }
 
     // Verify the file exists
@@ -271,30 +327,46 @@ fn test_archive_and_extract_with_delete_dir() {
     // 1) ARCHIVE with delete_dir=true
     let archive = Archive::new(temp_dir_path.clone(), ArchiveOperation::Archive);
     // true => delete the original directory after archiving
-    archive.execute(true).expect("Archiving with delete_dir=true failed");
+    archive
+        .execute(true)
+        .expect("Archiving with delete_dir=true failed");
 
     // Verify the archive file was created.
     let archive_path = temp_dir_path.with_extension("tar.xz");
     assert!(archive_path.exists());
 
     // Verify the original directory has been deleted
-    assert!(!temp_dir_path.exists(), "Source directory was not deleted after archiving with delete_dir=true");
+    assert!(
+        !temp_dir_path.exists(),
+        "Source directory was not deleted after archiving with delete_dir=true"
+    );
 
     // 2) UNARCHIVE with delete_dir=true
     let unarchive = Archive::new(archive_path.clone(), ArchiveOperation::Unarchive);
     // true => delete the archive file after extraction
-    unarchive.execute(true).expect("Unarchiving with delete_dir=true failed");
+    unarchive
+        .execute(true)
+        .expect("Unarchiving with delete_dir=true failed");
 
     // The extraction should restore the original directory
     let extracted_dir = temp_dir_path.clone();
-    assert!(extracted_dir.exists(), "Extracted directory does not exist after unarchiving with delete_dir=true");
+    assert!(
+        extracted_dir.exists(),
+        "Extracted directory does not exist after unarchiving with delete_dir=true"
+    );
 
     // Verify the archive file has been deleted
-    assert!(!archive_path.exists(), "Archive file was not deleted after unarchiving with delete_dir=true");
+    assert!(
+        !archive_path.exists(),
+        "Archive file was not deleted after unarchiving with delete_dir=true"
+    );
 
     // Verify the extracted file exists and has correct contents
     let extracted_file_path = extracted_dir.join("test_file_delete.txt");
-    assert!(extracted_file_path.exists(), "Extracted file does not exist");
+    assert!(
+        extracted_file_path.exists(),
+        "Extracted file does not exist"
+    );
 
     let mut contents = String::new();
     let mut extracted_file = File::open(&extracted_file_path)
@@ -360,16 +432,25 @@ fn test_extract_macro_with_delete() {
     assert!(archive_path.exists());
 
     // Verify the original directory has been deleted
-    assert!(!temp_dir_path.exists(), "Source directory was not deleted after archiving");
+    assert!(
+        !temp_dir_path.exists(),
+        "Source directory was not deleted after archiving"
+    );
 
     // Extract the archive and delete the archive file
     extract!(archive_path, true);
 
     // Verify the extracted directory exists
-    assert!(temp_dir_path.exists(), "Extraction failed: Directory does not exist");
+    assert!(
+        temp_dir_path.exists(),
+        "Extraction failed: Directory does not exist"
+    );
 
     // Verify the archive file has been deleted
-    assert!(!archive_path.exists(), "Archive file was not deleted after extraction");
+    assert!(
+        !archive_path.exists(),
+        "Archive file was not deleted after extraction"
+    );
 
     // Verify the extracted file exists
     let extracted_file_path = temp_dir_path.join("test_file.txt");
@@ -377,7 +458,8 @@ fn test_extract_macro_with_delete() {
 
     // Read and verify the file contents
     let mut contents = String::new();
-    let mut extracted_file = File::open(&extracted_file_path).expect("Failed to open extracted file");
+    let mut extracted_file =
+        File::open(&extracted_file_path).expect("Failed to open extracted file");
     extracted_file
         .read_to_string(&mut contents)
         .expect("Failed to read extracted file");
@@ -403,7 +485,9 @@ fn test_zip_creation() {
     let archive_path = temp_dir_path.join("test_archive.zip");
     let mut manager = ZipManager::new(archive_path.to_str().unwrap());
     manager.add_file(test_file_path.to_str().unwrap());
-    manager.create_zip(Compression::deflated()).expect("Failed to create ZIP archive");
+    manager
+        .create_zip(Compression::deflated())
+        .expect("Failed to create ZIP archive");
 
     // Verify the ZIP archive was created
     assert!(archive_path.exists(), "ZIP archive was not created");
@@ -414,7 +498,9 @@ fn test_zip_creation() {
 
     println!("Files in ZIP archive:");
     for i in 0..zip_archive.len() {
-        let file = zip_archive.by_index(i).expect("Failed to access file in ZIP archive");
+        let file = zip_archive
+            .by_index(i)
+            .expect("Failed to access file in ZIP archive");
         println!("Found file in ZIP: {}", file.name());
     }
 
@@ -422,13 +508,17 @@ fn test_zip_creation() {
     // Ensure the path matches exactly how it's stored in the ZIP
     let file_name_in_zip = "test_file.txt"; // Adjust if the path includes directories
 
-    let mut extracted_file = zip_archive
-        .by_name(file_name_in_zip)
-        .unwrap();
+    let mut extracted_file = zip_archive.by_name(file_name_in_zip).unwrap();
 
     let mut contents = String::new();
-    extracted_file.read_to_string(&mut contents).expect("Failed to read extracted file");
-    assert_eq!(contents.trim(), "This is a test file.", "Extracted file contents do not match");
+    extracted_file
+        .read_to_string(&mut contents)
+        .expect("Failed to read extracted file");
+    assert_eq!(
+        contents.trim(),
+        "This is a test file.",
+        "Extracted file contents do not match"
+    );
 
     // Cleanup: Remove the ZIP file
     fs::remove_file(&archive_path).expect("Failed to remove ZIP archive");
@@ -469,7 +559,9 @@ fn test_zip_folder() {
     let archive_path = temp_dir_path.join("test_folder_archive.zip");
     let mut manager = ZipManager::new(archive_path.to_str().unwrap());
     manager.add_directory(temp_dir_path.to_str().unwrap());
-    manager.create_zip(Compression::Deflated).expect("Failed to create ZIP archive");
+    manager
+        .create_zip(Compression::Deflated)
+        .expect("Failed to create ZIP archive");
 
     // Verify the ZIP archive was created
     assert!(archive_path.exists(), "ZIP archive was not created");
@@ -481,7 +573,9 @@ fn test_zip_folder() {
     println!("Files in ZIP archive:");
     let mut found_files = Vec::new();
     for i in 0..zip_archive.len() {
-        let file = zip_archive.by_index(i).expect("Failed to access file in ZIP archive");
+        let file = zip_archive
+            .by_index(i)
+            .expect("Failed to access file in ZIP archive");
         println!("Found file in ZIP: {}", file.name());
         found_files.push(file.name().to_string());
     }
@@ -502,8 +596,14 @@ fn test_zip_folder() {
             .expect("Failed to find sub_dir/file2.txt in ZIP archive");
 
         let mut contents2 = String::new();
-        extracted_file2.read_to_string(&mut contents2).expect("Failed to read extracted file2");
-        assert_eq!(contents2.trim(), "Content of file2", "Extracted file2 content mismatch");
+        extracted_file2
+            .read_to_string(&mut contents2)
+            .expect("Failed to read extracted file2");
+        assert_eq!(
+            contents2.trim(),
+            "Content of file2",
+            "Extracted file2 content mismatch"
+        );
     }
 
     {
@@ -512,8 +612,14 @@ fn test_zip_folder() {
             .expect("Failed to find sub_dir/nested/file3.txt in ZIP archive");
 
         let mut contents3 = String::new();
-        extracted_file3.read_to_string(&mut contents3).expect("Failed to read extracted file3");
-        assert_eq!(contents3.trim(), "Content of file3", "Extracted file3 content mismatch");
+        extracted_file3
+            .read_to_string(&mut contents3)
+            .expect("Failed to read extracted file3");
+        assert_eq!(
+            contents3.trim(),
+            "Content of file3",
+            "Extracted file3 content mismatch"
+        );
     }
 
     // Cleanup: Remove the ZIP file

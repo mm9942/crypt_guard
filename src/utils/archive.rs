@@ -23,7 +23,7 @@ pub struct Archive {
 
 impl Archive {
     /// Creates a new `Archive` instance.
-    /// 
+    ///
     /// - `source_path`:
     ///   - For `Archive`, the directory (or file) that you want to compress.
     ///   - For `Unarchive`, the `.tar.xz` file that you want to extract.

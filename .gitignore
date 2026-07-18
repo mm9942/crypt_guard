@@ -2,3 +2,15 @@ target/
 .github/
 Falcon1024/
 key/
+.claude/
+.remember/
+old/
+old/.cargo-home/
+test.log
+.codex/
+session-2026-06-21/
+tools/
+.codex
+test_legacy.log
+test_legacy_pqclean.log
+Cargo.lock

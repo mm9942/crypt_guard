@@ -5,7 +5,7 @@ use crate::builder::{
     DecryptBuilder, EncryptBuilder, KyberKeygenBuilder, SignAlgorithm, SignBuilder, SignMode,
     SymmetricAlg, VerifyBuilder,
 };
-use crate::core::kyber::key_controler::{KeyControKyber1024, KeyControKyber768, KeyControKyber512};
+use crate::core::kyber::key_controler::{KeyControKyber512, KeyControKyber768};
 
 #[test]
 fn builder_encrypt_decrypt_data_aes_gcm_siv_kyber768() -> Result<(), Box<dyn std::error::Error>> {
@@ -133,4 +133,3 @@ fn builder_keygen_768() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!sk.is_empty());
     Ok(())
 }
-

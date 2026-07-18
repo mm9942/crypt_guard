@@ -1,0 +1,12 @@
+error[E0599]: no method named `seal` found for struct `EncryptorBuilder<WithRecipient, MissingPlaintext, crypt_guard::MlKem768>` in the current scope
+ --> tests/ui/sealer_missing_plaintext.rs:7:10
+  |
+5 |       let _ = Encryptor::<MlKem768, XChaCha20Poly1305>::new()
+  |  _____________-
+6 | |         .recipient(vec![0u8; 32])
+7 | |         .seal();
+  | |         -^^^^ method not found in `EncryptorBuilder<WithRecipient, MissingPlaintext, crypt_guard::MlKem768>`
+  | |_________|
+  |
+  |
+  = note: the method was found for `EncryptorBuilder<WithRecipient, WithPlaintext, K, A>`

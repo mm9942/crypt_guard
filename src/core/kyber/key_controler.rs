@@ -1,20 +1,11 @@
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
-use crate::{
-    *,
-    log_activity, 
-    error::CryptError, 
-    //hmac_sign::*,
-    FileTypes,
-    FileState,
-    FileMetadata,
-    KeyTypes,
-    Key,
-};
+use crate::{error::CryptError, log_activity, FileMetadata, FileState, FileTypes, Key, KeyTypes};
+use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use std::{
-    path::{PathBuf, Path},
-    marker::PhantomData, 
+    marker::PhantomData,
+    path::{Path, PathBuf},
     result::Result,
 };
+use zeroize::Zeroize;
 
 /// Trait for implementing key management functions. This trait provides
 /// an interface for key pair generation, encapsulation/decapsulation of secrets,
@@ -30,49 +21,63 @@ pub trait KyberKeyFunctions {
 
 /// Implementation for Kyber 1024 variant.
 pub struct KeyControKyber1024;
-impl KyberKeyFunctions for KeyControKyber1024{
+impl KyberKeyFunctions for KeyControKyber1024 {
     /// Generates a public and secret key pair using the Kyber1024 algorithm.
-	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber1024::*;
-		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
+    fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber1024::*;
+        log_activity!(
+            "Generating a new keypair.\n\tThe used KEM: ",
+            format!("Kyber{}", 1024).as_str()
+        );
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_owned();
         let secret_key = sk.as_bytes().to_owned();
 
-		log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
+        log_activity!(
+            "A new keypair was created.\n\tThe used KEM: ",
+            format!("Kyber{}", 1024).as_str()
+        );
         Ok((public_key, secret_key))
-	}
+    }
 
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
-	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber1024::*;
-		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
+    fn encap(public: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber1024::*;
+        log_activity!(
+            "Generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 1024).as_str()
+        );
 
         let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
-		let ciphertext = ct.as_bytes().to_vec();
-		let shared_secret = ss.as_bytes().to_vec();
+        let ciphertext = ct.as_bytes().to_vec();
+        let shared_secret = ss.as_bytes().to_vec();
 
-
-		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
-		Ok((shared_secret, ciphertext))
-	}
+        log_activity!(
+            "Finished generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 1024).as_str()
+        );
+        Ok((shared_secret, ciphertext))
+    }
 
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
-	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
-		use pqcrypto_kyber::kyber1024::*;
-		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
+    fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
+        use pqcrypto_kyber::kyber1024::*;
+        log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
-        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+        let ct = Ciphertext::from_bytes(cipher).unwrap();
         let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
-		let shared_secret = ss2.as_bytes().to_vec();
+        let shared_secret = ss2.as_bytes().to_vec();
 
-		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
-		Ok(shared_secret)
-	}
+        log_activity!(
+            "Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 1024).as_str()
+        );
+        Ok(shared_secret)
+    }
 }
 
 // Provide inherent methods so call sites can use `KeyControKyber1024::keypair()` etc.
@@ -92,46 +97,61 @@ impl KeyControKyber1024 {
 pub struct KeyControKyber768;
 impl KyberKeyFunctions for KeyControKyber768 {
     /// Generates a public and secret key pair using the Kyber768 algorithm.
-	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber768::*;
-		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+    fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber768::*;
+        log_activity!(
+            "Generating a new keypair.\n\tThe used KEM: ",
+            format!("Kyber{}", 768).as_str()
+        );
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_vec();
         let secret_key = sk.as_bytes().to_vec();
-		log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+        log_activity!(
+            "A new keypair was created.\n\tThe used KEM: ",
+            format!("Kyber{}", 768).as_str()
+        );
 
         Ok((public_key, secret_key))
-	}
+    }
 
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
-	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber768::*;
-		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+    fn encap(public: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber768::*;
+        log_activity!(
+            "Generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 768).as_str()
+        );
 
         let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
-		let ciphertext = ct.as_bytes().to_vec();
-		let shared_secret = ss.as_bytes().to_vec();
-		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+        let ciphertext = ct.as_bytes().to_vec();
+        let shared_secret = ss.as_bytes().to_vec();
+        log_activity!(
+            "Finished generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 768).as_str()
+        );
 
-		Ok((shared_secret, ciphertext))
-	}
+        Ok((shared_secret, ciphertext))
+    }
 
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
-	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
-		use pqcrypto_kyber::kyber768::*;
-		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+    fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
+        use pqcrypto_kyber::kyber768::*;
+        log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
-        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+        let ct = Ciphertext::from_bytes(cipher).unwrap();
         let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
-		let shared_secret = ss2.as_bytes().to_vec();
-		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
+        let shared_secret = ss2.as_bytes().to_vec();
+        log_activity!(
+            "Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 768).as_str()
+        );
 
-		Ok(shared_secret)
-	}
+        Ok(shared_secret)
+    }
 }
 
 // Provide inherent methods so call sites can use `KeyControKyber768::keypair()` etc.
@@ -151,46 +171,61 @@ impl KeyControKyber768 {
 pub struct KeyControKyber512;
 impl KyberKeyFunctions for KeyControKyber512 {
     /// Generates a public and secret key pair using the Kyber512 algorithm.
-	fn keypair() -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber512::*;
-		log_activity!("Generating a new keypair.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+    fn keypair() -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber512::*;
+        log_activity!(
+            "Generating a new keypair.\n\tThe used KEM: ",
+            format!("Kyber{}", 512).as_str()
+        );
 
         let (pk, sk) = keypair();
         let public_key = pk.as_bytes().to_vec();
         let secret_key = sk.as_bytes().to_vec();
-        log_activity!("A new keypair was created.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+        log_activity!(
+            "A new keypair was created.\n\tThe used KEM: ",
+            format!("Kyber{}", 512).as_str()
+        );
 
         Ok((public_key, secret_key))
-	}
+    }
 
     /// Encapsulates a secret using a public key to produce a shared secret and a ciphertext.
-	fn encap(public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		use pqcrypto_kyber::kyber512::*;
-		log_activity!("Generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+    fn encap(public: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        use pqcrypto_kyber::kyber512::*;
+        log_activity!(
+            "Generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 512).as_str()
+        );
 
         let pk = PublicKey::from_bytes(public).unwrap();
         let (ss, ct) = encapsulate(&pk);
 
-		let ciphertext = ct.as_bytes().to_vec();
-		let shared_secret = ss.as_bytes().to_vec();
-		log_activity!("Finished generating shared_secret and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+        let ciphertext = ct.as_bytes().to_vec();
+        let shared_secret = ss.as_bytes().to_vec();
+        log_activity!(
+            "Finished generating shared_secret and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 512).as_str()
+        );
 
-		Ok((shared_secret, ciphertext))
-	}
+        Ok((shared_secret, ciphertext))
+    }
 
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
-	fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
-		use pqcrypto_kyber::kyber512::*;
-		log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
-		
-        let ct = Ciphertext::from_bytes(cipher).unwrap();        
+    fn decap(sec: &[u8], cipher: &[u8]) -> Result<Vec<u8>, CryptError> {
+        use pqcrypto_kyber::kyber512::*;
+        log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+
+        let ct = Ciphertext::from_bytes(cipher).unwrap();
         let sk = SecretKey::from_bytes(sec).unwrap();
         let ss2 = decapsulate(&ct, &sk);
-		let shared_secret = ss2.as_bytes().to_vec();
-		log_activity!("Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
+        let shared_secret = ss2.as_bytes().to_vec();
+        log_activity!(
+            "Decapsulated the shared_secret using secret_key and ciphertext.\n\tThe used KEM: ",
+            format!("Kyber{}", 512).as_str()
+        );
 
-		Ok(shared_secret)
-	}
+        Ok(shared_secret)
+    }
 }
 
 // Provide inherent methods so call sites can use `KeyControKyber512::keypair()` etc.
@@ -213,7 +248,14 @@ pub struct KeyControl<T: KyberKeyFunctions> {
     pub secret_key: Vec<u8>,
     pub ciphertext: Vec<u8>,
     pub shared_secret: Vec<u8>,
-    _marker: std::marker::PhantomData<T>, 
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: KyberKeyFunctions> Drop for KeyControl<T> {
+    fn drop(&mut self) {
+        self.secret_key.zeroize();
+        self.shared_secret.zeroize();
+    }
 }
 
 impl<T: KyberKeyFunctions> KeyControl<T> {
@@ -246,103 +288,77 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
     }
 
     /// Retrieves a specified key based on `KeyTypes`.
-	pub fn get_key(&self, key: KeyTypes) -> Result<Key, CryptError> {
-		let key = match key {
-			KeyTypes::None => unimplemented!(),
-			KeyTypes::PublicKey => {
-				Key::new(KeyTypes::PublicKey, self.public_key.to_vec())
-			}
-			KeyTypes::SecretKey => {
-				Key::new(KeyTypes::SecretKey, self.secret_key.to_vec())
-			}
-			KeyTypes::Ciphertext => {
-				Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec())
-			}
-			KeyTypes::SharedSecret => {
-				Key::new(KeyTypes::SharedSecret, self.shared_secret.to_vec())
-			}
-		};
-		Ok(key)
-	}
+    pub fn get_key(&self, key: KeyTypes) -> Result<Key, CryptError> {
+        let key = match key {
+            KeyTypes::None => unimplemented!(),
+            KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
+            KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
+            KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
+            KeyTypes::SharedSecret => Key::new(KeyTypes::SharedSecret, self.shared_secret.to_vec()),
+        };
+        Ok(key)
+    }
 
     /// Saves a specified key to a file at the given base path.
-	pub fn save(&self, key: KeyTypes, base_path: PathBuf) -> Result<(), CryptError> {
-		let key = match key {
-			KeyTypes::None => unimplemented!(),
-			KeyTypes::PublicKey => {
-				Key::new(KeyTypes::PublicKey, self.public_key.to_vec())
-			}
-			KeyTypes::SecretKey => {
-				Key::new(KeyTypes::SecretKey, self.secret_key.to_vec())
-			}
-			KeyTypes::Ciphertext => {
-				Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec())
-			}
-			KeyTypes::SharedSecret => unimplemented!(),
-		};
-		key.save(base_path)
-	}
+    pub fn save(&self, key: KeyTypes, base_path: PathBuf) -> Result<(), CryptError> {
+        let key = match key {
+            KeyTypes::None => unimplemented!(),
+            KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
+            KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
+            KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
+            KeyTypes::SharedSecret => unimplemented!(),
+        };
+        key.save(base_path)
+    }
     /// Loads a specified key from a file.
-	pub fn load(&self, key: KeyTypes, path: &Path) -> Result<Vec<u8>, CryptError> {
-		let key = match key {
-			KeyTypes::None => unimplemented!(),
-			KeyTypes::PublicKey => {
-		        FileMetadata::from(
-		            PathBuf::from(path),
-		            FileTypes::PublicKey,
-		            FileState::Other
-		        )
-			}
-			KeyTypes::SecretKey => {
-		        FileMetadata::from(
-		            PathBuf::from(path),
-		            FileTypes::SecretKey,
-		            FileState::Other
-		        )
-			}
-			KeyTypes::Ciphertext => {
-		        FileMetadata::from(
-		            PathBuf::from(path),
-		            FileTypes::Ciphertext,
-		            FileState::Other
-		        )
-			}
-			KeyTypes::SharedSecret => unimplemented!(),
-		};
-		Ok(key.load().unwrap())
-	}
-
+    pub fn load(&self, key: KeyTypes, path: &Path) -> Result<Vec<u8>, CryptError> {
+        let key = match key {
+            KeyTypes::None => unimplemented!(),
+            KeyTypes::PublicKey => {
+                FileMetadata::from(PathBuf::from(path), FileTypes::PublicKey, FileState::Other)
+            }
+            KeyTypes::SecretKey => {
+                FileMetadata::from(PathBuf::from(path), FileTypes::SecretKey, FileState::Other)
+            }
+            KeyTypes::Ciphertext => {
+                FileMetadata::from(PathBuf::from(path), FileTypes::Ciphertext, FileState::Other)
+            }
+            KeyTypes::SharedSecret => unimplemented!(),
+        };
+        Ok(key.load().unwrap())
+    }
 
     /// Getter methods for public_key, secret_key, ciphertext, and shared_secret.
-	pub fn public_key(&self) -> Result<Vec<u8>, CryptError> {
-		let key = &self.public_key;
-		Ok(key.to_vec())
-	}
-	pub fn secret_key(&self) -> Result<Vec<u8>, CryptError> {
-		let key = &self.secret_key;
-		Ok(key.to_vec())
-	}
-	pub fn ciphertext(&self) -> Result<Vec<u8>, CryptError> {
-		let key = &self.ciphertext;
-		Ok(key.to_vec())
-	}
-	pub fn shared_secret(&self) -> Result<Vec<u8>, CryptError> {
-		let key = &self.shared_secret;
-		Ok(key.to_vec())
-	}
-	
+    pub fn public_key(&self) -> Result<Vec<u8>, CryptError> {
+        let key = &self.public_key;
+        Ok(key.to_vec())
+    }
+    pub fn secret_key(&self) -> Result<Vec<u8>, CryptError> {
+        let key = &self.secret_key;
+        Ok(key.to_vec())
+    }
+    pub fn ciphertext(&self) -> Result<Vec<u8>, CryptError> {
+        let key = &self.ciphertext;
+        Ok(key.to_vec())
+    }
+    pub fn shared_secret(&self) -> Result<Vec<u8>, CryptError> {
+        let key = &self.shared_secret;
+        Ok(key.to_vec())
+    }
+
     /// Encapsulates a secret using a public key.
-	pub fn encap(&self, public: &[u8]) -> Result<(Vec<u8>,Vec<u8>), CryptError> {
-		T::encap(public)
-	}
+    pub fn encap(&self, public: &[u8]) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+        T::encap(public)
+    }
     /// Decapsulates the ciphertext using a secret key to retrieve the shared secret.
     pub fn decap(&self, secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptError> {
         // Call the `decap` method on the type `T` that `KeyControl` wraps around
         T::decap(secret_key, ciphertext)
     }
-
 }
 
 impl<T: KyberKeyFunctions> Default for KeyControl<T> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

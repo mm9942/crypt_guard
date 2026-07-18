@@ -1,40 +1,19 @@
-use crypt_guard::{*, error::*};
-use std::fs::{self, File};
-use tempfile::{TempDir, Builder};
+use crypt_guard::kem::{backend::OsRng, ml_kem::MlKem768Impl, KemBackend};
+use crypt_guard::{Decryptor, Encryptor, MlKem768, XChaCha20Poly1305};
 
+fn main() -> Result<(), crypt_guard::error::CryptError> {
+    let mut rng = OsRng;
+    let (public_key, secret_key) = MlKem768Impl::keypair(&mut rng)?;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let message = "Hey, how are you doing?";
+    let envelope = Encryptor::<MlKem768, XChaCha20Poly1305>::new()
+        .recipient(public_key.as_ref().to_vec())
+        .plaintext(b"Hello from XChaCha20Poly1305")
+        .seal()?;
 
-    let _tmp_dir = TempDir::new().map_err(CryptError::from)?;
-    let tmp_dir = Builder::new().prefix("messages").tempdir().map_err(CryptError::from)?;
-    
-    let enc_path = tmp_dir.path().join("message.txt");
-    let dec_path = tmp_dir.path().join("message.txt.enc"); 
-    
-    fs::write(&enc_path, message.as_bytes())?;
+    let plaintext = Decryptor::<MlKem768, XChaCha20Poly1305>::new()
+        .secret_key(secret_key.as_ref().to_vec())
+        .open(&envelope)?;
 
-    let passphrase = "Test Passphrase";
-
-    // Generate key pair
-    let (public_key, secret_key) = KeyControKyber768::keypair().expect("Failed to generate keypair");
-
-    // Instantiate Kyber for encryption of a file with Kyber768 and XChaCha20
-    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-    let mut encryptor = Kyber::<Encryption, Kyber768, File, XChaCha20>::new(public_key.clone(), None)?;
-
-    // Encrypt message
-    let (_encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase)?;
-
-    let nonce = encryptor.get_nonce();
-
-    let _ = fs::remove_file(enc_path.clone());
-
-    // Instantiate Kyber for decryption of a file with Kyber768 and XChaCha20
-    // Fails when not using either of these properties since it would be the wrong type of algorithm, data, keysize or process!
-    let decryptor = Kyber::<Decryption, Kyber768, File, XChaCha20>::new(secret_key, Some(nonce?.to_string()))?;
-    
-    // Decrypt message
-    let _decrypt_message = decryptor.decrypt_file(dec_path.clone(), passphrase, cipher)?;
+    assert_eq!(plaintext, b"Hello from XChaCha20Poly1305");
     Ok(())
 }

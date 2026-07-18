@@ -1,13 +1,5 @@
-use crate::{
-    key_control::*,
-    cryptography::{
-        *,
-    },
-};
-use std::{
-	fs::File,
-	io::Write,
-};
+use crate::{cryptography::*, key_control::*};
+use std::{fs::File, io::Write};
 
 /// Enum defining cryptographic mechanisms supported by the system.
 impl CryptographicMechanism {
@@ -42,7 +34,9 @@ impl CryptographicMechanism {
 }
 
 impl Default for CryptographicMechanism {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Enum defining the process type (encryption or decryption).
@@ -78,7 +72,9 @@ impl KeyEncapMechanism {
 }
 
 impl Default for KeyEncapMechanism {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Enum defining the type of content being encrypted or decrypted.
@@ -102,73 +98,83 @@ impl ContentType {
 }
 
 impl Default for ContentType {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Stores cryptographic settings for an operation.
 impl CryptographicMetadata {
     /// Constructs a new instance with default values.
-	pub fn new() -> Self {
-		CryptographicMetadata {
-			process: Process::encryption(),
-			encryption_type: CryptographicMechanism::new(),
-			key_type: KeyEncapMechanism::new(),
-			content_type: ContentType::new(),
-		}
-	}
-	
+    pub fn new() -> Self {
+        CryptographicMetadata {
+            process: Process::encryption(),
+            encryption_type: CryptographicMechanism::new(),
+            key_type: KeyEncapMechanism::new(),
+            content_type: ContentType::new(),
+        }
+    }
+
     /// Constructs a new instance with specified values.
-	pub fn from(
-		process: Process,
-		encryption_type: CryptographicMechanism,
-		key_type: KeyEncapMechanism,
-		content_type: ContentType,
-	) -> Self {
-		CryptographicMetadata {
-			process,
-			encryption_type,
-			key_type,
-			content_type,
-		}
-	}
+    pub fn from(
+        process: Process,
+        encryption_type: CryptographicMechanism,
+        key_type: KeyEncapMechanism,
+        content_type: ContentType,
+    ) -> Self {
+        CryptographicMetadata {
+            process,
+            encryption_type,
+            key_type,
+            content_type,
+        }
+    }
 
     /// Accessor method for process property
-	pub fn process(&self) -> Result<Process, CryptError> {
-		Ok(self.process)
-	}
+    pub fn process(&self) -> Result<Process, CryptError> {
+        Ok(self.process)
+    }
 
     /// Accessor method for encryption_type property
-	pub fn encryption_type(self) -> Result<CryptographicMechanism, CryptError> {
-		Ok(self.encryption_type)
-	}
+    pub fn encryption_type(self) -> Result<CryptographicMechanism, CryptError> {
+        Ok(self.encryption_type)
+    }
 
     /// Accessor method for key_type property
-	pub fn key_type(self) -> Result<KeyEncapMechanism, CryptError> {
-		Ok(self.key_type)
-	}
+    pub fn key_type(self) -> Result<KeyEncapMechanism, CryptError> {
+        Ok(self.key_type)
+    }
 
     /// Accessor method for content_type property
-	pub fn content_type(self) -> Result<ContentType, CryptError> {
-		Ok(self.content_type)
-	}
+    pub fn content_type(self) -> Result<ContentType, CryptError> {
+        Ok(self.content_type)
+    }
 }
 
 impl Default for CryptographicMetadata {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for CryptographicInformation {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Holds all cryptographic information for an encryption/decryption operation.
 impl CryptographicInformation {
     /// Constructs a new instance with empty values and default metadata.
-	pub fn new() -> Self {
-		CryptographicInformation {
-			content: Vec::new(),
-			passphrase: Vec::new(),
-			metadata: CryptographicMetadata::new(),
-			safe: false,
-			location: None
-		}
-	}
+    pub fn new() -> Self {
+        CryptographicInformation {
+            content: Vec::new(),
+            passphrase: Vec::new(),
+            metadata: CryptographicMetadata::new(),
+            safe: false,
+            location: None,
+        }
+    }
 
     /// Checks if the cryptographic information contains a file.
     pub fn contains_file(&self) -> Result<bool, CryptError> {
@@ -176,16 +182,19 @@ impl CryptographicInformation {
     }
 
     /// Sets the content to be encrypted or decrypted.
-	pub fn set_data(&mut self, data: &[u8]) -> Result<(), CryptError> {
-		let data = data.to_vec();
-		self.content = data;
-		Ok(())
-	}
+    pub fn set_data(&mut self, data: &[u8]) -> Result<(), CryptError> {
+        let data = data.to_vec();
+        self.content = data;
+        Ok(())
+    }
 
     /// Prepares a file name for saving, considering its extension.
-    fn prepare_file_name_for_saving(&self, file_path: &std::path::Path) -> Result<PathBuf, CryptError> {
+    fn prepare_file_name_for_saving(
+        &self,
+        file_path: &std::path::Path,
+    ) -> Result<PathBuf, CryptError> {
         let mut new_file_path = file_path.to_path_buf();
-        
+
         // Check if the file extension is .enc
         if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
             if extension == "enc" {
@@ -219,48 +228,50 @@ impl CryptographicInformation {
         }
 
         let mut buffer = File::create(&file_path_with_enc).map_err(|_| CryptError::WriteError)?;
-        buffer.write_all(&self.content).map_err(|_| CryptError::WriteError)?;
+        buffer
+            .write_all(&self.content)
+            .map_err(|_| CryptError::WriteError)?;
 
         Ok(())
     }
 
     /// Indicates whether the cryptographic operation is considered safe.
-	pub fn safe(&self) -> Result<bool, CryptError> {
-		Ok(self.safe)
-	}
+    pub fn safe(&self) -> Result<bool, CryptError> {
+        Ok(self.safe)
+    }
 
     /// Returns the file location.
-	pub fn location(&self) -> Result<PathBuf, CryptError> {
+    pub fn location(&self) -> Result<PathBuf, CryptError> {
         match &self.location {
             Some(path) => Ok(path.location()?),
-            _ => Err(CryptError::PathError)
+            _ => Err(CryptError::PathError),
         }
-	}
+    }
 
     /// Constructs a new instance with specified values.
-	pub fn from(
-		content: Vec<u8>,
-		passphrase: Vec<u8>,
-		metadata: CryptographicMetadata,
-		safe: bool,
-		location: Option<FileMetadata>
-	) -> Self {
-		CryptographicInformation {
-			content,
-			passphrase,
-			metadata,
-			safe,
-			location
-		}
-	}
+    pub fn from(
+        content: Vec<u8>,
+        passphrase: Vec<u8>,
+        metadata: CryptographicMetadata,
+        safe: bool,
+        location: Option<FileMetadata>,
+    ) -> Self {
+        CryptographicInformation {
+            content,
+            passphrase,
+            metadata,
+            safe,
+            location,
+        }
+    }
 
-	// Accessor method for content.
-	pub fn content(&self) -> Result<&[u8], CryptError> {
-		Ok(&self.content)
-	}
+    // Accessor method for content.
+    pub fn content(&self) -> Result<&[u8], CryptError> {
+        Ok(&self.content)
+    }
 
-	// Accessor method for passphrase
-	pub fn passphrase(&self) -> Result<&[u8], CryptError> {
-		Ok(&self.passphrase)
-	}
+    // Accessor method for passphrase
+    pub fn passphrase(&self) -> Result<&[u8], CryptError> {
+        Ok(&self.passphrase)
+    }
 }

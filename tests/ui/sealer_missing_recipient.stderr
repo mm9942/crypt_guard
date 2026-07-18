@@ -1,0 +1,9 @@
+error[E0599]: no method named `plaintext` found for struct `EncryptorBuilder<MissingRecipient, MissingPlaintext, crypt_guard::MlKem768>` in the current scope
+ --> tests/ui/sealer_missing_recipient.rs:6:10
+  |
+5 |       let _ = Encryptor::<MlKem768, XChaCha20Poly1305>::new()
+  |  _____________-
+6 | |         .plaintext(b"hello")
+  | |         -^^^^^^^^^ private field, not a method
+  | |_________|
+  |

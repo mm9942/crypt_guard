@@ -1,0 +1,5 @@
+error[E0599]: no method named `decrypt_msg` found for struct `crypt_guard::hub::Kyber<ProcessStatus, KyberSize, ContentStatus, AlgorithmParam>` in the current scope
+  --> tests/ui/content_decrypt_msg_on_files.rs:20:17
+   |
+20 |     let _ = dec.decrypt_msg(&envelope.ciphertext, "passphrase", &envelope);
+   |                 ^^^^^^^^^^^ method not found in `crypt_guard::hub::Kyber<crypt_guard::Decryption, crypt_guard::MlKem768, Files, crypt_guard::XChaCha20Poly1305>`

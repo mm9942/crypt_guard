@@ -1,21 +1,23 @@
 //use crypt_guard_proc::{*, log_actnonceity, write_log};
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::{CryptographicFunctions, KeyControlVariant};
 use crate::{
-    *,
-    cryptography::{*, hmac_sign::{Sign, SignType, Operation}},
-    error::CryptError, 
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
+    cryptography::{
+        hmac_sign::{Operation, Sign, SignType},
+        *,
     },
+    error::CryptError,
 };
-use std::result::Result;
-use rand::{RngCore, rngs::OsRng};
-use hex;
+use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
-    XChaCha20Poly1305, XNonce
+    XChaCha20Poly1305, XNonce,
 };
-use aes::cipher::generic_array::GenericArray;
+use hex;
+use hmac::{Hmac, Mac};
+use rand::{rngs::OsRng, RngCore};
+use sha2::Sha256;
+use std::result::Result;
 
 /// Generates a 24-byte nonce using OS-level randomness.
 ///
@@ -25,6 +27,27 @@ pub fn generate_nonce() -> [u8; 24] {
     let mut nonce = [0u8; 24];
     OsRng.fill_bytes(&mut nonce);
     nonce
+}
+
+fn derive_legacy_xchacha_poly_key(
+    sharedsecret: &[u8],
+    nonce: &[u8; 24],
+) -> Result<[u8; 32], CryptError> {
+    type HmacSha256 = Hmac<Sha256>;
+    let mut extract =
+        <HmacSha256 as Mac>::new_from_slice(nonce).expect("HMAC-SHA256 accepts any key length");
+    extract.update(sharedsecret);
+    let prk = extract.finalize().into_bytes();
+
+    let mut expand =
+        <HmacSha256 as Mac>::new_from_slice(&prk).expect("HMAC-SHA256 accepts any key length");
+    expand.update(b"crypt_guard:legacy:xchacha20poly1305:key");
+    expand.update(&[1]);
+    let okm = expand.finalize().into_bytes();
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&okm[..32]);
+    Ok(key)
 }
 
 /// The main struct for handling cryptographic operations with ChaCha20 algorithm.
@@ -45,10 +68,14 @@ impl CipherChaChaPoly {
                 let decoded = hex::decode(nonce).expect("An error occurred while decoding hex!");
                 array.copy_from_slice(&decoded);
                 array
-            },
+            }
             None => generate_nonce(),
         };
-        CipherChaChaPoly { infos, sharedsecret: Vec::new(), nonce }
+        CipherChaChaPoly {
+            infos,
+            sharedsecret: Vec::new(),
+            nonce,
+        }
     }
 
     /// Retrieves the encrypted or decrypted data stored within the CryptographicInformation.
@@ -102,33 +129,60 @@ impl CipherChaChaPoly {
         &self.nonce
     }
 
+    // Legacy tuple-return XChaCha20Poly1305 path; kept for source compatibility,
+    // not reached from the default envelope API.
+    #[allow(dead_code)]
     fn encryption(&self) -> Result<(Vec<u8>, [u8; 24]), CryptError> {
         let plaintext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
+        let derived_key = derive_legacy_xchacha_poly_key(&self.sharedsecret, &self.nonce)?;
+        let key = GenericArray::from_slice(&derived_key);
         let cipher = XChaCha20Poly1305::new(key);
         let nonce = XNonce::from_slice(&self.nonce);
-        let mut hmac = Sign::new(plaintext.to_vec(), passphrase, Operation::Sign, SignType::Sha512);
+        let mut hmac = Sign::new(
+            plaintext.to_vec(),
+            passphrase,
+            Operation::Sign,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
-        let encrypted = cipher.encrypt(nonce, &*data).map_err(|e| CryptError::new(e.to_string().as_str()))?;
+        let encrypted = cipher
+            .encrypt(nonce, &*data)
+            .map_err(|e| CryptError::new(e.to_string().as_str()))?;
         let nonce = *self.nonce();
         Ok((encrypted, nonce))
     }
 
+    #[allow(dead_code)]
     fn decryption(&self) -> Result<(Vec<u8>, [u8; 24]), CryptError> {
         let ciphertext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
-        let key = GenericArray::from_slice(&self.sharedsecret);
-        let cipher = XChaCha20Poly1305::new(key);
         let nonce = XNonce::from_slice(&self.nonce);
-        let decrypted = cipher.decrypt(nonce, &*ciphertext.to_vec()).map_err(|e| CryptError::new(e.to_string().as_str()))?;
-        let mut hmac = Sign::new(decrypted.to_vec(), passphrase, Operation::Verify, SignType::Sha512);
+        let derived_key = derive_legacy_xchacha_poly_key(&self.sharedsecret, &self.nonce)?;
+        let cipher = XChaCha20Poly1305::new(GenericArray::from_slice(&derived_key));
+        let decrypted = match cipher.decrypt(nonce, &*ciphertext.to_vec()) {
+            Ok(decrypted) => decrypted,
+            Err(_) => {
+                let legacy_cipher =
+                    XChaCha20Poly1305::new(GenericArray::from_slice(&self.sharedsecret));
+                legacy_cipher
+                    .decrypt(nonce, &*ciphertext.to_vec())
+                    .map_err(|e| CryptError::new(e.to_string().as_str()))?
+            }
+        };
+        let mut hmac = Sign::new(
+            decrypted.to_vec(),
+            passphrase,
+            Operation::Verify,
+            SignType::Sha512,
+        );
         let data = hmac.hmac();
         let nonce = *self.nonce();
         Ok((data, nonce))
     }
 }
 
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherChaChaPoly {
     /// Encrypts the provided data using the public key.
     ///

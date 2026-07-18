@@ -1,0 +1,36 @@
+error[E0277]: the trait bound `crypt_guard::AES: AuthenticatedAead` is not satisfied
+ --> tests/ui/legacy_aes_not_safe_aead.rs:5:13
+  |
+5 |     let _ = Encryptor::<MlKem768, AES>::new();
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `AuthenticatedAead` is not implemented for `crypt_guard::AES`
+  |
+help: the following other types implement trait `AuthenticatedAead`
+ --> src/api/mod.rs
+  |
+  | impl AuthenticatedAead for XChaCha20Poly1305 {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crypt_guard::XChaCha20Poly1305`
+...
+  | impl AuthenticatedAead for AesGcmSiv {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crypt_guard::AesGcmSiv`
+note: required by a bound in `Encryptor`
+ --> src/api/seal.rs
+  |
+  | pub struct Encryptor<K = MlKem1024, A = XChaCha20Poly1305>(PhantomData<(K, A)>)
+  |            --------- required by a bound in this struct
+...
+  |     A: AuthenticatedAead;
+  |        ^^^^^^^^^^^^^^^^^ required by this bound in `Encryptor`
+
+error[E0599]: the associated function or constant `new` exists for struct `Encryptor<crypt_guard::MlKem768, crypt_guard::AES>`, but its trait bounds were not satisfied
+ --> tests/ui/legacy_aes_not_safe_aead.rs:5:41
+  |
+5 |     let _ = Encryptor::<MlKem768, AES>::new();
+  |                                         ^^^ associated function or constant cannot be called on `Encryptor<crypt_guard::MlKem768, crypt_guard::AES>` due to unsatisfied trait bounds
+  |
+ ::: src/markers.rs
+  |
+  | pub struct AES;
+  | -------------- doesn't satisfy `crypt_guard::AES: AuthenticatedAead`
+  |
+  = note: the following trait bounds were not satisfied:
+          `crypt_guard::AES: AuthenticatedAead`
