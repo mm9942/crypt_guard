@@ -4,6 +4,7 @@ mod sign;
 
 use crate::cryptography::*;
 use crate::error::SigningErr;
+use zeroize::Zeroize;
 
 /// Defines the operation being performed, either verification or signing.
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -40,6 +41,20 @@ pub struct SignatureData {
     pub concat_data: Vec<u8>,
 }
 
+impl Drop for SignatureData {
+    /// Wipes all secret-bearing byte buffers on drop.
+    ///
+    /// `passphrase` is the caller secret; `data`, `hmac`, and `concat_data` may
+    /// carry key material or authentication tags derived from it, so every field
+    /// is zeroized to avoid leaving copies in freed heap memory.
+    fn drop(&mut self) {
+        self.data.zeroize();
+        self.passphrase.zeroize();
+        self.hmac.zeroize();
+        self.concat_data.zeroize();
+    }
+}
+
 /// Defines the type of data associated with a signature.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum SignatureDataType {
@@ -63,6 +78,16 @@ pub enum SignatureType {
 pub struct SignatureKey {
     pub data: Vec<u8>,
     pub key_type: SignatureDataType,
+}
+
+impl Drop for SignatureKey {
+    /// Wipes the raw key bytes on drop.
+    ///
+    /// `data` may hold a secret key (`SignatureDataType::SecretKey`); it is
+    /// zeroized unconditionally so no key material survives in freed memory.
+    fn drop(&mut self) {
+        self.data.zeroize();
+    }
 }
 
 /// Represents the mechanism used for signing, along with the signature and public key used.

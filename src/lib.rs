@@ -1377,10 +1377,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon1024, Message>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1389,10 +1389,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon1024, Detached>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1403,10 +1403,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon512, Message>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1415,10 +1415,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon512, Detached>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1430,10 +1430,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium5, Message>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1442,10 +1442,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium5, Detached>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1456,10 +1456,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium3, Message>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1468,10 +1468,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium3, Detached>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1482,10 +1482,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium2, Message>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1494,10 +1494,10 @@ macro_rules! signature {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium2, Detached>::new();
             sign.signature(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1512,10 +1512,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon1024, Message>::new();
             sign.open(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1525,10 +1525,10 @@ macro_rules! verify {
         let mut signature = $signature;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon1024, Detached>::new();
             sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1540,10 +1540,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon512, Message>::new();
             sign.open(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1553,10 +1553,10 @@ macro_rules! verify {
         let mut signature = $signature;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Falcon512, Detached>::new();
             sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1569,10 +1569,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium5, Message>::new();
             sign.open(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1581,10 +1581,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut signature = $signature;
         let mut content = $content;
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium5, Detached>::new();
             sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1596,10 +1596,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium3, Message>::new();
             sign.open(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1609,10 +1609,10 @@ macro_rules! verify {
         let mut signature = $signature;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium3, Detached>::new();
             sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         signature.zeroize();
         content.zeroize();
@@ -1624,10 +1624,10 @@ macro_rules! verify {
         let mut key = $key;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium2, Message>::new();
             sign.open(content.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         content.zeroize();
         result
@@ -1637,10 +1637,10 @@ macro_rules! verify {
         let mut signature = $signature;
         let mut content = $content;
 
-        let result = (|| {
+        let result = {
             let sign = Signature::<Dilithium2, Detached>::new();
             sign.verify(content.to_owned(), signature.to_owned(), key.to_owned())
-        })();
+        };
         key.zeroize();
         signature.zeroize();
         content.zeroize();

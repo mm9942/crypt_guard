@@ -182,7 +182,7 @@ impl CipherAES {
 
         // Prepend IV to the ciphertext to use it during decryption
         let mut result = iv;
-        result.extend_from_slice(&ciphertext);
+        result.extend_from_slice(ciphertext);
         Ok(result)
     }
 

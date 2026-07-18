@@ -31,9 +31,9 @@ where
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -69,9 +69,9 @@ where
         passphrase: &str,
     ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -106,9 +106,9 @@ where
         passphrase: &str,
     ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -205,9 +205,9 @@ where
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -243,9 +243,9 @@ where
         ciphertext: Vec<u8>,
     ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -279,9 +279,9 @@ where
         ciphertext: Vec<u8>,
     ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
-            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
-            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512_usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768_usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024_usize),
         };
 
         let crypt_metadata = CryptographicMetadata {

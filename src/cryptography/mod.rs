@@ -265,6 +265,18 @@ pub struct CryptographicInformation {
     pub location: Option<FileMetadata>,
 }
 
+impl Drop for CryptographicInformation {
+    /// Wipes the secret-bearing fields when the value is dropped.
+    ///
+    /// `content` (plaintext on the encrypt side) and `passphrase` are zeroized
+    /// so that neither lingers in freed heap memory. Non-secret metadata is left
+    /// untouched.
+    fn drop(&mut self) {
+        self.content.zeroize();
+        self.passphrase.zeroize();
+    }
+}
+
 impl fmt::Display for CryptographicInformation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

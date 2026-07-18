@@ -1075,11 +1075,11 @@ fn encrypt_message_XChaCha20_Kyber512() -> Result<(), Box<dyn std::error::Error>
 fn encrypt_file_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
     let message = "Hey, how are you doing?";
 
-    let _tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
+    let _tmp_dir = TempDir::new().map_err(CryptError::from)?;
     let tmp_dir = Builder::new()
         .prefix("messages")
         .tempdir()
-        .map_err(|e| CryptError::from(e))?;
+        .map_err(CryptError::from)?;
 
     let enc_path = tmp_dir.path().join("message.txt");
     let dec_path = tmp_dir.path().join("message.txt.enc");
@@ -1137,11 +1137,11 @@ fn encrypt_file_XChaCha20_Kyber1024() -> Result<(), Box<dyn std::error::Error>> 
 fn encrypt_file_XChaCha20_Kyber768() -> Result<(), Box<dyn std::error::Error>> {
     let message = "Hey, how are you doing?";
 
-    let _tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
+    let _tmp_dir = TempDir::new().map_err(CryptError::from)?;
     let tmp_dir = Builder::new()
         .prefix("messages")
         .tempdir()
-        .map_err(|e| CryptError::from(e))?;
+        .map_err(CryptError::from)?;
 
     let enc_path = tmp_dir.path().join("message.txt");
     let dec_path = tmp_dir.path().join("message.txt.enc");
@@ -1197,11 +1197,11 @@ fn encrypt_file_XChaCha20_Kyber768() -> Result<(), Box<dyn std::error::Error>> {
 fn encrypt_file_XChaCha20_Kyber512() -> Result<(), Box<dyn std::error::Error>> {
     let message = "Hey, how are you doing?";
 
-    let _tmp_dir = TempDir::new().map_err(|e| CryptError::from(e))?;
+    let _tmp_dir = TempDir::new().map_err(CryptError::from)?;
     let tmp_dir = Builder::new()
         .prefix("messages")
         .tempdir()
-        .map_err(|e| CryptError::from(e))?;
+        .map_err(CryptError::from)?;
 
     let enc_path = tmp_dir.path().join("message.txt");
     let dec_path = tmp_dir.path().join("message.txt.enc");

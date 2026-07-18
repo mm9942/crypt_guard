@@ -1670,6 +1670,13 @@ pub mod draft_ietf_hpke_pq_05 {
 /// final IANA registration.
 pub mod draft_ietf_hpke_pq_05_full {
     use super::*;
+
+    /// Byte-vector triple returned by the hybrid test helpers below
+    /// (`encapsulation`/`shared_secret`/`decapsulated` or
+    /// `key`/`base_nonce`/`exporter_secret`).
+    #[cfg(test)]
+    pub(crate) type HybridTestBytes = (Vec<u8>, Vec<u8>, Vec<u8>);
+
     use chacha20poly1305::{
         aead::{Aead as ChaChaAead, KeyInit, Payload},
         ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce,
@@ -2166,7 +2173,7 @@ pub mod draft_ietf_hpke_pq_05_full {
     pub(crate) fn test_p256_hybrid_encapsulate(
         recipient_seed: &[u8],
         ikm_e: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Error> {
+    ) -> Result<HybridTestBytes, Error> {
         let private = HybridPrivateKey::from_seed_bytes(Kem::MlKem768P256, recipient_seed)?;
         let public = HybridPublicKey::derive(Kem::MlKem768P256, private.as_seed_bytes())?;
         let (encapsulation, shared_secret) =
@@ -2184,7 +2191,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         recipient_seed: &[u8],
         ikm_e: &[u8],
         info: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Error> {
+    ) -> Result<HybridTestBytes, Error> {
         let (_, shared_secret, _) = test_p256_hybrid_encapsulate(recipient_seed, ikm_e)?;
         let context = Context::from_shared_secret(
             Suite::new(Kem::MlKem768P256, Kdf::HkdfSha256, Aead::Aes128Gcm),

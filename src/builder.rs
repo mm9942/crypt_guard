@@ -890,7 +890,8 @@ impl SignBuilder {
         let key = self.key.ok_or_else(|| SigningErr::new("missing key"))?;
         let data = self.data.ok_or_else(|| SigningErr::new("missing data"))?;
 
-        let res = match (alg, mode) {
+        
+        match (alg, mode) {
             (SignAlgorithm::Falcon1024, SignMode::Message) => {
                 signature!(Falcon, key.clone(), 1024, data.clone(), Message)
             }
@@ -921,8 +922,7 @@ impl SignBuilder {
             (SignAlgorithm::Dilithium2, SignMode::Detached) => {
                 signature!(Dilithium, key.clone(), 2, data.clone(), Detached)
             }
-        };
-        Ok(res?)
+        }
     }
 }
 
@@ -1002,14 +1002,14 @@ impl VerifyBuilder {
         let msg = self
             .signed_message
             .ok_or_else(|| SigningErr::new("missing signed message"))?;
-        let res = match alg {
+        
+        match alg {
             SignAlgorithm::Falcon1024 => verify!(Falcon, key.clone(), 1024, msg.clone(), Message),
             SignAlgorithm::Falcon512 => verify!(Falcon, key.clone(), 512, msg.clone(), Message),
             SignAlgorithm::Dilithium5 => verify!(Dilithium, key.clone(), 5, msg.clone(), Message),
             SignAlgorithm::Dilithium3 => verify!(Dilithium, key.clone(), 3, msg.clone(), Message),
             SignAlgorithm::Dilithium2 => verify!(Dilithium, key.clone(), 2, msg.clone(), Message),
-        };
-        Ok(res?)
+        }
     }
 
     /// Verifies a detached signature against the configured data.
@@ -1035,7 +1035,8 @@ impl VerifyBuilder {
         let signature = self
             .signature
             .ok_or_else(|| SigningErr::new("missing signature"))?;
-        let res = match alg {
+        
+        match alg {
             SignAlgorithm::Falcon1024 => verify!(
                 Falcon,
                 key.clone(),
@@ -1076,7 +1077,6 @@ impl VerifyBuilder {
                 data.clone(),
                 Detached
             ),
-        };
-        Ok(res?)
+        }
     }
 }

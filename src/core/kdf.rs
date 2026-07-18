@@ -687,16 +687,16 @@ impl<AlgorithmType, SignatureType> Default for Signature<AlgorithmType, Signatur
 // Implementation of Signature for Falcon1024
 impl Signature<Falcon1024, Message> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon1024::sign_message(data, key)?)
+        Falcon1024::sign_message(data, key)
     }
     pub fn open(&self, signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon1024::open_message(signed_data, key)?)
+        Falcon1024::open_message(signed_data, key)
     }
 }
 
 impl Signature<Falcon1024, Detached> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon1024::detached_signature(data, key)?)
+        Falcon1024::detached_signature(data, key)
     }
     pub fn verify(
         &self,
@@ -704,23 +704,23 @@ impl Signature<Falcon1024, Detached> {
         signature: Vec<u8>,
         key: Vec<u8>,
     ) -> Result<bool, SigningErr> {
-        Ok(Falcon1024::verify(signature, data, key)?)
+        Falcon1024::verify(signature, data, key)
     }
 }
 
 // Implementation of Signature for Falcon512
 impl Signature<Falcon512, Message> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon512::sign_message(data, key)?)
+        Falcon512::sign_message(data, key)
     }
     pub fn open(&self, signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon512::open_message(signed_data, key)?)
+        Falcon512::open_message(signed_data, key)
     }
 }
 
 impl Signature<Falcon512, Detached> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Falcon512::detached_signature(data, key)?)
+        Falcon512::detached_signature(data, key)
     }
     pub fn verify(
         &self,
@@ -728,23 +728,23 @@ impl Signature<Falcon512, Detached> {
         signature: Vec<u8>,
         key: Vec<u8>,
     ) -> Result<bool, SigningErr> {
-        Ok(Falcon512::verify(signature, data, key)?)
+        Falcon512::verify(signature, data, key)
     }
 }
 
 // Implementation of Signature for Dilithium2
 impl Signature<Dilithium2, Message> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium2::sign_message(data, key)?)
+        Dilithium2::sign_message(data, key)
     }
     pub fn open(&self, signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium2::open_message(signed_data, key)?)
+        Dilithium2::open_message(signed_data, key)
     }
 }
 
 impl Signature<Dilithium2, Detached> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium2::detached_signature(data, key)?)
+        Dilithium2::detached_signature(data, key)
     }
     pub fn verify(
         &self,
@@ -752,23 +752,23 @@ impl Signature<Dilithium2, Detached> {
         signature: Vec<u8>,
         key: Vec<u8>,
     ) -> Result<bool, SigningErr> {
-        Ok(Dilithium2::verify(signature, data, key)?)
+        Dilithium2::verify(signature, data, key)
     }
 }
 
 // Implementation of Signature for Dilithium3
 impl Signature<Dilithium3, Message> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium3::sign_message(data, key)?)
+        Dilithium3::sign_message(data, key)
     }
     pub fn open(&self, signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium3::open_message(signed_data, key)?)
+        Dilithium3::open_message(signed_data, key)
     }
 }
 
 impl Signature<Dilithium3, Detached> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium3::detached_signature(data, key)?)
+        Dilithium3::detached_signature(data, key)
     }
     pub fn verify(
         &self,
@@ -776,23 +776,23 @@ impl Signature<Dilithium3, Detached> {
         signature: Vec<u8>,
         key: Vec<u8>,
     ) -> Result<bool, SigningErr> {
-        Ok(Dilithium3::verify(signature, data, key)?)
+        Dilithium3::verify(signature, data, key)
     }
 }
 
 // Implementation of Signature for Dilithium5
 impl Signature<Dilithium5, Message> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium5::sign_message(data, key)?)
+        Dilithium5::sign_message(data, key)
     }
     pub fn open(&self, signed_data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium5::open_message(signed_data, key)?)
+        Dilithium5::open_message(signed_data, key)
     }
 }
 
 impl Signature<Dilithium5, Detached> {
     pub fn signature(&self, data: Vec<u8>, key: Vec<u8>) -> Result<Vec<u8>, SigningErr> {
-        Ok(Dilithium5::detached_signature(data, key)?)
+        Dilithium5::detached_signature(data, key)
     }
     pub fn verify(
         &self,
@@ -800,6 +800,6 @@ impl Signature<Dilithium5, Detached> {
         signature: Vec<u8>,
         key: Vec<u8>,
     ) -> Result<bool, SigningErr> {
-        Ok(Dilithium5::verify(signature, data, key)?)
+        Dilithium5::verify(signature, data, key)
     }
 }
