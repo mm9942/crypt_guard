@@ -1,9 +1,48 @@
 //! Public v3 PQ HPKE transport contracts.
 
 use crypt_guard::pq_hpke::{
-    generate_recipient_key_pair, setup_base_receiver, setup_base_sender, EnvelopeError, Error,
-    HpkeEnvelope, DEFAULT_SUITE,
+    derive_recipient_key_pair, generate_recipient_key_pair, setup_base_receiver, setup_base_sender,
+    Aead, EnvelopeError, Error, HpkeEnvelope, Kdf, Kem, Suite, DEFAULT_SUITE,
 };
+
+#[test]
+fn provenance_seed_rederives_v3_recipient_for_open_without_persisting_private_material() {
+    // This is the only secret material a provenance store retains. In
+    // particular, it is not the 64-byte ML-KEM recipient seed created inside
+    // the v3 derivation path.
+    let provenance_seed = [0x4d_u8; 32];
+    let suite = Suite::new(Kem::MlKem768, Kdf::Shake256, Aead::ChaCha20Poly1305);
+
+    let sealing_pair = derive_recipient_key_pair(suite.kem(), &provenance_seed)
+        .expect("a validated provenance seed must derive a v3 recipient");
+    assert_eq!(sealing_pair.private_key().as_seed_bytes().len(), 64);
+    assert_ne!(sealing_pair.private_key().as_seed_bytes(), provenance_seed);
+    let envelope = HpkeEnvelope::seal(
+        suite,
+        sealing_pair.public_key(),
+        b"Harw provenance record",
+        b"provenance-bound AAD",
+        b"payload opened after rederivation",
+    )
+    .expect("derived recipient must seal");
+    drop(sealing_pair);
+
+    // Model an open after process restart: rederive from the retained original
+    // 32-byte seed, rather than serializing the internal recipient private
+    // representation.
+    let opening_pair = derive_recipient_key_pair(suite.kem(), &provenance_seed)
+        .expect("the retained provenance seed must rederive the same recipient");
+    assert_eq!(
+        envelope
+            .open(
+                opening_pair.private_key(),
+                b"Harw provenance record",
+                b"provenance-bound AAD",
+            )
+            .expect("rederived recipient must open"),
+        b"payload opened after rederivation"
+    );
+}
 
 #[test]
 fn default_envelope_round_trip_preserves_the_default_profile() {
