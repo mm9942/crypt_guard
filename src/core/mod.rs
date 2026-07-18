@@ -20,8 +20,12 @@ pub mod kdf;
 /// KyberSizeVariant, deprecated size markers, and key_controler (legacy-pqclean).
 pub mod kyber;
 
-/// Phase 3 hub module (src/core/hub/): EncryptFunctions + DecryptFunctions traits,
-/// FIPS primary size markers MlKem512/768/1024, ML-KEM + HKDF + Envelope-wired cipher impls.
+/// Legacy CGv2 hub module (src/core/hub/): EncryptFunctions + DecryptFunctions
+/// traits, FIPS primary size markers, and Envelope-wired cipher implementations.
+///
+/// This path is intentionally available only for explicit CGv2 compatibility
+/// migrations; new applications should use [`crate::pq_hpke`].
+#[cfg(feature = "cgv2-compat")]
 pub mod hub;
 
 /// AES-256-CBC + HMAC symmetric cipher implementation.

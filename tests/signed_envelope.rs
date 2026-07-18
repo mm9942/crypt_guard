@@ -1,3 +1,4 @@
+#![cfg(feature = "cgv2-compat")]
 //! External contract tests for the CGv2 signed-envelope binding.
 //!
 //! Production-API assumptions deliberately locked by this suite:

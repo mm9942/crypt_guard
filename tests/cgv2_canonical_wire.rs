@@ -1,3 +1,4 @@
+#![cfg(feature = "cgv2-compat")]
 //! External contract tests for CGv2 canonical wire validation.
 //!
 //! These tests deliberately use only public APIs. They lock down the strict

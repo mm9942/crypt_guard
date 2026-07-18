@@ -1677,9 +1677,11 @@ pub mod draft_ietf_hpke_pq_05_full {
     #[cfg(test)]
     pub(crate) type HybridTestBytes = (Vec<u8>, Vec<u8>, Vec<u8>);
 
+    use aes_gcm_siv::{Aes256GcmSiv, Nonce as AesGcmSivNonce};
     use chacha20poly1305::{
         aead::{Aead as ChaChaAead, KeyInit, Payload},
-        ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce,
+        ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce, XChaCha20Poly1305,
+        XNonce as XChaCha20Poly1305Nonce,
     };
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     use p256::{ecdh::diffie_hellman, PublicKey as P256PublicKey, SecretKey as P256SecretKey};
@@ -1791,6 +1793,12 @@ pub mod draft_ietf_hpke_pq_05_full {
         Aes256Gcm = 0x0002,
         /// ChaCha20-Poly1305 (`0x0003`).
         ChaCha20Poly1305 = 0x0003,
+        /// crypt_guard private extension: AES-256-GCM-SIV (`0xff01`).
+        /// This is not an RFC 9180 or IANA HPKE AEAD identifier.
+        Aes256GcmSiv = 0xff01,
+        /// crypt_guard private extension: XChaCha20-Poly1305 (`0xff02`).
+        /// This is not an RFC 9180 or IANA HPKE AEAD identifier.
+        XChaCha20Poly1305 = 0xff02,
         /// RFC 9180 Export-Only (`0xffff`); `seal` and `open` are unavailable.
         ExportOnly = 0xffff,
     }
@@ -1804,9 +1812,28 @@ pub mod draft_ietf_hpke_pq_05_full {
         const fn key_len(self) -> usize {
             match self {
                 Self::Aes128Gcm => 16,
-                Self::Aes256Gcm | Self::ChaCha20Poly1305 => 32,
+                Self::Aes256Gcm
+                | Self::ChaCha20Poly1305
+                | Self::Aes256GcmSiv
+                | Self::XChaCha20Poly1305 => 32,
                 Self::ExportOnly => 0,
             }
+        }
+
+        const fn nonce_len(self) -> usize {
+            match self {
+                Self::XChaCha20Poly1305 => 24,
+                Self::Aes128Gcm | Self::Aes256Gcm | Self::ChaCha20Poly1305 | Self::Aes256GcmSiv => {
+                    12
+                }
+                Self::ExportOnly => 0,
+            }
+        }
+
+        /// Whether this algorithm is a crypt_guard private extension rather
+        /// than an RFC 9180 / IANA interoperable AEAD identifier.
+        pub const fn is_private_extension(self) -> bool {
+            matches!(self, Self::Aes256GcmSiv | Self::XChaCha20Poly1305)
         }
     }
 
@@ -2956,7 +2983,7 @@ pub mod draft_ietf_hpke_pq_05_full {
     struct Context {
         suite: Suite,
         key: Zeroizing<Vec<u8>>,
-        base_nonce: Zeroizing<[u8; 12]>,
+        base_nonce: Zeroizing<Vec<u8>>,
         exporter_secret: Zeroizing<Vec<u8>>,
         sequence: [u8; 12],
     }
@@ -2975,14 +3002,13 @@ pub mod draft_ietf_hpke_pq_05_full {
             } else {
                 combine_two_stage(suite, shared_secret, info, psk, psk_id, psk_mode)?
             };
-            let base_nonce: [u8; 12] = base_nonce
-                .as_slice()
-                .try_into()
-                .map_err(|_| Error::InternalInvariant)?;
+            if base_nonce.len() != suite.aead.nonce_len() {
+                return Err(Error::InternalInvariant);
+            }
             Ok(Self {
                 suite,
                 key,
-                base_nonce: Zeroizing::new(base_nonce),
+                base_nonce,
                 exporter_secret,
                 sequence: [0; 12],
             })
@@ -3025,6 +3051,32 @@ pub mod draft_ietf_hpke_pq_05_full {
                 Aead::ChaCha20Poly1305 => {
                     let nonce: &ChaCha20Poly1305Nonce = nonce.as_slice().into();
                     ChaCha20Poly1305::new_from_slice(&self.key)
+                        .map_err(|_| Error::InternalInvariant)?
+                        .encrypt(
+                            nonce,
+                            Payload {
+                                msg: plaintext,
+                                aad,
+                            },
+                        )
+                        .map_err(|_| Error::AuthenticationFailed)
+                }
+                Aead::Aes256GcmSiv => {
+                    let nonce: &AesGcmSivNonce = nonce.as_slice().into();
+                    Aes256GcmSiv::new_from_slice(&self.key)
+                        .map_err(|_| Error::InternalInvariant)?
+                        .encrypt(
+                            &nonce,
+                            aes_gcm_siv::aead::Payload {
+                                msg: plaintext,
+                                aad,
+                            },
+                        )
+                        .map_err(|_| Error::AuthenticationFailed)
+                }
+                Aead::XChaCha20Poly1305 => {
+                    let nonce: &XChaCha20Poly1305Nonce = nonce.as_slice().into();
+                    XChaCha20Poly1305::new_from_slice(&self.key)
                         .map_err(|_| Error::InternalInvariant)?
                         .encrypt(
                             nonce,
@@ -3088,6 +3140,32 @@ pub mod draft_ietf_hpke_pq_05_full {
                         )
                         .map_err(|_| Error::AuthenticationFailed)
                 }
+                Aead::Aes256GcmSiv => {
+                    let nonce: &AesGcmSivNonce = nonce.as_slice().into();
+                    Aes256GcmSiv::new_from_slice(&self.key)
+                        .map_err(|_| Error::InternalInvariant)?
+                        .decrypt(
+                            &nonce,
+                            aes_gcm_siv::aead::Payload {
+                                msg: ciphertext,
+                                aad,
+                            },
+                        )
+                        .map_err(|_| Error::AuthenticationFailed)
+                }
+                Aead::XChaCha20Poly1305 => {
+                    let nonce: &XChaCha20Poly1305Nonce = nonce.as_slice().into();
+                    XChaCha20Poly1305::new_from_slice(&self.key)
+                        .map_err(|_| Error::InternalInvariant)?
+                        .decrypt(
+                            nonce,
+                            Payload {
+                                msg: ciphertext,
+                                aad,
+                            },
+                        )
+                        .map_err(|_| Error::AuthenticationFailed)
+                }
                 Aead::ExportOnly => Err(Error::ExportOnlyAead),
             }?;
             self.advance()?;
@@ -3114,12 +3192,13 @@ pub mod draft_ietf_hpke_pq_05_full {
             }
         }
 
-        fn nonce(&self) -> Result<[u8; 12], Error> {
+        fn nonce(&self) -> Result<Vec<u8>, Error> {
             if self.sequence == [u8::MAX; 12] {
                 return Err(Error::MessageLimitReached);
             }
-            let mut nonce = *self.base_nonce;
-            for (left, right) in nonce.iter_mut().zip(self.sequence) {
+            let mut nonce = self.base_nonce.to_vec();
+            let start = nonce.len() - self.sequence.len();
+            for (left, right) in nonce[start..].iter_mut().zip(self.sequence) {
                 *left ^= right;
             }
             Ok(nonce)
@@ -3166,7 +3245,13 @@ pub mod draft_ietf_hpke_pq_05_full {
             &context,
             suite.aead.key_len(),
         )?);
-        let nonce = Zeroizing::new(labeled_expand(suite, &secret, b"base_nonce", &context, 12)?);
+        let nonce = Zeroizing::new(labeled_expand(
+            suite,
+            &secret,
+            b"base_nonce",
+            &context,
+            suite.aead.nonce_len(),
+        )?);
         let exporter = Zeroizing::new(labeled_expand(
             suite,
             &secret,
@@ -3192,10 +3277,10 @@ pub mod draft_ietf_hpke_pq_05_full {
         context.push(if psk_mode { 1 } else { 0 });
         append_length_prefixed(&mut context, psk_id)?;
         append_length_prefixed(&mut context, info)?;
-        let total = suite.aead.key_len() + 12 + suite.kdf.nh();
+        let total = suite.aead.key_len() + suite.aead.nonce_len() + suite.kdf.nh();
         let secret = labeled_derive(suite, &secrets, b"secret", &context, total)?;
         let (key, remainder) = secret.split_at(suite.aead.key_len());
-        let (nonce, exporter) = remainder.split_at(12);
+        let (nonce, exporter) = remainder.split_at(suite.aead.nonce_len());
         Ok((
             Zeroizing::new(key.to_vec()),
             Zeroizing::new(nonce.to_vec()),

@@ -1,314 +1,123 @@
-# CryptGuard v2.0.5
+# CryptGuard v3.0.0
 
-[![Crates.io](https://img.shields.io/badge/crates.io-v2-blue.svg?style=for-the-badge)](https://crates.io/crates/crypt_guard)
+[![Crates.io](https://img.shields.io/badge/crates.io-v3-blue.svg?style=for-the-badge)](https://crates.io/crates/crypt_guard)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-v2-yellow.svg?style=for-the-badge)](https://docs.rs/crypt_guard/)
+[![Documentation](https://img.shields.io/badge/docs-v3-yellow.svg?style=for-the-badge)](https://docs.rs/crypt_guard/)
 [![GitHub Library](https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard)
 
-`crypt_guard` is a post-quantum sealing library centered on one safe default flow:
+`crypt_guard` is a pure-Rust post-quantum sealing library. Version 3 makes a
+revision-pinned PQ HPKE construction the default transport:
 
 ```text
-ML-KEM (FIPS 203) -> HKDF -> CGv2 authenticated envelope
+ML-KEM (FIPS 203) -> HPKE KEM/KDF schedule -> AEAD
 ```
 
-The primary API produces one self-contained CGv2 envelope. Nonce handling,
-key derivation, and KEM encapsulation are all internal — the caller provides
-a public key and plaintext and receives a sealed `Envelope` back.
+The default suite is **ML-KEM-1024/P-384 + SHAKE256 + ChaCha20-Poly1305**.
+CGv2 is no longer part of the default public API; read or write CGv2 data only
+with the explicit `cgv2-compat` feature during a deliberate migration.
 
-Current release version: `2.0.5`. The Phase 4 safe-default upgrade remains the
-primary supported path. The additive `crypt_guard::hpke::rfc9180` API provides
-vector-verified RFC 9180 setup for all five DHKEMs, all registered encryption
-AEADs, and Base/PSK/Auth/AuthPSK; it is intentionally distinct from CGv2.
-Separately, the default build exposes revision-pinned, experimental PQ HPKE APIs.
-The compatibility API retains two pinned `draft-ietf-hpke-pq-05` ML-KEM
-profiles, while the full namespace also exposes vector-verified concrete
-hybrids. That active Internet-Draft is not an
-RFC or a finalized IANA profile; its literal revision is part of the protocol
-identity.
+## Default API: `pq_hpke`
 
----
-
-## Safe Default: `Encryptor` / `Decryptor`
+`pq_hpke` keeps the HPKE KEM output (`enc`) and ciphertext distinct for raw
+transport users, and provides `HpkeEnvelope` (`CGH3`, version 1) for
+crypt_guard deployments that need a self-describing record. Setup `info` and
+per-message AAD are caller inputs; neither is hidden in encrypted plaintext.
 
 ```rust
-use crypt_guard::{Decryptor, Encryptor};
-use crypt_guard::XChaCha20Poly1305;
-# #[cfg(feature = "ml-kem-backend")]
-use crypt_guard::{MlKem768, kem::{KemBackend, ml_kem::MlKem768Impl}};
-use crypt_guard::kem::backend::OsRng;
-
-fn main() -> Result<(), crypt_guard::error::CryptError> {
-    #[cfg(feature = "ml-kem-backend")]
-    {
-    let mut rng = OsRng;
-    let (public_key, secret_key) = MlKem768Impl::keypair(&mut rng)?;
-
-    // Seal: ML-KEM encapsulate -> HKDF -> XChaCha20-Poly1305 AEAD
-    let envelope = Encryptor::<MlKem768, XChaCha20Poly1305>::new()
-        .recipient(public_key.as_ref().to_vec())
-        .plaintext(b"hello post-quantum world")
-        .seal()?;
-
-    // Open: ML-KEM decapsulate -> HKDF -> AEAD verify + decrypt
-    let plaintext = Decryptor::<MlKem768, XChaCha20Poly1305>::new()
-        .secret_key(secret_key.as_ref().to_vec())
-        .open(&envelope)?;
-
-    assert_eq!(plaintext, b"hello post-quantum world");
-    }
-    Ok(())
-}
-```
-
-The `Envelope` type is a self-describing serialisable blob:
-`{ header, kem_ciphertext, nonce, ciphertext }`. The nonce is
-generated internally and bound into the AEAD AAD; callers never
-juggle it separately.
-
----
-
-## What is New in v2
-
-| Area | v1.x | v2 |
-|---|---|---|
-| KEM | pqcrypto Kyber (NIST Round 3) | **ML-KEM** (FIPS 203 final) |
-| Signing | Falcon / Dilithium | **ML-DSA** (FIPS 204) + **SLH-DSA** (FIPS 205) |
-| Key schedule | ad-hoc passphrase KDF | **HKDF-SHA256/512** with domain-separated labels |
-| Envelope | `(ciphertext, kyber_secret)` tuple | **CGv2 Envelope** — one self-describing blob |
-| Nonce | caller-managed, separate artifact | nonce embedded and bound inside envelope |
-| Type enforcement | decorative content axis | **compile-enforced** content-axis typestate |
-| API shape | macro-first | `Encryptor`/`Decryptor` staged builders (macros still work) |
-
----
-
-## Protocol: CGv2 authenticated envelope (not RFC 9180 HPKE)
-
-crypt_guard v2 currently implements its own CGv2 envelope format. It uses a
-KEM, HKDF, and AEAD, but it is **not** an implementation of
-[RFC 9180 HPKE](https://www.rfc-editor.org/rfc/rfc9180.html): it does not use
-the RFC 9180 KEM interface, labeled key schedule, AEAD nonce sequencing, or
-wire format, and is not interoperable with RFC 9180 implementations.
-
-The current CGv2 construction is:
-
-```text
-Sender:
-  (kem_ct, shared_secret) = ML-KEM.Encapsulate(recipient_pk)
-  session_key, base_nonce = HKDF(ikm=shared_secret, salt=kem_ct,
-                                  info="crypt_guard:v2:aead:<alg>")
-  ciphertext = AEAD.Seal(session_key, nonce, aad, plaintext)
-  envelope   = { header, kem_ct, nonce, ciphertext }
-
-Receiver:
-  shared_secret = ML-KEM.Decapsulate(kem_ct, recipient_sk)
-  session_key   = HKDF(same params)
-  plaintext     = AEAD.Open(session_key, nonce, aad, ciphertext)
-```
-
-The shared secret is zeroized immediately after key derivation, following the
-NIST SP 800-227 direction for KEM-based protocols. The `header` field carries the
-algorithm identifiers (`kem_id`, `kdf_id`, `aead_id`) so the
-envelope is self-describing and forwards-compatible.
-
-The `crypt_guard::api::hpke` module is retained as a source-compatible legacy
-CGv2 framing API. Its `info` and `aad` arguments are encoded inside an encrypted
-HFv1 payload framing; they do not provide RFC 9180 HPKE setup or AEAD-AAD
-semantics. The separate `crypt_guard::hpke::rfc9180` module is the versioned
-RFC 9180 setup and interoperability API; it is independent from this legacy
-framing.
-
----
-
-## Experimental `draft-ietf-hpke-pq-05` Base mode
-
-The additive default
-`crypt_guard::hpke_pq::draft_ietf_hpke_pq_05_full` namespace exposes the
-draft-05 registry (ML-KEM, hybrid KEM identifiers, HKDF/SHAKE/TurboSHAKE KDFs,
-and the registered AEADs). MLKEM768-P256, MLKEM1024-P384, and
-MLKEM768-X25519 are vector-verified; no ML-KEM-only substitution is performed.
-The
-compatibility `crypt_guard::hpke_pq::draft_ietf_hpke_pq_05` module remains
-limited to these exact pinned Base-mode profiles:
-
-- ML-KEM-768 / HKDF-SHA256 / AES-128-GCM
-- ML-KEM-1024 / HKDF-SHA384 / AES-256-GCM
-
-It is a **vector-gated experimental implementation of an active Internet
-Draft**, not an RFC-standardized post-quantum HPKE profile. There is no
-algorithm negotiation or fallback. Applications must store the protocol family,
-the literal `draft-ietf-hpke-pq-05` revision, and the exact profile alongside
-the separately transported `enc` and ciphertext; they must select this reader
-directly rather than trial-decrypting CGv2/HFv1 data.
-
-No feature flag is required; the revision-pinned API is part of the default build.
-
-```rust
-use crypt_guard::hpke_pq::draft_ietf_hpke_pq_05::{
-    generate_recipient_key_pair, setup_base_receiver, setup_base_sender, Profile,
+use crypt_guard::pq_hpke::{
+    generate_recipient_key_pair, HpkeEnvelope, DEFAULT_SUITE,
 };
 
-let profile = Profile::MlKem768HkdfSha256Aes128Gcm;
-let recipient_keys = generate_recipient_key_pair(profile);
-
-// `enc` is a separate transport value. Contexts own nonce sequencing; callers
-// supply only setup info and AEAD AAD, never a nonce or a raw shared secret.
-let (enc, mut sender) = setup_base_sender(profile, recipient_keys.public_key(), b"service=v1")?;
-let ciphertext = sender.seal(b"record metadata", b"payload")?;
-
-let mut recipient = setup_base_receiver(
-    profile,
-    recipient_keys.private_key(),
-    &enc,
-    b"service=v1",
+let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem())?;
+let envelope = HpkeEnvelope::seal(
+    DEFAULT_SUITE,
+    keys.public_key(),
+    b"service=payments",
+    b"record=42",
+    b"post-quantum payload",
 )?;
-assert_eq!(recipient.open(b"record metadata", &ciphertext)?, b"payload");
-# Ok::<(), crypt_guard::hpke_pq::draft_ietf_hpke_pq_05::Error>(())
+
+let encoded = envelope.to_bytes();
+let parsed = HpkeEnvelope::from_bytes(&encoded)?;
+let plaintext = parsed.open(keys.private_key(), b"service=payments", b"record=42")?;
+assert_eq!(plaintext, b"post-quantum payload");
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-The sender and recipient contexts are intentionally non-`Clone`, advance their
-sequence only after a successful AEAD operation, and expose no manual-nonce
-API. Wrong AAD, ciphertext, or a same-size modified `enc` all produce the same
-opaque authentication failure when opening.
+For standardized AEAD suites, raw Base and PSK APIs are available through
+`setup_base_sender`, `setup_base_receiver`, `setup_psk_sender`, and
+`setup_psk_receiver`. They return / consume separate `Encapsulation` (`enc`)
+and stateful sender or recipient contexts.
 
----
+## Suites and interoperability
 
-## Supported Algorithms
+The revision-pinned PQ HPKE adapter exposes ML-KEM-512/768/1024 and the
+ML-KEM-768/P-256, ML-KEM-768/X25519, and ML-KEM-1024/P-384 hybrid KEMs.
+Suite selection is explicit through `Suite::new(Kem, Kdf, Aead)`.
 
-### Key Encapsulation (KEM)
+| AEAD | Raw standardized transport | `HpkeEnvelope` |
+|---|---:|---:|
+| AES-128-GCM | yes | yes |
+| AES-256-GCM | yes | yes |
+| ChaCha20-Poly1305 | yes | yes |
+| AES-256-GCM-SIV | no, crypt_guard private extension | yes |
+| XChaCha20-Poly1305 | no, crypt_guard private extension | yes |
 
-| Marker | Algorithm | Security | Standard |
-|---|---|---|---|
-| `MlKem512` | ML-KEM-512 | Category 1 | FIPS 203 |
-| `MlKem768` | ML-KEM-768 | Category 3 (recommended) | FIPS 203 |
-| `MlKem1024` | ML-KEM-1024 | Category 5 | FIPS 203 |
+The two private extensions use explicit `0xff01` / `0xff02` identifiers. They
+must not be represented as RFC 9180 or IANA-interoperable HPKE suites.
 
-### Authenticated Encryption (AEAD)
+The PQ KEM registry and vector corpus are pinned to
+`draft-ietf-hpke-pq-05`. This is an Internet-Draft, not an RFC or final IANA
+assignment; applications that persist raw artifacts should persist the literal
+draft revision and all suite identifiers alongside them.
 
-| Marker | Algorithm | Notes |
-|---|---|---|
-| `XChaCha20Poly1305` | XChaCha20-Poly1305 | Default; 24-byte nonce |
-| `AesGcmSiv` | AES-256-GCM-SIV | Nonce-misuse resistant |
+## Feature flags
 
-### Digital Signatures
-
-| Algorithm | Feature | Standard |
-|---|---|---|
-| ML-DSA-44 / 65 / 87 | `ml-dsa-backend` (default) | FIPS 204 |
-| SLH-DSA | `sign-slhdsa` | FIPS 205 |
-
----
-
-## Feature Flags
-
-| Flag | Default | What it adds |
-|---|---|---|
-| `ml-kem-backend` | yes | ML-KEM-512/768/1024 (FIPS 203) |
-| `ml-dsa-backend` | yes | ML-DSA-44/65/87 (FIPS 204) |
-| `sign-slhdsa` | no | SLH-DSA (FIPS 205) |
-| `aes-ctr` | no | AES-CTR stream cipher |
-| `aes-xts` | no | AES-XTS disk encryption |
-| `archive` | no | tar/xz/gz archive helpers |
-| `legacy-pqclean` | no | Legacy Kyber/Falcon/Dilithium + old tuple API |
-
-To use only the new FIPS path without legacy code:
+| Flag | Default | Purpose |
+|---|---:|---|
+| `ml-kem-backend` | yes | ML-KEM-512/768/1024 FIPS backend |
+| `ml-dsa-backend` | yes | ML-DSA-44/65/87 |
+| `cgv2-compat` | no | CGv2 envelope, builders, and legacy HPKE helpers for migration only |
+| `legacy-pqclean` | no | Legacy Kyber/Falcon/Dilithium support |
+| `sign-slhdsa` | no | SLH-DSA support |
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.5", default-features = true }
+crypt_guard = "3.0.0"
 ```
 
-To include the legacy path for reading data encrypted with v1.x:
+To migrate CGv2 records, opt in explicitly:
 
 ```toml
 [dependencies]
-crypt_guard = { version = "2.0.5", features = ["legacy-pqclean"] }
+crypt_guard = { version = "3.0.0", features = ["cgv2-compat"] }
 ```
 
----
+## Migration from v2
 
-## Typestate Design: `Kyber<Process, Size, Content, Algorithm>`
+1. Deploy a reader with `cgv2-compat` enabled.
+2. Decrypt each CGv2 record using the legacy API.
+3. Re-encrypt it with `pq_hpke::HpkeEnvelope` and persist the new `CGH3`
+   record plus its application `info` / AAD contract.
+4. Remove `cgv2-compat` once all records are migrated.
 
-The underlying `Kyber<P, S, C, A>` type encodes four axes in the type:
+Default v3 builds neither emit nor expose CGv2 ergonomic APIs. Do not
+trial-decrypt CGv2 and PQ HPKE records; dispatch by the stored transport type.
 
-| Axis | Variants |
-|---|---|
-| Process | `Encryption`, `Decryption` |
-| Size | `MlKem512`, `MlKem768`, `MlKem1024` |
-| Content | `Data`, `Message`, `Files` |
-| Algorithm | `XChaCha20Poly1305`, `AesGcmSiv`, … |
+## Security properties
 
-Calling `encrypt_file` on a `Message` instance is a **compile error** (E0599).
-The `Encryptor`/`Decryptor` builders use the same underlying type but
-expose only the safe `Data` path by default.
-
----
-
-## Signing
-
-```rust,no_run
-use crypt_guard::kem::backend::OsRng;
-use crypt_guard::sign::{SignAlgorithm, ml_dsa::MlDsa65Impl};
-
-let mut rng = OsRng;
-let (sk, vk) = MlDsa65Impl::keypair(&mut rng)?;
-let sig = MlDsa65Impl::sign(&sk, b"my message")?;
-MlDsa65Impl::verify(&vk, b"my message", &sig)?;
-# Ok::<(), crypt_guard::error::CryptError>(())
-```
-
----
-
-## Architecture
-
-```text
-crypt_guard::api           (Encryptor / Decryptor — safe entry points)
-  -> crypt_guard::protocol (CGv2 Envelope + Header + AAD construction)
-  -> crypt_guard::kem      (ML-KEM backend trait + ML-KEM-512/768/1024)
-  -> crypt_guard::kdf      (HKDF-SHA256/512 with domain-separated labels)
-  -> crypt_guard::core     (AEAD wiring; typestate Kyber<P,S,C,A>)
-  -> crypt_guard::sign     (ML-DSA, SLH-DSA)
-  -> crypt_guard::legacy   (pqcrypto Kyber/Falcon/Dilithium — feature-gated)
-```
-
----
-
-## Legacy Compatibility
-
-If you have data encrypted with crypt_guard v1.x (pqcrypto Kyber, tuple-return
-API, manual nonce), enable the `legacy-pqclean` feature:
-
-```toml
-[dependencies]
-crypt_guard = { version = "2.0.5", features = ["legacy-pqclean"] }
-```
-
-The old `Kyber<Encryption, Kyber1024, Message, AES>` types, the
-`encryption!` / `decryption!` macros, the `kyber_keypair!` macro, and
-the tuple-returning `encrypt_msg` / `decrypt_msg` functions remain available
-under the `legacy` module and through the crate re-exports.
-
-```rust,ignore
-// Legacy usage (requires --features legacy-pqclean)
-use crypt_guard::{*, error::*};
-
-let (public_key, secret_key) = kyber_keypair!(1024);
-let (ciphertext, kyber_secret) = encryption!(
-    public_key.to_owned(), 1024,
-    b"hello".to_vec(), "passphrase", AES
-)?;
-let plaintext = decryption!(
-    secret_key.to_owned(), 1024,
-    ciphertext, "passphrase", kyber_secret, AES
-)?;
-```
-
----
+- Private key seed handling, ML-KEM validation, implicit rejection, and shared
+  secret zeroization remain in the PQCA/libcrux-backed KEM adapter.
+- Sender and recipient contexts are non-`Clone`, derive AEAD nonces from the
+  HPKE sequence number, and reject sequence wrap.
+- Authentication failures for wrong AAD, `info`, ciphertext, or same-size
+  tampered encapsulations are intentionally opaque.
+- `HpkeEnvelope` authenticates no caller metadata by itself: callers must pass
+  matching `info` and AAD when opening.
 
 ## References
 
 - [FIPS 203 — ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)
 - [FIPS 204 — ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
-- [FIPS 205 — SLH-DSA](https://csrc.nist.gov/pubs/fips/205/final)
-- [NIST SP 800-227 — Recommendations for Key-Encapsulation Mechanisms](https://csrc.nist.gov/pubs/sp/800/227/final)
-- [RFC 9180 — Hybrid Public Key Encryption (HPKE)](https://www.rfc-editor.org/rfc/rfc9180.html)
-- [draft-ietf-hpke-pq-05 — Post-Quantum HPKE](https://datatracker.ietf.org/doc/draft-ietf-hpke-pq-05/) (experimental draft mapping; not an RFC)
+- [RFC 9180 — HPKE](https://www.rfc-editor.org/rfc/rfc9180.html)
+- [draft-ietf-hpke-pq-05](https://datatracker.ietf.org/doc/draft-ietf-hpke-pq-05/)
