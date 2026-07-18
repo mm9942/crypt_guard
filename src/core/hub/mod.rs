@@ -50,6 +50,7 @@ pub mod macros;
 use crate::error::CryptError;
 use crate::protocol::Envelope;
 use std::{marker::PhantomData, path::PathBuf};
+use zeroize::Zeroize;
 
 // Re-export all shared ZST markers from the thin markers shim.
 pub use crate::markers::{
@@ -415,6 +416,24 @@ impl KyberData {
     pub fn key(&self) -> Result<Vec<u8>, CryptError> {
         Ok(self.key.to_vec())
     }
+
+    /// Borrow the key bytes without creating a second key buffer.
+    ///
+    /// This is crate-internal so terminal decrypt sessions can hand the
+    /// caller-provided secret key directly to the KEM operation. The public
+    /// [`Self::key`] accessor remains cloning for source compatibility.
+    pub(crate) fn key_bytes(&self) -> &[u8] {
+        &self.key
+    }
+
+    /// Clear the key bytes held by a terminal decrypt session.
+    ///
+    /// This is intentionally crate-internal: a generic `Kyber` can also hold
+    /// a public encapsulation key, whose public API and semantics remain
+    /// unchanged.
+    pub(crate) fn zeroize_key(&mut self) {
+        self.key.zeroize();
+    }
     /// Returns the nonce string.
     pub fn nonce(&self) -> Result<&str, CryptError> {
         Ok(&self.nonce)
@@ -496,6 +515,14 @@ impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam>
     /// Returns the key bytes.
     pub fn get_key(&self) -> Result<Vec<u8>, CryptError> {
         self.kyber_data.key()
+    }
+
+    /// Clear this instance's owned key bytes.
+    ///
+    /// Only the decrypt-session owner calls this internal operation after the
+    /// KEM operation completes; public-key `Kyber` instances are not changed.
+    pub(crate) fn zeroize_key(&mut self) {
+        self.kyber_data.zeroize_key();
     }
 
     /// Returns the hex-encoded nonce string.

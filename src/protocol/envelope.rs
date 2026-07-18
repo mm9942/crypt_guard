@@ -47,7 +47,7 @@
 //! ```
 
 use crate::error::CryptError;
-use crate::protocol::aad::build_aad;
+use crate::protocol::aad::{build_aad, try_build_aad};
 use crate::protocol::header::{Header, HEADER_SIZE};
 
 /// Authenticated envelope containing all fields needed for a single
@@ -120,6 +120,22 @@ impl Envelope {
         build_aad(&self.header, &self.kem_ciphertext, &self.nonce, metadata)
     }
 
+    /// Compute canonical AAD with checked wire-length arithmetic.
+    ///
+    /// # Arguments
+    /// - `metadata` (`&[u8]`): optional caller-supplied context bytes.
+    ///
+    /// # Returns
+    /// The canonical AAD `Vec<u8>`.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::InvalidEnvelope`] when a field cannot be encoded
+    /// in the canonical AAD or the combined allocation length cannot be
+    /// represented or reserved.
+    pub fn try_build_aad(&self, metadata: &[u8]) -> Result<Vec<u8>, CryptError> {
+        try_build_aad(&self.header, &self.kem_ciphertext, &self.nonce, metadata)
+    }
+
     /// Serialize the envelope to bytes.
     ///
     /// # Description
@@ -128,19 +144,43 @@ impl Envelope {
     /// # Returns
     /// The serialized envelope as a `Vec<u8>`.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let hdr = self.header.to_bytes();
-        let kem_ct_len = (self.kem_ciphertext.len() as u32).to_le_bytes();
-        let nonce_len = (self.nonce.len() as u32).to_le_bytes();
-        let ct_len = (self.ciphertext.len() as u32).to_le_bytes();
+        self.try_to_bytes().unwrap_or_else(|_| {
+            panic!("CGv2 envelope fields exceed the canonical wire representation")
+        })
+    }
+
+    /// Serialize the envelope with checked wire-length arithmetic.
+    ///
+    /// # Returns
+    /// The serialized envelope as a `Vec<u8>`.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::InvalidEnvelope`] when a field cannot be encoded
+    /// in the CGv2 `u32` length-prefixed wire format, or when the combined
+    /// output length overflows or cannot be reserved.
+    pub fn try_to_bytes(&self) -> Result<Vec<u8>, CryptError> {
+        let hdr = self.header.try_to_bytes()?;
+        let kem_ct_len = u32::try_from(self.kem_ciphertext.len())
+            .map_err(|_| CryptError::InvalidEnvelope)?
+            .to_le_bytes();
+        let nonce_len = u32::try_from(self.nonce.len())
+            .map_err(|_| CryptError::InvalidEnvelope)?
+            .to_le_bytes();
+        let ct_len = u32::try_from(self.ciphertext.len())
+            .map_err(|_| CryptError::InvalidEnvelope)?
+            .to_le_bytes();
 
         let cap = HEADER_SIZE
-            + 4
-            + self.kem_ciphertext.len()
-            + 4
-            + self.nonce.len()
-            + 4
-            + self.ciphertext.len();
-        let mut out = Vec::with_capacity(cap);
+            .checked_add(4)
+            .and_then(|capacity| capacity.checked_add(self.kem_ciphertext.len()))
+            .and_then(|capacity| capacity.checked_add(4))
+            .and_then(|capacity| capacity.checked_add(self.nonce.len()))
+            .and_then(|capacity| capacity.checked_add(4))
+            .and_then(|capacity| capacity.checked_add(self.ciphertext.len()))
+            .ok_or(CryptError::InvalidEnvelope)?;
+        let mut out = Vec::new();
+        out.try_reserve_exact(cap)
+            .map_err(|_| CryptError::InvalidEnvelope)?;
         out.extend_from_slice(&hdr);
         out.extend_from_slice(&kem_ct_len);
         out.extend_from_slice(&self.kem_ciphertext);
@@ -148,7 +188,7 @@ impl Envelope {
         out.extend_from_slice(&self.nonce);
         out.extend_from_slice(&ct_len);
         out.extend_from_slice(&self.ciphertext);
-        out
+        Ok(out)
     }
 
     /// Deserialize an envelope from a byte slice.
@@ -160,8 +200,9 @@ impl Envelope {
     /// `Ok(Envelope)` on success.
     ///
     /// # Errors
-    /// - [`CryptError::InvalidEnvelope`]: byte slice is too short for the header, any
-    ///   length-prefix field, or the declared payload.
+    /// - [`CryptError::InvalidEnvelope`]: byte slice is structurally malformed,
+    ///   includes trailing bytes, or encodes KEM ciphertext or nonce lengths
+    ///   inconsistent with its algorithm identifiers.
     /// - [`CryptError::UnsupportedEnvelopeVersion`]: header version ≠ 2.
     /// - [`CryptError::UnsupportedAlgorithm`]: unknown algorithm byte in header.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CryptError> {
@@ -172,14 +213,25 @@ impl Envelope {
         let mut pos = HEADER_SIZE;
 
         let kem_ciphertext = read_len_prefixed(bytes, &mut pos)?;
+        if kem_ciphertext.len() != header.kem_alg.ciphertext_len() {
+            return Err(CryptError::InvalidEnvelope);
+        }
+
         let nonce = read_len_prefixed(bytes, &mut pos)?;
+        if nonce.len() != header.aead_alg.nonce_len() {
+            return Err(CryptError::InvalidEnvelope);
+        }
+
         let ciphertext = read_len_prefixed(bytes, &mut pos)?;
+        if pos != bytes.len() {
+            return Err(CryptError::InvalidEnvelope);
+        }
 
         Ok(Self {
             header,
-            kem_ciphertext,
-            nonce,
-            ciphertext,
+            kem_ciphertext: copy_field(kem_ciphertext)?,
+            nonce: copy_field(nonce)?,
+            ciphertext: copy_field(ciphertext)?,
         })
     }
 }
@@ -188,23 +240,34 @@ impl Envelope {
 ///
 /// # Errors
 /// Returns [`CryptError::InvalidEnvelope`] if there are insufficient bytes.
-fn read_len_prefixed(bytes: &[u8], pos: &mut usize) -> Result<Vec<u8>, CryptError> {
-    if *pos + 4 > bytes.len() {
+fn read_len_prefixed<'a>(bytes: &'a [u8], pos: &mut usize) -> Result<&'a [u8], CryptError> {
+    let length_end = pos.checked_add(4).ok_or(CryptError::InvalidEnvelope)?;
+    if length_end > bytes.len() {
         return Err(CryptError::InvalidEnvelope);
     }
-    let len = u32::from_le_bytes([
-        bytes[*pos],
-        bytes[*pos + 1],
-        bytes[*pos + 2],
-        bytes[*pos + 3],
-    ]) as usize;
-    *pos += 4;
-    if *pos + len > bytes.len() {
+    let length_bytes = bytes[*pos..length_end]
+        .try_into()
+        .map_err(|_| CryptError::InvalidEnvelope)?;
+    let len = u32::from_le_bytes(length_bytes);
+    let len = usize::try_from(len).map_err(|_| CryptError::InvalidEnvelope)?;
+    *pos = length_end;
+    let field_end = pos.checked_add(len).ok_or(CryptError::InvalidEnvelope)?;
+    if field_end > bytes.len() {
         return Err(CryptError::InvalidEnvelope);
     }
-    let field = bytes[*pos..*pos + len].to_vec();
-    *pos += len;
+    let field = &bytes[*pos..field_end];
+    *pos = field_end;
     Ok(field)
+}
+
+/// Copy an already-validated field without unchecked allocation arithmetic.
+fn copy_field(field: &[u8]) -> Result<Vec<u8>, CryptError> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(field.len())
+        .map_err(|_| CryptError::InvalidEnvelope)?;
+    owned.extend_from_slice(field);
+    Ok(owned)
 }
 
 #[cfg(test)]
@@ -218,7 +281,12 @@ mod tests {
             AeadAlgId::XChaCha20Poly1305,
             KdfAlgId::HkdfSha256,
         );
-        Envelope::new(hdr, vec![0u8; 32], vec![1u8; 24], vec![2u8; 64])
+        Envelope::new(
+            hdr,
+            vec![0u8; KemAlgId::MlKem768.ciphertext_len()],
+            vec![1u8; 24],
+            vec![2u8; 64],
+        )
     }
 
     #[test]

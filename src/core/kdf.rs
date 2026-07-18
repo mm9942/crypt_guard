@@ -12,6 +12,7 @@ use pqcrypto_dilithium::{dilithium2, dilithium3, dilithium5};
 use pqcrypto_falcon::{falcon1024, falcon512};
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey, SignedMessage};
 use std::{marker::PhantomData, path::PathBuf, result::Result};
+use zeroize::Zeroizing;
 
 /// Represents the type of key used in cryptographic operations.
 pub enum KeyVariant {
@@ -113,6 +114,7 @@ impl SignatureFunctions for Falcon1024 {
             "Starting with signing of the message.",
             "\nUsed key: Falcon1024"
         );
+        let key = Zeroizing::new(key);
         let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon1024::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
@@ -124,6 +126,7 @@ impl SignatureFunctions for Falcon1024 {
             "Generating a detached signature from the specified data.",
             "\nUsed key: Falcon1024"
         );
+        let key = Zeroizing::new(key);
         let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon1024::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
@@ -234,6 +237,7 @@ impl SignatureFunctions for Falcon512 {
             "Starting with signing of the message.",
             "\nUsed key: Falcon512"
         );
+        let key = Zeroizing::new(key);
         let key = falcon512::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon512::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
@@ -245,6 +249,7 @@ impl SignatureFunctions for Falcon512 {
             "Generating a detached signature from the specified data.",
             "\nUsed key: Falcon512"
         );
+        let key = Zeroizing::new(key);
         let key = falcon512::SecretKey::from_bytes(&key).unwrap();
         let signature = falcon512::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
@@ -359,6 +364,7 @@ impl SignatureFunctions for Dilithium2 {
             "Starting with signing of the message.",
             "\nSelected KDF: Dilithium2"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium2::sign(&data, &key).as_bytes().to_owned();
         log_activity!(
@@ -373,6 +379,7 @@ impl SignatureFunctions for Dilithium2 {
             "Starting with signing of the message.",
             "\nSelected KDF: Dilithium2"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium2::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!(
@@ -489,6 +496,7 @@ impl SignatureFunctions for Dilithium3 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium3"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium3::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
@@ -500,6 +508,7 @@ impl SignatureFunctions for Dilithium3 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium3"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium3::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
@@ -611,6 +620,7 @@ impl SignatureFunctions for Dilithium5 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium5"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium5::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
@@ -622,6 +632,7 @@ impl SignatureFunctions for Dilithium5 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium5"
         );
+        let key = Zeroizing::new(key);
         let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
         let signature = dilithium5::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");

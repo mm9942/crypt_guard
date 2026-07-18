@@ -39,6 +39,7 @@
 //! assert!(!aad.is_empty());
 //! ```
 
+use crate::error::CryptError;
 use crate::protocol::header::Header;
 
 /// Construct the AAD for a CGv2 envelope.
@@ -72,20 +73,55 @@ use crate::protocol::header::Header;
 /// assert!(aad.len() > 14);
 /// ```
 pub fn build_aad(header: &Header, kem_ciphertext: &[u8], nonce: &[u8], metadata: &[u8]) -> Vec<u8> {
-    let hdr_bytes = header.to_bytes();
-    let kem_ct_len = kem_ciphertext.len() as u32;
-    let capacity = hdr_bytes.len()
-        + 4  // u32 length prefix for kem_ciphertext
-        + kem_ciphertext.len()
-        + nonce.len()
-        + metadata.len();
-    let mut aad = Vec::with_capacity(capacity);
+    try_build_aad(header, kem_ciphertext, nonce, metadata)
+        .unwrap_or_else(|_| panic!("CGv2 AAD fields exceed the canonical wire representation"))
+}
+
+/// Construct the AAD for a CGv2 envelope with checked wire-length arithmetic.
+///
+/// # Description
+/// Produces exactly the same bytes as [`build_aad`] for valid inputs, while
+/// rejecting a KEM ciphertext that cannot be represented by its `u32`
+/// little-endian length prefix and checked allocation failures.
+///
+/// # Arguments
+/// - `header` (`&Header`): the envelope header.
+/// - `kem_ciphertext` (`&[u8]`): the raw KEM ciphertext bytes.
+/// - `nonce` (`&[u8]`): the symmetric cipher nonce or IV bytes.
+/// - `metadata` (`&[u8]`): optional caller-supplied context bytes.
+///
+/// # Returns
+/// The complete canonical AAD as a `Vec<u8>`.
+///
+/// # Errors
+/// Returns [`CryptError::InvalidEnvelope`] when the KEM ciphertext length
+/// cannot be encoded in the CGv2 AAD or the combined allocation length
+/// overflows or cannot be reserved.
+pub fn try_build_aad(
+    header: &Header,
+    kem_ciphertext: &[u8],
+    nonce: &[u8],
+    metadata: &[u8],
+) -> Result<Vec<u8>, CryptError> {
+    let hdr_bytes = header.try_to_bytes()?;
+    let kem_ct_len =
+        u32::try_from(kem_ciphertext.len()).map_err(|_| CryptError::InvalidEnvelope)?;
+    let capacity = hdr_bytes
+        .len()
+        .checked_add(4) // u32 length prefix for kem_ciphertext
+        .and_then(|capacity| capacity.checked_add(kem_ciphertext.len()))
+        .and_then(|capacity| capacity.checked_add(nonce.len()))
+        .and_then(|capacity| capacity.checked_add(metadata.len()))
+        .ok_or(CryptError::InvalidEnvelope)?;
+    let mut aad = Vec::new();
+    aad.try_reserve_exact(capacity)
+        .map_err(|_| CryptError::InvalidEnvelope)?;
     aad.extend_from_slice(&hdr_bytes);
     aad.extend_from_slice(&kem_ct_len.to_le_bytes());
     aad.extend_from_slice(kem_ciphertext);
     aad.extend_from_slice(nonce);
     aad.extend_from_slice(metadata);
-    aad
+    Ok(aad)
 }
 
 #[cfg(test)]

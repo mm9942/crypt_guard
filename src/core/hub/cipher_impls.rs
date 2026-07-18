@@ -230,7 +230,7 @@ mod inner {
             _passphrase: &str,
             envelope: &Envelope,
         ) -> Result<Vec<u8>, CryptError> {
-            open_envelope::<K, C>(&self.kyber_data.key()?, envelope)
+            open_envelope::<K, C>(self.kyber_data.key_bytes(), envelope)
         }
     }
 
@@ -241,7 +241,7 @@ mod inner {
             _passphrase: &str,
             envelope: &Envelope,
         ) -> Result<Vec<u8>, CryptError> {
-            open_envelope::<K, C>(&self.kyber_data.key()?, envelope)
+            open_envelope::<K, C>(self.kyber_data.key_bytes(), envelope)
         }
     }
 
@@ -254,7 +254,7 @@ mod inner {
         ) -> Result<Vec<u8>, CryptError> {
             // The ciphertext lives in the envelope; reading the file preserves FileNotFound semantics.
             let _ = read_file(&path)?;
-            open_envelope::<K, C>(&self.kyber_data.key()?, envelope)
+            open_envelope::<K, C>(self.kyber_data.key_bytes(), envelope)
         }
     }
 

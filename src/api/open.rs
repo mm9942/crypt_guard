@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use zeroize::Zeroize;
+
 use crate::{
     api::AuthenticatedAead,
     core::hub::{DecryptData, Kyber, KyberSizeVariant, MlKem1024},
@@ -61,6 +63,55 @@ where
     _state: PhantomData<(S, K, A)>,
 }
 
+/// Owns the key-bearing `Kyber` value for one terminal decrypt operation.
+///
+/// The builder moves its recipient secret key here before decryption. Dropping
+/// this session clears that owned key after either a successful open or an
+/// error, without changing the behavior of encryption-side public keys.
+struct DecryptSession<K, A>
+where
+    K: KyberSizeVariant,
+    A: AuthenticatedAead,
+{
+    kyber: Kyber<Decryption, K, Data, A>,
+}
+
+impl<K, A> DecryptSession<K, A>
+where
+    K: KyberSizeVariant,
+    A: AuthenticatedAead,
+    Kyber<Decryption, K, Data, A>: DecryptData,
+{
+    fn open(&self, envelope: &Envelope) -> Result<Vec<u8>, CryptError> {
+        self.kyber.decrypt_data(&envelope.ciphertext, "", envelope)
+    }
+}
+
+impl<K, A> Drop for DecryptSession<K, A>
+where
+    K: KyberSizeVariant,
+    A: AuthenticatedAead,
+{
+    fn drop(&mut self) {
+        self.kyber.zeroize_key();
+    }
+}
+
+/// Zeroizes the recipient ML-KEM secret key when the builder is dropped, so a
+/// partially configured or discarded builder does not leave key material in
+/// freed heap memory.
+impl<S, K, A> Drop for DecryptorBuilder<S, K, A>
+where
+    K: KyberSizeVariant,
+    A: AuthenticatedAead,
+{
+    fn drop(&mut self) {
+        if let Some(secret_key) = self.secret_key.as_mut() {
+            secret_key.zeroize();
+        }
+    }
+}
+
 impl<K, A> DecryptorBuilder<MissingSecretKey, K, A>
 where
     K: KyberSizeVariant,
@@ -89,10 +140,12 @@ where
     Kyber<Decryption, K, Data, A>: DecryptData,
 {
     /// Open and authenticate a CGv2 envelope, returning the plaintext bytes.
-    pub fn open(self, envelope: &Envelope) -> Result<Vec<u8>, CryptError> {
-        let secret_key = self.secret_key.ok_or(CryptError::MissingSecretKey)?;
-        let kyber = Kyber::<Decryption, K, Data, A>::new(secret_key, None)?;
-        kyber.decrypt_data(&envelope.ciphertext, "", envelope)
+    pub fn open(mut self, envelope: &Envelope) -> Result<Vec<u8>, CryptError> {
+        let secret_key = self.secret_key.take().ok_or(CryptError::MissingSecretKey)?;
+        let session = DecryptSession {
+            kyber: Kyber::<Decryption, K, Data, A>::new(secret_key, None)?,
+        };
+        session.open(envelope)
     }
 }
 

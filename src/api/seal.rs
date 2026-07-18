@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use zeroize::{Zeroize, Zeroizing};
+
 use crate::{
     api::AuthenticatedAead,
     core::hub::{EncryptData, Kyber, KyberSizeVariant, MlKem1024},
@@ -83,6 +85,21 @@ where
     _state: PhantomData<(R, P, K, A)>,
 }
 
+/// Zeroizes the plaintext buffer when the builder is dropped, so a partially
+/// configured or discarded builder does not leave plaintext in freed heap
+/// memory.
+impl<R, P, K, A> Drop for EncryptorBuilder<R, P, K, A>
+where
+    K: KyberSizeVariant,
+    A: AuthenticatedAead,
+{
+    fn drop(&mut self) {
+        if let Some(plaintext) = self.plaintext.as_mut() {
+            plaintext.zeroize();
+        }
+    }
+}
+
 impl<K, A> EncryptorBuilder<MissingRecipient, MissingPlaintext, K, A>
 where
     K: KyberSizeVariant,
@@ -103,10 +120,10 @@ where
     A: AuthenticatedAead,
 {
     /// Set the recipient ML-KEM public key bytes.
-    pub fn recipient(self, recipient: Vec<u8>) -> EncryptorBuilder<WithRecipient, P, K, A> {
+    pub fn recipient(mut self, recipient: Vec<u8>) -> EncryptorBuilder<WithRecipient, P, K, A> {
         EncryptorBuilder {
             recipient: Some(recipient),
-            plaintext: self.plaintext,
+            plaintext: self.plaintext.take(),
             _state: PhantomData,
         }
     }
@@ -120,11 +137,11 @@ where
 {
     /// Set the plaintext bytes to encrypt.
     pub fn plaintext<T: Into<Vec<u8>>>(
-        self,
+        mut self,
         plaintext: T,
     ) -> EncryptorBuilder<WithRecipient, WithPlaintext, K, A> {
         EncryptorBuilder {
-            recipient: self.recipient,
+            recipient: self.recipient.take(),
             plaintext: Some(plaintext.into()),
             _state: PhantomData,
         }
@@ -143,9 +160,9 @@ where
     Kyber<Encryption, K, Data, A>: EncryptData,
 {
     /// Seal the configured plaintext into a CGv2 authenticated envelope.
-    pub fn seal(self) -> Result<Envelope, CryptError> {
-        let recipient = self.recipient.ok_or(CryptError::MissingPublicKey)?;
-        let plaintext = self.plaintext.ok_or(CryptError::MissingData)?;
+    pub fn seal(mut self) -> Result<Envelope, CryptError> {
+        let recipient = self.recipient.take().ok_or(CryptError::MissingPublicKey)?;
+        let plaintext = Zeroizing::new(self.plaintext.take().ok_or(CryptError::MissingData)?);
         let mut kyber = Kyber::<Encryption, K, Data, A>::new(recipient, None)?;
         kyber.encrypt_data(&plaintext, "")
     }

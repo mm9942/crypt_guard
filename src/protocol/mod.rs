@@ -23,7 +23,9 @@
 //! and ensure that trace logging is disabled in production builds.
 //!
 //! # Concurrency
-//! All types in this module are `Clone + Send + Sync`. No shared mutable state.
+//! Protocol types have no shared mutable state and are `Send + Sync` where their
+//! fields permit it. [`signed_envelope::SignedEnvelope`] intentionally does not
+//! require `Clone`; clone guarantees apply only to types that explicitly provide them.
 //!
 //! # Errors
 //! Parse errors map to [`crate::error::CryptError::InvalidEnvelope`] or
@@ -45,9 +47,10 @@
 pub mod aad;
 pub mod envelope;
 pub mod header;
+pub mod signed_envelope;
 pub mod version;
 
-pub use aad::build_aad;
+pub use aad::{build_aad, try_build_aad};
 pub use envelope::Envelope;
 pub use header::{AeadAlgId, Header, KdfAlgId, KemAlgId};
 pub use version::{MAGIC, VERSION_V2};

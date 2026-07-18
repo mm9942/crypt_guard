@@ -185,21 +185,24 @@ impl EncryptBuilder {
     /// - [`CryptError`]: a required field (key, size, passphrase, algorithm, content) is
     ///   missing, the Kyber size is not `1024`/`768`/`512`, the cipher/content combination
     ///   is unsupported for files, or the underlying macro fails.
-    pub fn run(self) -> Result<EncryptionOutput, CryptError> {
+    pub fn run(mut self) -> Result<EncryptionOutput, CryptError> {
         let key = self
             .key
+            .take()
             .ok_or_else(|| CryptError::new("missing public key"))?;
         let size = self
             .key_size
             .ok_or_else(|| CryptError::new("missing key size"))?;
         let pass = self
             .passphrase
+            .take()
             .ok_or_else(|| CryptError::new("missing passphrase"))?;
         let alg = self
             .algorithm
             .ok_or_else(|| CryptError::new("missing algorithm"))?;
         let content = self
             .content
+            .take()
             .ok_or_else(|| CryptError::new("missing content (data or file)"))?;
 
         match content {
@@ -375,6 +378,21 @@ impl EncryptBuilder {
     }
 }
 
+/// Zeroizes the passphrase and any plaintext held by the builder when it is dropped.
+///
+/// `key` carries the Kyber public key, so it is deliberately left untouched.
+#[cfg(feature = "legacy-pqclean")]
+impl Drop for EncryptBuilder {
+    fn drop(&mut self) {
+        if let Some(passphrase) = self.passphrase.as_mut() {
+            passphrase.zeroize();
+        }
+        if let Some(Content::Data(plaintext)) = self.content.as_mut() {
+            plaintext.zeroize();
+        }
+    }
+}
+
 /// Builder for Kyber-wrapped symmetric decryption of in-memory data or a file.
 ///
 /// # Description
@@ -450,27 +468,31 @@ impl DecryptBuilder {
     /// - [`CryptError`]: a required field is missing (including the nonce for nonce-bearing
     ///   ciphers or the cipher for data/file paths), the Kyber size is invalid, the
     ///   cipher/content combination is unsupported, or the underlying macro fails.
-    pub fn run(self) -> Result<Vec<u8>, CryptError> {
+    pub fn run(mut self) -> Result<Vec<u8>, CryptError> {
         let key = self
             .key
+            .take()
             .ok_or_else(|| CryptError::new("missing secret key"))?;
         let size = self
             .key_size
             .ok_or_else(|| CryptError::new("missing key size"))?;
         let pass = self
             .passphrase
+            .take()
             .ok_or_else(|| CryptError::new("missing passphrase"))?;
         let alg = self
             .algorithm
             .ok_or_else(|| CryptError::new("missing algorithm"))?;
         let content = self
             .content
+            .take()
             .ok_or_else(|| CryptError::new("missing content (data or file)"))?;
 
         match content {
             Content::Data(data) => {
                 let cipher = self
                     .cipher
+                    .take()
                     .ok_or_else(|| CryptError::new("missing cipher"))?;
                 match alg {
                     SymmetricAlg::Aes => match size {
@@ -557,6 +579,7 @@ impl DecryptBuilder {
                     SymmetricAlg::AesGcmSiv => {
                         let n = self
                             .nonce
+                            .take()
                             .ok_or_else(|| CryptError::new("missing nonce for AES_GCM_SIV"))?;
                         match size {
                             1024 => decryption!(
@@ -592,6 +615,7 @@ impl DecryptBuilder {
                     SymmetricAlg::AesCtr => {
                         let n = self
                             .nonce
+                            .take()
                             .ok_or_else(|| CryptError::new("missing nonce for AES_CTR"))?;
                         match size {
                             1024 => decryption!(
@@ -627,6 +651,7 @@ impl DecryptBuilder {
                     SymmetricAlg::XChaCha20 => {
                         let n = self
                             .nonce
+                            .take()
                             .ok_or_else(|| CryptError::new("missing nonce for XChaCha20"))?;
                         match size {
                             1024 => decryption!(
@@ -660,7 +685,7 @@ impl DecryptBuilder {
                         }
                     }
                     SymmetricAlg::XChaCha20Poly1305 => {
-                        let n = self.nonce.ok_or_else(|| {
+                        let n = self.nonce.take().ok_or_else(|| {
                             CryptError::new("missing nonce for XChaCha20Poly1305")
                         })?;
                         match size {
@@ -700,6 +725,7 @@ impl DecryptBuilder {
                 SymmetricAlg::Aes => {
                     let cipher = self
                         .cipher
+                        .take()
                         .ok_or_else(|| CryptError::new("missing cipher"))?;
                     match size {
                         1024 => decrypt_file!(
@@ -732,9 +758,11 @@ impl DecryptBuilder {
                 SymmetricAlg::XChaCha20 => {
                     let cipher = self
                         .cipher
+                        .take()
                         .ok_or_else(|| CryptError::new("missing cipher"))?;
                     let n = self
                         .nonce
+                        .take()
                         .ok_or_else(|| CryptError::new("missing nonce for XChaCha20"))?;
                     match size {
                         1024 => decrypt_file!(
@@ -771,6 +799,21 @@ impl DecryptBuilder {
                     "file decryption supported only for AES and XChaCha20",
                 )),
             },
+        }
+    }
+}
+
+/// Zeroizes the Kyber secret key and passphrase held by the builder when it is dropped.
+///
+/// Ciphertext, nonces, and encrypted content are intentionally left untouched.
+#[cfg(feature = "legacy-pqclean")]
+impl Drop for DecryptBuilder {
+    fn drop(&mut self) {
+        if let Some(key) = self.key.as_mut() {
+            key.zeroize();
+        }
+        if let Some(passphrase) = self.passphrase.as_mut() {
+            passphrase.zeroize();
         }
     }
 }
@@ -890,7 +933,6 @@ impl SignBuilder {
         let key = self.key.ok_or_else(|| SigningErr::new("missing key"))?;
         let data = self.data.ok_or_else(|| SigningErr::new("missing data"))?;
 
-        
         match (alg, mode) {
             (SignAlgorithm::Falcon1024, SignMode::Message) => {
                 signature!(Falcon, key.clone(), 1024, data.clone(), Message)
@@ -1002,7 +1044,7 @@ impl VerifyBuilder {
         let msg = self
             .signed_message
             .ok_or_else(|| SigningErr::new("missing signed message"))?;
-        
+
         match alg {
             SignAlgorithm::Falcon1024 => verify!(Falcon, key.clone(), 1024, msg.clone(), Message),
             SignAlgorithm::Falcon512 => verify!(Falcon, key.clone(), 512, msg.clone(), Message),
@@ -1035,7 +1077,7 @@ impl VerifyBuilder {
         let signature = self
             .signature
             .ok_or_else(|| SigningErr::new("missing signature"))?;
-        
+
         match alg {
             SignAlgorithm::Falcon1024 => verify!(
                 Falcon,

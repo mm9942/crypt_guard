@@ -63,6 +63,18 @@ pub enum KemAlgId {
 }
 
 impl KemAlgId {
+    /// Return the canonical serialized ML-KEM ciphertext length for this parameter set.
+    ///
+    /// # Returns
+    /// The FIPS 203 ciphertext length in bytes.
+    pub const fn ciphertext_len(self) -> usize {
+        match self {
+            Self::MlKem512 => 768,
+            Self::MlKem768 => 1_088,
+            Self::MlKem1024 => 1_568,
+        }
+    }
+
     /// Parse from a raw byte.
     ///
     /// # Errors
@@ -99,6 +111,20 @@ pub enum AeadAlgId {
 }
 
 impl AeadAlgId {
+    /// Return the canonical nonce length for this symmetric algorithm.
+    ///
+    /// # Returns
+    /// The nonce or IV length in bytes. Algorithms that embed their IV in the
+    /// ciphertext return zero.
+    pub const fn nonce_len(self) -> usize {
+        match self {
+            Self::AesCbc | Self::AesXts => 0,
+            Self::AesGcmSiv => 12,
+            Self::AesCtr => 16,
+            Self::XChaCha20 | Self::XChaCha20Poly1305 => 24,
+        }
+    }
+
     /// Returns `true` when this algorithm provides built-in AEAD authentication.
     ///
     /// # Description
@@ -208,11 +234,43 @@ impl Header {
         }
     }
 
+    /// Validate that this header can be represented in canonical CGv2 form.
+    ///
+    /// # Returns
+    /// `Ok(())` when the magic, version, and reserved flags are canonical.
+    ///
+    /// # Errors
+    /// - [`CryptError::InvalidEnvelope`]: the magic or reserved flags are not canonical.
+    /// - [`CryptError::UnsupportedEnvelopeVersion`]: the version is not CGv2.
+    pub fn validate(&self) -> Result<(), CryptError> {
+        if self.magic != MAGIC || self.flags != 0 {
+            return Err(CryptError::InvalidEnvelope);
+        }
+        if self.version != VERSION_V2 {
+            return Err(CryptError::UnsupportedEnvelopeVersion);
+        }
+        Ok(())
+    }
+
     /// Serialize the header to a fixed-size 14-byte array.
     ///
     /// # Returns
     /// `[u8; HEADER_SIZE]` in the layout described in the module doc.
     pub fn to_bytes(self) -> [u8; HEADER_SIZE] {
+        self.try_to_bytes()
+            .unwrap_or_else(|_| panic!("CGv2 header is not canonical"))
+    }
+
+    /// Serialize the header after validating its canonical CGv2 fields.
+    ///
+    /// # Returns
+    /// `[u8; HEADER_SIZE]` in the layout described in the module doc.
+    ///
+    /// # Errors
+    /// - [`CryptError::InvalidEnvelope`]: the magic or reserved flags are not canonical.
+    /// - [`CryptError::UnsupportedEnvelopeVersion`]: the version is not CGv2.
+    pub fn try_to_bytes(self) -> Result<[u8; HEADER_SIZE], CryptError> {
+        self.validate()?;
         let mut out = [0u8; HEADER_SIZE];
         out[0..4].copy_from_slice(&self.magic);
         out[4..6].copy_from_slice(&self.version.to_le_bytes());
@@ -221,24 +279,24 @@ impl Header {
         out[8] = self.kdf_alg as u8;
         out[9] = self.flags;
         // bytes 10–13 are reserved / padding (zero)
-        out
+        Ok(out)
     }
 
     /// Deserialize a header from a byte slice.
     ///
     /// # Arguments
-    /// - `bytes` (`&[u8]`): must be at least [`HEADER_SIZE`] bytes long.
+    /// - `bytes` (`&[u8]`): must be exactly [`HEADER_SIZE`] bytes long.
     ///
     /// # Returns
     /// `Ok(Header)` on success.
     ///
     /// # Errors
-    /// - [`CryptError::InvalidEnvelope`]: fewer than `HEADER_SIZE` bytes provided, or
-    ///   magic does not match `b"CGv2"`.
+    /// - [`CryptError::InvalidEnvelope`]: the length is not [`HEADER_SIZE`], magic does
+    ///   not match `b"CGv2"`, or reserved bytes are non-zero.
     /// - [`CryptError::UnsupportedEnvelopeVersion`]: version field ≠ 2.
     /// - [`CryptError::UnsupportedAlgorithm`]: unknown algorithm byte.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CryptError> {
-        if bytes.len() < HEADER_SIZE {
+        if bytes.len() != HEADER_SIZE {
             return Err(CryptError::InvalidEnvelope);
         }
         let mut magic = [0u8; 4];
@@ -254,6 +312,9 @@ impl Header {
         let aead_alg = AeadAlgId::from_byte(bytes[7])?;
         let kdf_alg = KdfAlgId::from_byte(bytes[8])?;
         let flags = bytes[9];
+        if flags != 0 || bytes[10..HEADER_SIZE].iter().any(|&byte| byte != 0) {
+            return Err(CryptError::InvalidEnvelope);
+        }
         Ok(Self {
             magic,
             version,
