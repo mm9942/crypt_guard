@@ -1,8 +1,8 @@
-# CryptGuard v3.0.1
+# CryptGuard v3.0.2
 
-[![Crates.io](https://img.shields.io/badge/crates.io-v3.0.1-blue.svg?style=for-the-badge)](https://crates.io/crates/crypt_guard)
+[![Crates.io](https://img.shields.io/badge/crates.io-v3.0.2-blue.svg?style=for-the-badge)](https://crates.io/crates/crypt_guard)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-v3.0.1-yellow.svg?style=for-the-badge)](https://docs.rs/crypt_guard/)
+[![Documentation](https://img.shields.io/badge/docs-v3.0.2-yellow.svg?style=for-the-badge)](https://docs.rs/crypt_guard/)
 [![GitHub Library](https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard)
 
 CryptGuard is a pure-Rust post-quantum cryptography library. Version 3 uses a
@@ -35,7 +35,7 @@ boundaries over compact ciphertexts.
 
 ```toml
 [dependencies]
-crypt_guard = "3.0.1"
+crypt_guard = "3.0.2"
 ```
 
 The default feature set includes the FIPS ML-KEM and ML-DSA backends. No
@@ -270,7 +270,7 @@ explicit migration build.
 
 ```toml
 [dependencies]
-crypt_guard = { version = "3.0.1", features = ["cgv2-compat"] }
+crypt_guard = { version = "3.0.2", features = ["cgv2-compat"] }
 ```
 
 Migration procedure:
@@ -323,4 +323,10 @@ Dilithium path for explicitly managed legacy data. It is separate from
 - [FIPS 204: ML-DSA](https://csrc.nist.gov/pubs/fips/204/final)
 - [FIPS 205: SLH-DSA](https://csrc.nist.gov/pubs/fips/205/final)
 - [RFC 9180: Hybrid Public Key Encryption](https://www.rfc-editor.org/rfc/rfc9180.html)
-- [draft-ietf-hpke-pq-05](https://datatracker.ietf.org/doc/draft-ietf-hpke-pq-05/)
+
+## Release note: v3.0.2
+
+This release removes a v3 provenance-recovery bug: a caller now retains its
+validated 32-byte provenance seed and deterministically rederives the
+recipient key pair when opening an envelope. It must not persist the
+KEM-specific, internally expanded recipient-private representation.

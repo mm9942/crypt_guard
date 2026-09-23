@@ -1,4 +1,4 @@
-//! # CryptGuard v3.0.1
+//! # CryptGuard v3.0.2
 //!
 //! CryptGuard v3 makes [`pq_hpke`] the default post-quantum encryption
 //! transport. Its default profile is ML-KEM-1024/P-384, SHAKE256, and

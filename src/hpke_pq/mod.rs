@@ -2546,7 +2546,13 @@ pub mod draft_ietf_hpke_pq_05_full {
             self.kem
         }
 
-        /// Borrow the 64-byte seed only for protected key-storage integration.
+        /// Borrow the KEM-specific private-key seed for controlled key-storage
+        /// integration.
+        ///
+        /// This is operational recipient material, not an application's
+        /// provenance seed. A caller recovering a recipient through
+        /// [`derive_recipient_key_pair`] must retain its original validated
+        /// 32-byte input and must not replace it with these bytes.
         pub fn as_seed_bytes(&self) -> &[u8] {
             match &self.inner {
                 RecipientPrivateKeyInner::MlKem512(value) => value.as_bytes(),
@@ -2651,6 +2657,102 @@ pub mod draft_ietf_hpke_pq_05_full {
                 })
             }
         }
+    }
+
+    /// Deterministically derive a recipient key pair from exactly 32 seed bytes.
+    ///
+    /// This is intended for reproducible key recovery from protected external
+    /// keying material, not for ordinary key generation. Persist the exact
+    /// validated 32-byte caller seed and invoke this function again when a
+    /// recipient key is needed; do **not** persist
+    /// [`RecipientPrivateKey::as_seed_bytes`] as provenance material. Some KEM
+    /// implementations use a larger private-key seed internally. The caller
+    /// seed is expanded with SHAKE256 under a crypt_guard v3 domain separator
+    /// and the selected KEM identifier before it reaches any KEM-specific
+    /// derivation. Use [`generate_recipient_key_pair`] for fresh
+    /// OS-CSPRNG-generated keys.
+    ///
+    /// The returned error intentionally identifies only an invalid seed format;
+    /// it never includes seed material.
+    pub fn derive_recipient_key_pair(kem: Kem, seed: &[u8]) -> Result<RecipientKeyPair, Error> {
+        require_kem(kem)?;
+        let seed = derive_recipient_key_seed(kem, seed)?;
+
+        match kem {
+            Kem::MlKem512 => {
+                let (public_key, private_key) =
+                    derive_key_pair_512(&seed[..]).map_err(|_| Error::InternalInvariant)?;
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        kem,
+                        inner: RecipientPublicKeyInner::MlKem512(Box::new(public_key)),
+                    },
+                    private_key: RecipientPrivateKey {
+                        kem,
+                        inner: RecipientPrivateKeyInner::MlKem512(private_key),
+                    },
+                })
+            }
+            Kem::MlKem768 => {
+                let (public_key, private_key) =
+                    derive_key_pair(&seed[..]).map_err(|_| Error::InternalInvariant)?;
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        kem,
+                        inner: RecipientPublicKeyInner::MlKem768(Box::new(public_key)),
+                    },
+                    private_key: RecipientPrivateKey {
+                        kem,
+                        inner: RecipientPrivateKeyInner::MlKem768(private_key),
+                    },
+                })
+            }
+            Kem::MlKem1024 => {
+                let (public_key, private_key) =
+                    derive_key_pair_1024(&seed[..]).map_err(|_| Error::InternalInvariant)?;
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        kem,
+                        inner: RecipientPublicKeyInner::MlKem1024(Box::new(public_key)),
+                    },
+                    private_key: RecipientPrivateKey {
+                        kem,
+                        inner: RecipientPrivateKeyInner::MlKem1024(private_key),
+                    },
+                })
+            }
+            Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
+                let private_key = HybridPrivateKey::from_seed(kem, seed);
+                let public_key = HybridPublicKey::derive(kem, private_key.as_seed_bytes())?;
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        kem,
+                        inner: RecipientPublicKeyInner::Hybrid(public_key),
+                    },
+                    private_key: RecipientPrivateKey {
+                        kem,
+                        inner: RecipientPrivateKeyInner::Hybrid(private_key),
+                    },
+                })
+            }
+        }
+    }
+
+    fn derive_recipient_key_seed(
+        kem: Kem,
+        seed: &[u8],
+    ) -> Result<Zeroizing<[u8; HYBRID_SEED_BYTES]>, Error> {
+        let seed = <[u8; HYBRID_SEED_BYTES]>::try_from(seed)
+            .map(Zeroizing::new)
+            .map_err(|_| Error::InvalidRecipientPrivateKey)?;
+        let mut xof = Shake256::default();
+        xof.update(b"crypt_guard/v3/pq-hpke/recipient-key-pair");
+        xof.update(&kem.id().to_be_bytes());
+        xof.update(&seed[..]);
+
+        let mut derived = Zeroizing::new([0_u8; HYBRID_SEED_BYTES]);
+        xof.finalize_xof().read(&mut derived[..]);
+        Ok(derived)
     }
 
     #[derive(Clone, Eq, PartialEq)]
@@ -3840,6 +3942,52 @@ mod tests {
                     .unwrap(),
                 decode(&export.exported_value),
             );
+        }
+    }
+
+    #[test]
+    fn v3_recipient_key_pair_derivation_is_deterministic_for_every_operational_kem() {
+        use draft_ietf_hpke_pq_05_full::{derive_recipient_key_pair, Kem};
+
+        let seed = [0x5a_u8; 32];
+        for kem in [
+            Kem::MlKem512,
+            Kem::MlKem768,
+            Kem::MlKem1024,
+            Kem::MlKem768P256,
+            Kem::MlKem1024P384,
+            Kem::MlKem768X25519,
+        ] {
+            let first = derive_recipient_key_pair(kem, &seed)
+                .expect("every operational KEM must support deterministic recipient derivation");
+            let second = derive_recipient_key_pair(kem, &seed)
+                .expect("repeated deterministic recipient derivation must succeed");
+
+            assert_eq!(first.public_key().kem(), kem);
+            assert_eq!(first.private_key().kem(), kem);
+            assert_eq!(
+                first.public_key().as_bytes(),
+                second.public_key().as_bytes()
+            );
+            assert_eq!(
+                first.private_key().as_seed_bytes(),
+                second.private_key().as_seed_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn v3_recipient_key_pair_derivation_rejects_non_32_byte_seeds_without_echoing_them() {
+        use draft_ietf_hpke_pq_05_full::{derive_recipient_key_pair, Error, Kem};
+
+        for length in [31, 33] {
+            let seed = vec![0xa5_u8; length];
+            let error = match derive_recipient_key_pair(Kem::MlKem768, &seed) {
+                Ok(_) => panic!("a non-32-byte seed must be rejected"),
+                Err(error) => error,
+            };
+            assert_eq!(error, Error::InvalidRecipientPrivateKey);
+            assert_eq!(format!("{error:?}"), "InvalidRecipientPrivateKey");
         }
     }
 
