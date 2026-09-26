@@ -134,8 +134,8 @@ fn encrypt_decrypt_msg_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std::
     let mut aes_gcm_siv = CipherAesGcmSiv::new(infos, None);
     let (encrypt_message, cipher) = aes_gcm_siv.encrypt(public_key)?;
     let iv = aes_gcm_siv.iv();
-    println!("IV: {:?}", &iv);
-    println!("encrypt_message: {:?}", &encrypt_message);
+    println!("IV: {:?}", iv);
+    println!("encrypt_message: {:?}", encrypt_message);
 
     // Encrypt message
     let crypt_metadata = CryptographicMetadata {
@@ -156,7 +156,7 @@ fn encrypt_decrypt_msg_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std::
     let mut aes_gcm_siv_dec = CipherAesGcmSiv::new(infos, Some(hex::encode(iv)));
     let decrypt_message = aes_gcm_siv_dec.decrypt(secret_key, cipher)?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     for enc_b in decrypt_message.clone() {
         print!("{:02x} ", enc_b);
     }
@@ -220,7 +220,7 @@ fn encrypt_decrypt_data_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std:
     let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
-    println!("{:?}", &message);
+    println!("{:?}", message);
 
     // Generate key pair
     let (public_key, secret_key) = kyber_keypair!(1024);
@@ -246,7 +246,7 @@ fn encrypt_decrypt_data_macro_AES_GCM_SIV_Kyber1024() -> Result<(), Box<dyn std:
         AES_GCM_SIV
     )?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message.to_owned());
 
@@ -267,7 +267,7 @@ fn encrypt_decrypt_msg_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::erro
     // Decrypt message
     let decrypt_message = decryption!(secret_key.to_owned(), 1024, encrypt_message.to_owned(), passphrase, cipher.to_owned(), AES_CTR)?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message.to_owned());
 
@@ -300,7 +300,7 @@ fn encrypt_decrypt_msg_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Err
 
     let mut aes_xts = CipherAesXts::new(infos);
     let (encrypt_message, cipher) = aes_xts.encrypt(public_key)?;
-    println!("encrypt_message: {:?}", &encrypt_message);
+    println!("encrypt_message: {:?}", encrypt_message);
 
     // Encrypt message
     let crypt_metadata = CryptographicMetadata {
@@ -321,7 +321,7 @@ fn encrypt_decrypt_msg_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Err
     let mut aes_xts_dec = CipherAesXts::new(infos);
     let decrypt_message = aes_xts_dec.decrypt(secret_key, cipher)?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     for enc_b in decrypt_message.clone() {
         print!("{:02x} ", enc_b);
     }
@@ -357,8 +357,8 @@ fn encrypt_decrypt_msg_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::erro
     let mut aes_gcm_siv = CipherAesCtr::new(infos, None);
     let (encrypt_message, cipher) = aes_gcm_siv.encrypt(public_key)?;
     let iv = aes_gcm_siv.iv();
-    println!("IV: {:?}", &iv);
-    println!("encrypt_message: {:?}", &encrypt_message);
+    println!("IV: {:?}", iv);
+    println!("encrypt_message: {:?}", encrypt_message);
 
     // Encrypt message
     let crypt_metadata = CryptographicMetadata {
@@ -379,7 +379,7 @@ fn encrypt_decrypt_msg_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::erro
     let mut aes_gcm_siv_dec = CipherAesCtr::new(infos, Some(hex::encode(iv)));
     let decrypt_message = aes_gcm_siv_dec.decrypt(secret_key, cipher)?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     for enc_b in decrypt_message.clone() {
         print!("{:02x} ", enc_b);
     }
@@ -419,7 +419,7 @@ fn encrypt_decrypt_data_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::err
     let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
-    println!("{:?}", &message);
+    println!("{:?}", message);
 
     // Generate key pair
     let (public_key, secret_key) = kyber_keypair!(1024);
@@ -440,7 +440,7 @@ fn encrypt_decrypt_data_macro_AES_CTR_Kyber1024() -> Result<(), Box<dyn std::err
         AES_CTR
     )?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message.to_owned());
 
@@ -475,8 +475,8 @@ fn encrypt_decrypt_msg_macro_XChaCha20Poly1305_Kyber1024() -> Result<(), Box<dyn
     let mut aes_gcm_siv = CipherChaChaPoly::new(infos, None);
     let (encrypt_message, cipher) = aes_gcm_siv.encrypt(public_key)?;
     let iv = aes_gcm_siv.nonce();
-    println!("IV: {:?}", &iv);
-    println!("encrypt_message: {:?}", &encrypt_message);
+    println!("IV: {:?}", iv);
+    println!("encrypt_message: {:?}", encrypt_message);
 
     // Encrypt message
     let crypt_metadata = CryptographicMetadata {
@@ -497,7 +497,7 @@ fn encrypt_decrypt_msg_macro_XChaCha20Poly1305_Kyber1024() -> Result<(), Box<dyn
     let mut aes_gcm_siv_dec = CipherChaChaPoly::new(infos, Some(hex::encode(iv)));
     let decrypt_message = aes_gcm_siv_dec.decrypt(secret_key, cipher)?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     for enc_b in decrypt_message.clone() {
         print!("{:02x} ", enc_b);
     }
@@ -514,7 +514,7 @@ fn encrypt_decrypt_data_macro_XChaCha20Poly1305_Kyber1024() -> Result<(), Box<dy
     let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
-    println!("{:?}", &message);
+    println!("{:?}", message);
 
     // Generate key pair
     let (public_key, secret_key) = kyber_keypair!(1024);
@@ -540,7 +540,7 @@ fn encrypt_decrypt_data_macro_XChaCha20Poly1305_Kyber1024() -> Result<(), Box<dy
         XChaCha20Poly1305
     )?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message.to_owned());
 
@@ -579,7 +579,7 @@ fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
     let message = "Hey, how are you doing?".as_bytes();
     let passphrase = "Test Passphrase";
 
-    println!("{:?}", &message);
+    println!("{:?}", message);
 
     // Generate key pair
     let (public_key, secret_key) = kyber_keypair!(1024);
@@ -599,7 +599,7 @@ fn encrypt_decrypt_data_macro_AES_Kyber1024() -> Result<(), Box<dyn std::error::
         AES
     )?;
 
-    println!("{:?}", &decrypt_message);
+    println!("{:?}", decrypt_message);
     // Assert that the decrypted message matches the original message
     assert_eq!(decrypt_message, message.to_owned());
 

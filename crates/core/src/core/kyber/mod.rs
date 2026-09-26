@@ -186,7 +186,7 @@ impl<ProcessStatus, KyberSize: KyberSizeVariant, ContentStatus, AlgorithmParam>
 {
     /// Constructs a new Kyber instance with a key and an optional nonce.
     pub fn new(key: Vec<u8>, nonce: Option<String>) -> Result<Self, CryptError> {
-        let nonce = nonce.map_or(String::new(), |data| data);
+        let nonce = nonce.unwrap_or_default();
         Ok(Self {
             kyber_data: KyberData { key, nonce },
             hmac_size: 512,

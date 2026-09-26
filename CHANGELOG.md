@@ -62,6 +62,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Single-feature builds (`aes-ctr`, `aes-xts`, `legacy-aes`,
   `aes-gcm-siv-cipher`, `zip`).
 - Panics on crafted key files and in RFC 9180 KEM dispatch.
+- Legacy Kyber AES-CTR and AES-GCM-SIV wrappers printed the ciphertext on
+  encryption and the **decrypted plaintext** on decryption to stdout
+  (`println!("{:?}", data)`); in a service this ends up in logs. Removed.
 - Legacy Kyber ciphers panicked instead of returning an error on a wrong
   passphrase, a tampered ciphertext or a malformed KEM key/ciphertext
   (`unwrap()` in the `Kyber` wrappers and the key controller).

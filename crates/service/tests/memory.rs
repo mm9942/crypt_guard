@@ -274,8 +274,7 @@ fn decrypt_flipped_byte_at_any_position_is_authentication_failed() {
     positions.sort_unstable();
     positions.dedup();
 
-    let mut next_id: u128 = 100;
-    for pos in positions {
+    for (next_id, pos) in (100u128..).zip(positions) {
         let mut tampered = bytes.clone();
         tampered[pos] ^= 0x01;
         let err = decrypt(
@@ -291,7 +290,6 @@ fn decrypt_flipped_byte_at_any_position_is_authentication_failed() {
             CryptoServiceError::AuthenticationFailed,
             "flipping byte at position {pos} should be an opaque auth failure"
         );
-        next_id += 1;
     }
 }
 
@@ -310,8 +308,7 @@ fn decrypt_truncated_ciphertext_is_authentication_failed() {
     );
     let bytes = ciphertext.as_bytes().to_vec();
 
-    let mut next_id: u128 = 200;
-    for len in [1usize, 5, 9, bytes.len() / 2, bytes.len() - 1] {
+    for (next_id, len) in (200u128..).zip([1usize, 5, 9, bytes.len() / 2, bytes.len() - 1]) {
         let truncated = bytes[..len].to_vec();
         let err = decrypt(
             &mut provider,
@@ -322,7 +319,6 @@ fn decrypt_truncated_ciphertext_is_authentication_failed() {
         )
         .unwrap_err();
         assert_eq!(err, CryptoServiceError::AuthenticationFailed, "len {len}");
-        next_id += 1;
     }
 }
 

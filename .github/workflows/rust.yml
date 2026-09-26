@@ -71,14 +71,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    # Pinned so a new stable clippy cannot turn CI red overnight; bump it
+    # deliberately together with the lint fixes it requires.
     - name: Install clippy
-      run: rustup component add clippy
+      run: rustup toolchain install 1.98.0 --profile minimal -c clippy
     # Non-test code in the v3 modules denies unwrap/expect (panic-freedom
     # contract, see SECURITY.md); every lane must stay warning-free.
     - name: Clippy (all features)
-      run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+      run: cargo +1.98.0 clippy --workspace --all-features --all-targets -- -D warnings
     - name: Clippy (default features)
-      run: cargo clippy --workspace --all-targets -- -D warnings
+      run: cargo +1.98.0 clippy --workspace --all-targets -- -D warnings
 
   supply-chain:
     runs-on: ubuntu-latest

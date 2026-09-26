@@ -90,7 +90,6 @@ where
 
         let _ = self.kyber_data.set_nonce(hex::encode(aes_gcm_siv.iv()));
         let (data, cipher) = aes_gcm_siv.encrypt(self.kyber_data.key()?)?;
-        println!("{:?}", &data);
         Ok((data, cipher))
     }
 
@@ -127,7 +126,6 @@ where
         let _ = self.kyber_data.set_nonce(hex::encode(aes_gcm_siv.iv()));
 
         let (data, cipher) = aes_gcm_siv.encrypt(self.kyber_data.key()?)?;
-        println!("{:?}", &data);
         Ok((data, cipher))
     }
 
@@ -163,7 +161,6 @@ where
 
         let _ = self.kyber_data.set_nonce(hex::encode(aes_gcm_siv.iv()));
         let (data, cipher) = aes_gcm_siv.encrypt(self.kyber_data.key()?)?;
-        println!("{:?}", &data);
         Ok((data, cipher))
     }
 
@@ -263,7 +260,6 @@ where
         let mut aes_gcm_siv = CipherAesCtr::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
-        println!("{:?}", &data);
         Ok(data)
     }
 
@@ -299,7 +295,6 @@ where
         let mut aes_gcm_siv = CipherAesCtr::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
-        println!("{:?}", &data);
         Ok(data)
     }
 
@@ -335,7 +330,6 @@ where
         let mut aes_gcm_siv = CipherAesCtr::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
-        println!("{:?}", &data);
         Ok(data)
     }
 }
