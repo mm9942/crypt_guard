@@ -92,8 +92,11 @@ crrl             = { version = "=0.9.0", default-features = false, features = ["
 # ── Optional: New FIPS backends ───────────────────────────────────────────────
 ml-kem  = { version = "0.3.2", optional = true, features = ["zeroize"] }
 # PQCA/PQCP ML-KEM backend for the standards-track HPKE path. Pin exactly so
-# the reviewed validation and serialization contract cannot change unnoticed.
-libcrux-ml-kem = { version = "=0.0.9", default-features = false, features = ["std", "mlkem512", "mlkem768", "mlkem1024"] }
+# the reviewed validation and serialization contract cannot change unnoticed;
+# the draft-05 known-answer vectors in tests/vectors guard every bump.
+# 0.0.10 pulls libcrux-sha3 >= 0.0.10 and libcrux-secrets >= 0.0.6, fixing
+# RUSTSEC-2026-0207, RUSTSEC-2026-0208 and RUSTSEC-2026-0212.
+libcrux-ml-kem = { version = "=0.0.10", default-features = false, features = ["std", "mlkem512", "mlkem768", "mlkem1024"] }
 # RFC 9180 registers AES-128-GCM and AES-256-GCM alongside
 # ChaCha20-Poly1305. The HPKE context core supports all three suites.
 aes-gcm = { version = "=0.11.0" }

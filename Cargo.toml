@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/*", "crypt_guard_proc"]
-exclude = ["old"]
+exclude = ["old", "fuzz"]
 resolver = "2"
 
 # Single source of truth for the lockstep version of all published crates.

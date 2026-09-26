@@ -9,13 +9,14 @@
 //! - opening into `Zeroizing<Vec<u8>>` so the plaintext is wiped on drop,
 //! - the opaque failure for a wrong `aad`.
 
-use crypt_guard::pq_hpke::{derive_recipient_key_pair, HpkeEnvelope, DEFAULT_SUITE};
-use zeroize::Zeroizing;
+use crypt_guard::pq_hpke::{
+    derive_recipient_key_pair, generate_recipient_seed, HpkeEnvelope, DEFAULT_SUITE,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // In production the seed comes from a KMS/HSM or a sealed store. Keep it
-    // in zeroizing memory and never log it.
-    let seed = Zeroizing::new([7u8; 32]);
+    // Generate the seed once from the OS CSPRNG and keep it in your KMS/HSM
+    // or a sealed store. It lives in zeroizing memory; never log it.
+    let seed = generate_recipient_seed()?;
     let keys = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
 
     let info = b"service=billing;v=1";

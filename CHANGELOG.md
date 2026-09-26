@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- Security process: `SECURITY.md`, Dependabot (Cargo and Actions),
+  `cargo deny` in CI, committed `Cargo.lock`, and `cargo fuzz` targets for
+  every parser (`fuzz/`).
+- `pq_hpke::generate_recipient_seed` and `RECIPIENT_SEED_LEN`: the
+  recommended seed-based key-management workflow.
 - Workspace layout: `crypt_guard` is a facade over `crypt_guard_core`; all
   existing `crypt_guard::…` paths keep working.
 - `crypt_guard_service` (feature `service`): typed KMS operations,
@@ -27,6 +32,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - `examples/pq_hpke.rs`.
 
 ### Changed
+- `legacy-pqclean` is documented as depending on the unmaintained PQClean
+  based `pqcrypto-*` crates (RustSec unmaintained advisories); it stays
+  opt-in and migration-only.
 - RFC 9180 `SenderContext`/`ReceiverContext` are `Send + Sync`.
 - `Debug` of secret-bearing types is redacted; `Key` compares in constant time.
 - Secret key files are created with mode `0600` on Unix.

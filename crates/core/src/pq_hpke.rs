@@ -32,6 +32,38 @@ pub const DRAFT_NAME: &str = crate::hpke_pq::draft_ietf_hpke_pq_05_full::DRAFT_N
 pub const DEFAULT_SUITE: Suite =
     Suite::new(Kem::MlKem1024P384, Kdf::Shake256, Aead::ChaCha20Poly1305);
 
+/// Length in bytes of a recipient provenance seed accepted by
+/// [`derive_recipient_key_pair`].
+pub const RECIPIENT_SEED_LEN: usize = 32;
+
+/// Generate a fresh recipient provenance seed from the OS CSPRNG.
+///
+/// This is the recommended way to create long-lived recipient keys: keep the
+/// seed inside your key-management boundary and call
+/// [`derive_recipient_key_pair`] whenever the key pair is needed. Never
+/// build a seed by hand or from a password. The seed is returned in
+/// zeroizing memory and is wiped on drop.
+///
+/// ```rust
+/// use crypt_guard_core::pq_hpke::{derive_recipient_key_pair, generate_recipient_seed, DEFAULT_SUITE};
+///
+/// # fn main() -> Result<(), crypt_guard_core::pq_hpke::Error> {
+/// let seed = generate_recipient_seed()?;
+/// let keys = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
+/// let again = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
+/// assert_eq!(keys.public_key().as_bytes(), again.public_key().as_bytes());
+/// # Ok(())
+/// # }
+/// ```
+pub fn generate_recipient_seed() -> Result<Zeroizing<[u8; RECIPIENT_SEED_LEN]>, Error> {
+    use rand::RngCore;
+    let mut seed = Zeroizing::new([0u8; RECIPIENT_SEED_LEN]);
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut seed[..])
+        .map_err(|_| Error::InternalInvariant)?;
+    Ok(seed)
+}
+
 /// Versioned crypt_guard PQ HPKE transport magic.
 pub const ENVELOPE_MAGIC: [u8; 4] = *b"CGH3";
 /// Version of [`HpkeEnvelope`].
