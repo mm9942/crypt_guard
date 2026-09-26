@@ -33,6 +33,7 @@ use crate::error::CryptError;
 use crate::kdf::types::{HkdfSalt, SessionKey};
 use hkdf::Hkdf;
 use sha2_011::{Sha256, Sha512};
+use zeroize::Zeroize;
 
 /// Domain separation label for XChaCha20-Poly1305 AEAD.
 ///
@@ -99,7 +100,12 @@ pub fn derive_session_key(
     hk.expand(label, &mut okm).map_err(|_| {
         CryptError::CustomError("HKDF expand failed: invalid output length".to_owned())
     })?;
-    Ok(SessionKey::from_bytes(okm))
+    // `[u8; 32]` is `Copy`, so passing `okm` by value into `SessionKey::from_bytes`
+    // copies its bytes rather than moving them out; the local `okm` stays valid and
+    // must be wiped explicitly once the copy has been made.
+    let key = SessionKey::from_bytes(okm);
+    okm.zeroize();
+    Ok(key)
 }
 
 /// Derive a 32-byte session key from a KEM shared secret using HKDF-SHA512.
@@ -143,5 +149,79 @@ pub fn derive_session_key_sha512(
     hk.expand(label, &mut okm).map_err(|_| {
         CryptError::CustomError("HKDF-SHA512 expand failed: invalid output length".to_owned())
     })?;
-    Ok(SessionKey::from_bytes(okm))
+    // See the comment in `derive_session_key`: `okm` survives the by-value move
+    // into `SessionKey::from_bytes` because `[u8; 32]` is `Copy`, so it must be
+    // wiped explicitly here too.
+    let key = SessionKey::from_bytes(okm);
+    okm.zeroize();
+    Ok(key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// RFC 5869 §A.1, "Test Case 1" (Basic test case with SHA-256): known-answer
+    /// test for `derive_session_key`, which is a fixed-`L = 32` specialization of
+    /// plain HKDF-SHA256. The RFC's published 42-octet OKM is truncated to its
+    /// first 32 octets for comparison: HKDF-Expand computes its output in
+    /// `HashLen`-sized blocks (`T(1), T(2), ...`) and only truncates the final
+    /// block, so for SHA-256 (32-byte blocks) a 32-octet request yields exactly
+    /// `T(1)`, i.e. the first 32 octets of any longer-`L` expansion from the same
+    /// PRK and `info`. This was independently verified against a reference
+    /// HMAC-SHA256-based HKDF implementation.
+    #[test]
+    fn rfc5869_test_case_1_known_answer() {
+        let ikm = vec![0x0bu8; 22];
+        let salt = HkdfSalt::from_bytes(
+            hex::decode("000102030405060708090a0b0c").expect("valid hex fixture"),
+        );
+        let info = hex::decode("f0f1f2f3f4f5f6f7f8f9").expect("valid hex fixture");
+        let expected_okm =
+            hex::decode("3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf")
+                .expect("valid hex fixture");
+
+        let key = derive_session_key(&ikm, &salt, &info).expect("HKDF-SHA256 expand");
+        assert_eq!(key.as_ref(), expected_okm.as_slice());
+    }
+
+    #[test]
+    fn same_inputs_are_deterministic() {
+        let ss = vec![7u8; 32];
+        let salt = HkdfSalt::zero(32);
+        let a = derive_session_key(&ss, &salt, LABEL_GENERIC).expect("derive a");
+        let b = derive_session_key(&ss, &salt, LABEL_GENERIC).expect("derive b");
+        assert_eq!(a.as_ref(), b.as_ref());
+    }
+
+    #[test]
+    fn different_salt_yields_different_key() {
+        let ss = vec![7u8; 32];
+        let salt_a = HkdfSalt::zero(32);
+        let salt_b = HkdfSalt::from_bytes(vec![0xffu8; 32]);
+        let a = derive_session_key(&ss, &salt_a, LABEL_GENERIC).expect("derive a");
+        let b = derive_session_key(&ss, &salt_b, LABEL_GENERIC).expect("derive b");
+        assert_ne!(a.as_ref(), b.as_ref());
+    }
+
+    #[test]
+    fn different_label_yields_different_key() {
+        let ss = vec![7u8; 32];
+        let salt = HkdfSalt::zero(32);
+        let a = derive_session_key(&ss, &salt, LABEL_XCHACHA20POLY1305).expect("derive a");
+        let b = derive_session_key(&ss, &salt, LABEL_AESGCMSIV).expect("derive b");
+        assert_ne!(a.as_ref(), b.as_ref());
+    }
+
+    #[test]
+    fn sha512_variant_is_deterministic_and_label_separated() {
+        let ss = vec![7u8; 32];
+        let salt = HkdfSalt::zero(64);
+        let a = derive_session_key_sha512(&ss, &salt, LABEL_AESGCMSIV).expect("derive a");
+        let b = derive_session_key_sha512(&ss, &salt, LABEL_AESGCMSIV).expect("derive b");
+        assert_eq!(a.as_ref(), b.as_ref());
+
+        let c = derive_session_key_sha512(&ss, &salt, LABEL_GENERIC).expect("derive c");
+        assert_ne!(a.as_ref(), c.as_ref());
+    }
 }

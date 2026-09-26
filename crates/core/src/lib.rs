@@ -309,6 +309,14 @@ macro_rules! dilithium_keypair {
     }};
 }
 
+// Zeroization note (applies to every macro below that takes `$passphrase`):
+// the passphrase is accepted as `&str` and is never copied into an owned
+// buffer by these macros, so there is nothing here for them to zeroize.
+// The caller retains ownership of the passphrase's backing storage (e.g. a
+// `String` or `SecretString`) and is responsible for zeroizing it once done.
+// An earlier revision called `passphrase.to_string().zeroize()`, which only
+// wiped a throwaway `String` created for that call and left the caller's own
+// copy untouched; that no-op has been removed.
 #[macro_export]
 macro_rules! encryption {
     // AES
@@ -324,7 +332,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, AES) => {{
@@ -339,7 +346,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, AES) => {{
@@ -354,7 +360,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     // AES_XTS
@@ -370,7 +375,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_XTS) => {{
@@ -385,7 +389,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_XTS) => {{
@@ -400,7 +403,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
 
@@ -418,7 +420,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_CBC) => {{
@@ -434,7 +435,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_CBC) => {{
@@ -450,7 +450,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     // AES_GCM_SIV
@@ -468,7 +467,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_GCM_SIV) => {{
@@ -485,7 +483,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_GCM_SIV) => {{
@@ -502,7 +499,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
 
@@ -521,7 +517,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, AES_CTR) => {{
@@ -538,7 +533,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, AES_CTR) => {{
@@ -555,7 +549,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     // XChaCha20
@@ -573,7 +566,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20) => {{
@@ -590,7 +582,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20) => {{
@@ -607,7 +598,6 @@ macro_rules! encryption {
         };
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     // XChaCha20Poly1305
@@ -625,7 +615,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
@@ -642,7 +631,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $data:expr, $passphrase:expr, XChaCha20Poly1305) => {{
@@ -659,7 +647,6 @@ macro_rules! encryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
 }
@@ -679,7 +666,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -695,7 +681,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -707,11 +692,10 @@ macro_rules! decryption {
 
         let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber512, Data, AesXts>::new(key.to_owned(), None)?;
-            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -726,11 +710,10 @@ macro_rules! decryption {
         let result = (|| {
             let decryptor =
                 Kyber::<Decryption, Kyber1024, Data, AesXts>::new(key.to_owned(), None)?;
-            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -742,11 +725,10 @@ macro_rules! decryption {
 
         let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber768, Data, AesXts>::new(key.to_owned(), None)?;
-            decryptor.decrypt_data(data.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_data(data.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -762,7 +744,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -780,7 +761,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -796,7 +776,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -812,7 +791,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -834,7 +812,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -854,7 +831,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -874,7 +850,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -896,7 +871,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -914,7 +888,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -932,7 +905,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -954,7 +926,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -975,7 +946,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -996,7 +966,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1019,7 +988,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1040,7 +1008,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1061,7 +1028,6 @@ macro_rules! decryption {
         })();
         key.zeroize();
         data.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1081,7 +1047,6 @@ macro_rules! encrypt_file {
             encryptor.encrypt_file($path, &passphrase)
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $path:expr, $passphrase:expr, AES) => {{
@@ -1094,7 +1059,6 @@ macro_rules! encrypt_file {
             encryptor.encrypt_file($path, &passphrase)
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $path:expr, $passphrase:expr, AES) => {{
@@ -1107,7 +1071,6 @@ macro_rules! encrypt_file {
             encryptor.encrypt_file($path, &passphrase)
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     // XChaCha20
@@ -1123,7 +1086,6 @@ macro_rules! encrypt_file {
             Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 768, $path:expr, $passphrase:expr, XChaCha20) => {{
@@ -1138,7 +1100,6 @@ macro_rules! encrypt_file {
             Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
     ($key:expr, 512, $path:expr, $passphrase:expr, XChaCha20) => {{
@@ -1153,7 +1114,6 @@ macro_rules! encrypt_file {
             Ok::<_, CryptError>((encrypt_message, cipher, nonce.to_string()))
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         result
     }};
 }
@@ -1169,10 +1129,9 @@ macro_rules! decrypt_file {
 
         let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -1183,10 +1142,9 @@ macro_rules! decrypt_file {
 
         let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber768, Data, AES>::new(key.to_owned(), None)?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -1197,10 +1155,9 @@ macro_rules! decrypt_file {
 
         let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber512, Data, AES>::new(key.to_owned(), None)?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         result
     }};
@@ -1216,10 +1173,9 @@ macro_rules! decrypt_file {
                 key.to_owned(),
                 nonce.to_owned(),
             )?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1235,10 +1191,9 @@ macro_rules! decrypt_file {
                 key.to_owned(),
                 nonce.to_owned(),
             )?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result
@@ -1254,10 +1209,9 @@ macro_rules! decrypt_file {
                 key.to_owned(),
                 nonce.to_owned(),
             )?;
-            decryptor.decrypt_file($path.to_owned(), &passphrase.to_owned(), cipher.to_owned())
+            decryptor.decrypt_file($path.to_owned(), &passphrase, cipher.to_owned())
         })();
         key.zeroize();
-        passphrase.to_string().zeroize();
         cipher.zeroize();
         nonce.zeroize();
         result

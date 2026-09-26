@@ -1,11 +1,11 @@
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};
+// `KeyControlVariant` (legacy Kyber KEM dispatch) only exists with `legacy-pqclean`;
+// gate its import so this file compiles standalone under `aes-xts` alone.
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::KeyControlVariant;
 use crate::{
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
-    },
     cryptography::{
         hmac_sign::{Operation, Sign, SignType},
         *,
@@ -80,7 +80,7 @@ impl CipherAesXts {
             Operation::Sign,
             SignType::Sha512,
         );
-        let mut data = hmac.hmac();
+        let mut data = hmac.try_hmac()?;
 
         let sector_size = 0x200;
         let first_sector_index = 0;
@@ -116,12 +116,15 @@ impl CipherAesXts {
             Operation::Verify,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         //println!("Verified: {:?}", &data);
         Ok(data)
     }
 }
 
+// The KEM-based `CryptographicFunctions` impl depends on `KeyControlVariant`
+// (legacy Kyber key control), so it is only available under `legacy-pqclean`.
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherAesXts {
     /// Encrypts the provided data using the public key.
     ///
@@ -144,7 +147,10 @@ impl CryptographicFunctions for CipherAesXts {
         let ciphertext = [ciphertext1.to_owned(), ciphertext2.to_owned()].concat();
 
         let _ = self.set_shared_secret(sharedsecret);
+        // File mode: read the plaintext file, then persist `<file>.enc`.
+        self.infos.load_file_content()?;
         let encrypted_data = self.encryption()?;
+        self.infos.persist_file_output(&encrypted_data)?;
         Ok((encrypted_data, ciphertext))
     }
 
@@ -169,7 +175,9 @@ impl CryptographicFunctions for CipherAesXts {
         let sharedsecret = [sharedsecret1.to_owned(), sharedsecret2.to_owned()].concat();
 
         let _ = self.set_shared_secret(sharedsecret);
+        self.infos.load_file_content()?;
         let decrypted_data = self.decryption()?;
+        self.infos.persist_file_output(&decrypted_data)?;
         Ok(decrypted_data)
     }
 }

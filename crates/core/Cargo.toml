@@ -50,11 +50,11 @@ xchacha20poly1305-cipher = []  # same
 
 aes-ctr      = ["dep:ctr"]
 aes-xts      = ["dep:xts-mode"]
-legacy-aes   = ["dep:aes", "dep:cbc", "dep:block-padding"]
+legacy-aes   = ["dep:cbc", "dep:block-padding"]
 
 # ── Archive / zip features ─────────────────────────────────────────────────────
 archive = ["dep:tar", "dep:xz2", "dep:flate2", "dep:walkdir"]
-zip     = ["dep:zip"]
+zip     = ["dep:zip", "dep:walkdir"]
 
 # ── zeroize is unconditional — NOT gated ──────────────────────────────────────
 
@@ -92,6 +92,12 @@ libcrux-ml-kem = { version = "=0.0.9", default-features = false, features = ["st
 # RFC 9180 registers AES-128-GCM and AES-256-GCM alongside
 # ChaCha20-Poly1305. The HPKE context core supports all three suites.
 aes-gcm = { version = "=0.11.0" }
+# The AES block ciphers only wipe their expanded round keys on drop with their
+# `zeroize` feature. aes-gcm-siv (and the legacy AES modes) use aes 0.8,
+# aes-gcm uses aes 0.9; enabling the feature on both unifies it for every AEAD
+# key schedule created per message.
+aes = { version = "0.8.4", features = ["zeroize"] }
+aes_09 = { version = "0.9", package = "aes", features = ["zeroize"] }
 sha3 = { version = "=0.11.0" }
 turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"] }
 # Direct, pure-Rust traditional components for the revision-pinned concrete
@@ -101,7 +107,8 @@ p256 = { version = "=0.13.2", default-features = false, features = ["arithmetic"
 p384 = { version = "=0.13.1", default-features = false, features = ["arithmetic"] }
 x25519-dalek = { version = "=2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
 ml-dsa  = { version = "0.1.1", optional = true, features = ["zeroize", "rand_core"] }
-slh-dsa = { version = "0.2.0-rc.5", optional = true }
+# `zeroize`: wipe SLH-DSA signing keys (sk_seed/sk_prf) on drop.
+slh-dsa = { version = "0.2.0-rc.5", optional = true, features = ["zeroize"] }
 
 # ── Optional: legacy pqcrypto deps ────────────────────────────────────────────
 pqcrypto-falcon    = { version = "0.3.0",  optional = true }
@@ -110,7 +117,6 @@ pqcrypto-dilithium = { version = "0.5.0",  optional = true }
 pqcrypto-kyber     = { version = "0.8.1",  optional = true }
 
 # ── Optional: cipher deps ──────────────────────────────────────────────────────
-aes           = { version = "0.8.4",  optional = true }
 block-padding = { version = "0.3.3",  optional = true }
 cbc           = { version = "0.1.2",  optional = true, features = ["alloc", "std"] }
 ctr           = { version = "0.9.2",  optional = true }

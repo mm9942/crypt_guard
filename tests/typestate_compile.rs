@@ -133,7 +133,10 @@ fn default_features_enabled() -> bool {
 }
 
 fn dependency_features() -> Vec<&'static str> {
-    let mut features = Vec::new();
+    // This whole test only exists under `cgv2-compat`, and every UI case
+    // imports CGv2 items (`Encryptor`, `MlKem768`, ...), so the generated
+    // crate must enable it too.
+    let mut features = vec!["cgv2-compat"];
     if cfg!(feature = "legacy-pqclean") {
         features.push("legacy-pqclean");
     } else if cfg!(all(feature = "ml-kem-backend", feature = "ml-dsa-backend")) {

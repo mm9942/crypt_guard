@@ -1,11 +1,11 @@
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};
+// `KeyControlVariant` (legacy Kyber KEM dispatch) only exists with `legacy-pqclean`;
+// gate its import so this file compiles standalone under `aes-gcm-siv-cipher` alone.
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::KeyControlVariant;
 use crate::{
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
-    },
     cryptography::{
         hmac_sign::{Operation, Sign, SignType},
         *,
@@ -139,7 +139,7 @@ impl CipherAesGcmSiv {
             Operation::Sign,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         let encrypted = cipher
             .encrypt(iv, &*data)
             .map_err(|e| CryptError::new(e.to_string().as_str()))?;
@@ -169,13 +169,16 @@ impl CipherAesGcmSiv {
             Operation::Verify,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         //println!("Verified: {:?}", &data);
         let iv = self.iv();
         Ok((data, iv.to_owned()))
     }
 }
 
+// The KEM-based `CryptographicFunctions` impl depends on `KeyControlVariant`
+// (legacy Kyber key control), so it is only available under `legacy-pqclean`.
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherAesGcmSiv {
     /// Encrypts the provided data using the public key.
     ///

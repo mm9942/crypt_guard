@@ -2,12 +2,10 @@ use crate::{
     core::KeyControl, FileMetadata, FileState, FileTypes, KeyControKyber1024, KeyControKyber512,
     KeyControKyber768, KeyTypes, KyberKeyFunctions,
 };
-use std::{
-    fs::{self},
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use crate::initialize_logger;
+use tempfile::tempdir;
 
 fn test_keypair_generation<T: KyberKeyFunctions>() {
     let (public_key, secret_key) = T::keypair().expect("Key pair generation failed");
@@ -17,7 +15,11 @@ fn test_keypair_generation<T: KyberKeyFunctions>() {
 
 #[test]
 fn begin() {
-    initialize_logger(PathBuf::from("crypt_tests.log"));
+    // Use a tempdir instead of a fixed "crypt_tests.log" path in the crate
+    // root so this test does not race with other tests over a shared file,
+    // and the log file is cleaned up automatically when the dir drops.
+    let log_dir = tempdir().expect("Failed to create temp directory");
+    initialize_logger(log_dir.path().join("crypt_tests.log"));
 }
 
 #[test]
@@ -94,38 +96,45 @@ fn test_key_control_safe_functionality() -> Result<(), Box<dyn std::error::Error
     // Encapsulate a secret with the public key
     let (_shared_secret, ciphertext) = KeyControKyber1024::encap(&public_key).unwrap();
 
+    // Use a tempdir instead of a fixed "./key" path so this test cannot race
+    // with any other test over a shared, process-relative directory.
+    let key_dir = tempdir().expect("Failed to create temp directory");
+    let key_dir_path = key_dir.path();
+    let ciphertext_path = key_dir_path.join("ciphertext.ct");
+    let public_key_path = key_dir_path.join("public_key.pub");
+    let secret_key_path = key_dir_path.join("secret_key.sec");
+
     // Initialize KeyControl and set keys
     let mut key_control = KeyControl::<KeyControKyber1024>::new();
     // key_control.set_public_key(pqcrypto_traits::kem::PublicKey::from_bytes(public_key.clone()).as_bytes().to_owned()).unwrap();
     key_control.set_public_key(public_key.clone()).unwrap();
     key_control
-        .save(KeyTypes::PublicKey, "./key".into())
+        .save(KeyTypes::PublicKey, key_dir_path.to_path_buf())
         .unwrap();
 
     key_control.set_secret_key(secret_key.clone()).unwrap();
     key_control
-        .save(KeyTypes::SecretKey, "./key".into())
+        .save(KeyTypes::SecretKey, key_dir_path.to_path_buf())
         .unwrap();
 
     key_control.set_ciphertext(ciphertext.clone()).unwrap();
     key_control
-        .save(KeyTypes::Ciphertext, "./key".into())
+        .save(KeyTypes::Ciphertext, key_dir_path.to_path_buf())
         .unwrap();
 
-    let cipher = key_control.load(KeyTypes::Ciphertext, Path::new("./key/ciphertext.ct"));
-    let pubk = key_control.load(KeyTypes::PublicKey, Path::new("./key/public_key.pub"));
-    let seck = key_control.load(KeyTypes::SecretKey, Path::new("./key/secret_key.sec"));
+    let cipher = key_control.load(KeyTypes::Ciphertext, ciphertext_path.as_path());
+    let pubk = key_control.load(KeyTypes::PublicKey, public_key_path.as_path());
+    let seck = key_control.load(KeyTypes::SecretKey, secret_key_path.as_path());
 
     // Verify the integrity of the saved keys
-    assert!(Path::new("./key/ciphertext.ct").exists());
-    assert!(Path::new("./key/public_key.pub").exists());
-    assert!(Path::new("./key/secret_key.sec").exists());
+    assert!(ciphertext_path.exists());
+    assert!(public_key_path.exists());
+    assert!(secret_key_path.exists());
     assert_eq!(&public_key.len(), &pubk.clone()?.len());
     assert_eq!(public_key, pubk?, "Public keys do not match");
     assert_eq!(secret_key, seck?, "Secret keys do not match");
     assert_eq!(ciphertext, cipher?, "Ciphertexts do not match");
 
-    fs::remove_dir_all("./key")?;
     Ok(())
 }
 
@@ -135,30 +144,26 @@ fn test_key() {
 
     let keycontrol = KeyControl::<KeyControKyber1024>::new();
 
-    let pubkey_file = FileMetadata::from(
-        PathBuf::from("key.pub"),
-        FileTypes::PublicKey,
-        FileState::Other,
-    );
-    let seckey_file = FileMetadata::from(
-        PathBuf::from("key.sec"),
-        FileTypes::SecretKey,
-        FileState::Other,
-    );
+    // Use a tempdir instead of fixed "key.pub"/"key.sec" filenames in the
+    // crate root so this test cannot race with other tests writing the same
+    // relative paths.
+    let key_dir = tempdir().expect("Failed to create temp directory");
+    let pub_path = key_dir.path().join("key.pub");
+    let sec_path = key_dir.path().join("key.sec");
+
+    let pubkey_file = FileMetadata::from(pub_path.clone(), FileTypes::PublicKey, FileState::Other);
+    let seckey_file = FileMetadata::from(sec_path.clone(), FileTypes::SecretKey, FileState::Other);
 
     let _ = pubkey_file.save(&public_key);
     let _ = seckey_file.save(&secret_key);
 
     let public_key2 = keycontrol
-        .load(KeyTypes::PublicKey, Path::new("key.pub"))
+        .load(KeyTypes::PublicKey, pub_path.as_path())
         .unwrap();
     let secret_key2 = keycontrol
-        .load(KeyTypes::SecretKey, Path::new("key.sec"))
+        .load(KeyTypes::SecretKey, sec_path.as_path())
         .unwrap();
 
     assert_eq!(public_key2, public_key);
     assert_eq!(secret_key2, secret_key);
-
-    let _ = fs::remove_file(Path::new("key.pub"));
-    let _ = fs::remove_file(Path::new("key.sec"));
 }

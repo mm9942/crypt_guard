@@ -342,6 +342,53 @@ inputs and outputs travel as non-`Clone`, zeroize-on-drop `SecretBytes`.
 The service and Hyper crates are currently a skeleton: concrete providers and
 the request codecs follow.
 
+## KMS service (preview)
+
+`crypt_guard_service` and `crypt_guard_hyper` (behind `--features hyper`,
+which implies `service`) expose an in-process KMS over HTTP: key generation,
+lifecycle management, PQ HPKE encrypt/decrypt, sign/verify, and key
+wrap/unwrap/rewrap, addressed by namespace and version.
+
+| Route | Operation |
+|---|---|
+| `POST /v1/keys` | generate |
+| `GET /v1/keys/{ns}/{id}[@v]` | describe |
+| `GET /v1/keys/{ns}/{id}[@v]/public` | fetch public key |
+| `POST /v1/keys/{ns}/{id}[@v]:{op}` | `encrypt`, `decrypt`, `sign`, `verify`, `rotate`, `disable`, `enable`, `destroy`, `wrap`, `unwrap`, `rewrap` |
+
+Security properties:
+
+- All cryptographic state lives in a non-`Clone` `CryptoService`; only the
+  bounded `NetworkHandle` (a channel sender) is ever cloned per connection.
+- Secret material (plaintext, key bytes) travels as zeroize-on-drop,
+  non-`Clone` `SecretBytes`, from ingress to egress.
+- Ciphertexts are cryptographically bound to their namespace, key id,
+  version and operation purpose, so a blob cannot be replayed against a
+  different key or context.
+- Every decryption failure — tampering, wrong key, wrong context — returns
+  the same opaque `422 Unprocessable Entity`; nothing distinguishes the
+  cause.
+- Request bodies are bounded per operation class before they are collected,
+  so an oversized body is rejected before it is buffered.
+- Bearer tokens are compared in constant time against every registered
+  token (no early exit), and are never logged.
+- A caller denied by policy sees `404 Not Found`, identical to a key that
+  does not exist, to avoid key-existence enumeration.
+- Every response carries `Cache-Control: no-store`.
+
+Run the example server (it refuses to start without an explicit admin
+token — it never generates or prints one):
+
+```sh
+CG_KMS_ADMIN_TOKEN=$(openssl rand -hex 32) \
+    cargo run -p crypt_guard_hyper --example kms_server
+```
+
+Limitations: keys are held in memory only and are lost on exit; there is no
+built-in TLS (front it with a reverse proxy or your own TLS acceptor); there
+is no persistence; ML-DSA signing additionally requires the `ml-dsa` feature
+of `crypt_guard_service`.
+
 ## References
 
 - [FIPS 203: ML-KEM](https://csrc.nist.gov/pubs/fips/203/final)

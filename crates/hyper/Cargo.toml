@@ -16,9 +16,10 @@ hyper = { version = "1", default-features = false }
 # 0.1.20 already ships `TowerToHyperService`; newer patch releases raise the MSRV.
 hyper-util = { version = "0.1.20", default-features = false, features = ["service"] }
 tower-service = "0.3.3"
+zeroize = "1.8.1"
 
 [dev-dependencies]
 static_assertions = "1.1.0"
-tokio = { version = "1", features = ["macros", "rt", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-util", "net"] }
 hyper = { version = "1", features = ["client", "server", "http1"] }
 hyper-util = { version = "0.1.20", features = ["tokio"] }

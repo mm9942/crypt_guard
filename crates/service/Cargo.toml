@@ -12,6 +12,8 @@ default = []
 # non-Clone `CryptoService` into a cloneable network handle. Requires a Tokio
 # runtime at construction time.
 buffer = ["dep:tower"]
+# ML-DSA signing keys in `InMemoryProvider`.
+ml-dsa = ["crypt_guard_core/ml-dsa-backend"]
 
 [dependencies]
 # The facade decides which core features are enabled; the service layer only

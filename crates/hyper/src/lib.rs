@@ -32,18 +32,23 @@
 //!
 //! ## Status
 //!
-//! Skeleton: the reference routes are matched and bounded, `describe` and
-//! `public` are forwarded to the service, and the request codecs of the
-//! remaining operations answer `501 Not Implemented` for now.
+//! All reference routes are decoded ([`codec`]), authenticated
+//! ([`Authenticator`]) and forwarded to the service. Request bodies are
+//! bounded and collected into zeroizing memory ([`collect_secret`]).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod auth;
+pub mod body;
+pub mod codec;
 mod config;
 mod error;
 pub mod route;
 mod service;
 
+pub use auth::{Anonymous, Authenticator, BearerTokens};
+pub use body::{collect_secret, BodyError, SecretBody};
 pub use config::{BodyLimits, HttpConfig};
 pub use error::{error_response, status_for};
 pub use hyper_util::service::TowerToHyperService;
@@ -51,6 +56,8 @@ pub use service::{CryptoHttpService, ResponseBody};
 
 /// Bridge a [`CryptoHttpService`] into Hyper's service trait using the
 /// official `hyper_util` adapter.
-pub fn into_hyper<S>(service: CryptoHttpService<S>) -> TowerToHyperService<CryptoHttpService<S>> {
+pub fn into_hyper<S, A>(
+    service: CryptoHttpService<S, A>,
+) -> TowerToHyperService<CryptoHttpService<S, A>> {
     TowerToHyperService::new(service)
 }

@@ -302,10 +302,11 @@ pub(crate) fn derive_key_pair_512(
 }
 
 fn expand_512_seed(
-    seed: [u8; ML_KEM_512_PRIVATE_KEY_BYTES],
+    mut seed: [u8; ML_KEM_512_PRIVATE_KEY_BYTES],
 ) -> (MlKem512PublicKey, MlKem512PrivateKey) {
     let private_key = MlKem512PrivateKey(Zeroizing::new(seed));
     let key_pair = libcrux_ml_kem::mlkem512::generate_key_pair(seed);
+    seed.zeroize();
     let (raw_private_key, raw_public_key) = key_pair.into_parts();
     let public_key = MlKem512PublicKey(*raw_public_key.as_slice());
     let mut private_key_bytes: [u8; ML_KEM_512_EXPANDED_PRIVATE_KEY_BYTES] = raw_private_key.into();
@@ -325,7 +326,8 @@ pub(crate) fn encapsulate_512(
     }
 
     let mut randomness = Zeroizing::new([0u8; ML_KEM_SHARED_SECRET_BYTES]);
-    rng.fill_bytes(&mut randomness[..]);
+    rng.try_fill_bytes(&mut randomness[..])
+        .map_err(|_| CryptError::EncapsulationError)?;
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem512::encapsulate(&raw_public_key, *randomness);
     let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
@@ -488,10 +490,11 @@ pub(crate) fn derive_key_pair(
 }
 
 fn expand_768_seed(
-    seed: [u8; ML_KEM_768_PRIVATE_KEY_BYTES],
+    mut seed: [u8; ML_KEM_768_PRIVATE_KEY_BYTES],
 ) -> (MlKem768PublicKey, MlKem768PrivateKey) {
     let private_key = MlKem768PrivateKey(Zeroizing::new(seed));
     let key_pair = libcrux_ml_kem::mlkem768::generate_key_pair(seed);
+    seed.zeroize();
     let (raw_private_key, raw_public_key) = key_pair.into_parts();
     let public_key = MlKem768PublicKey(*raw_public_key.as_slice());
     let mut private_key_bytes: [u8; ML_KEM_768_EXPANDED_PRIVATE_KEY_BYTES] = raw_private_key.into();
@@ -513,7 +516,8 @@ pub(crate) fn encapsulate(
     }
 
     let mut randomness = Zeroizing::new([0u8; ML_KEM_SHARED_SECRET_BYTES]);
-    rng.fill_bytes(&mut randomness[..]);
+    rng.try_fill_bytes(&mut randomness[..])
+        .map_err(|_| CryptError::EncapsulationError)?;
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem768::encapsulate(&raw_public_key, *randomness);
     let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
@@ -712,10 +716,11 @@ pub(crate) fn derive_key_pair_1024(
 }
 
 fn expand_1024_seed(
-    seed: [u8; ML_KEM_1024_PRIVATE_KEY_BYTES],
+    mut seed: [u8; ML_KEM_1024_PRIVATE_KEY_BYTES],
 ) -> (MlKem1024PublicKey, MlKem1024PrivateKey) {
     let private_key = MlKem1024PrivateKey(Zeroizing::new(seed));
     let key_pair = libcrux_ml_kem::mlkem1024::generate_key_pair(seed);
+    seed.zeroize();
     let (raw_private_key, raw_public_key) = key_pair.into_parts();
     let public_key = MlKem1024PublicKey(*raw_public_key.as_slice());
     let mut private_key_bytes: [u8; ML_KEM_1024_EXPANDED_PRIVATE_KEY_BYTES] =
@@ -738,7 +743,8 @@ pub(crate) fn encapsulate_1024(
     }
 
     let mut randomness = Zeroizing::new([0u8; ML_KEM_SHARED_SECRET_BYTES]);
-    rng.fill_bytes(&mut randomness[..]);
+    rng.try_fill_bytes(&mut randomness[..])
+        .map_err(|_| CryptError::EncapsulationError)?;
     let (encapsulation, shared_secret) =
         libcrux_ml_kem::mlkem1024::encapsulate(&raw_public_key, *randomness);
     let shared_secret_bytes: [u8; ML_KEM_SHARED_SECRET_BYTES] = shared_secret;
@@ -1369,12 +1375,31 @@ pub mod draft_ietf_hpke_pq_05 {
         }
     }
 
+    impl fmt::Debug for RecipientPublicKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientPublicKey")
+                .field("profile", &self.profile)
+                .field("bytes", &self.as_bytes())
+                .finish()
+        }
+    }
+
     /// A recipient private key represented by the draft's 64-byte ML-KEM seed.
     ///
-    /// This type deliberately does not implement `Clone` or `Debug`.
+    /// This type deliberately does not implement `Clone`. Its [`Debug`]
+    /// implementation deliberately never prints seed material: it shows only
+    /// the type name and the bound profile.
     pub struct RecipientPrivateKey {
         profile: Profile,
         inner: RecipientPrivateKeyInner,
+    }
+
+    impl fmt::Debug for RecipientPrivateKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientPrivateKey")
+                .field("profile", &self.profile)
+                .finish_non_exhaustive()
+        }
     }
 
     enum RecipientPrivateKeyInner {
@@ -1435,7 +1460,22 @@ pub mod draft_ietf_hpke_pq_05 {
         }
     }
 
+    impl fmt::Debug for RecipientKeyPair {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientKeyPair")
+                .field("profile", &self.public_key.profile)
+                .finish_non_exhaustive()
+        }
+    }
+
     /// Generate a FIPS 203 ML-KEM key pair using the operating-system CSPRNG.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating-system CSPRNG fails to fill the key-generation
+    /// seed. This is only ever expected on a catastrophically broken host
+    /// environment. Use [`try_generate_recipient_key_pair`] to observe that
+    /// failure as an [`Error`] instead of a panic.
     pub fn generate_recipient_key_pair(profile: Profile) -> RecipientKeyPair {
         let mut rng = rand::rngs::OsRng;
         match profile {
@@ -1464,6 +1504,50 @@ pub mod draft_ietf_hpke_pq_05 {
                         inner: RecipientPrivateKeyInner::MlKem1024(private_key),
                     },
                 }
+            }
+        }
+    }
+
+    /// Generate a FIPS 203 ML-KEM key pair using the operating-system CSPRNG,
+    /// reporting an operating-system CSPRNG failure as an [`Error`] instead of
+    /// panicking.
+    ///
+    /// This produces the same key material as [`generate_recipient_key_pair`]
+    /// when the CSPRNG succeeds.
+    pub fn try_generate_recipient_key_pair(profile: Profile) -> Result<RecipientKeyPair, Error> {
+        let mut rng = rand::rngs::OsRng;
+        match profile {
+            Profile::MlKem768HkdfSha256Aes128Gcm => {
+                let mut seed = Zeroizing::new([0u8; ML_KEM_768_PRIVATE_KEY_BYTES]);
+                rng.try_fill_bytes(&mut seed[..])
+                    .map_err(|_| Error::InternalFailure)?;
+                let (public_key, private_key) = expand_768_seed(*seed);
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        profile,
+                        inner: RecipientPublicKeyInner::MlKem768(Box::new(public_key)),
+                    },
+                    private_key: RecipientPrivateKey {
+                        profile,
+                        inner: RecipientPrivateKeyInner::MlKem768(private_key),
+                    },
+                })
+            }
+            Profile::MlKem1024HkdfSha384Aes256Gcm => {
+                let mut seed = Zeroizing::new([0u8; ML_KEM_1024_PRIVATE_KEY_BYTES]);
+                rng.try_fill_bytes(&mut seed[..])
+                    .map_err(|_| Error::InternalFailure)?;
+                let (public_key, private_key) = expand_1024_seed(*seed);
+                Ok(RecipientKeyPair {
+                    public_key: RecipientPublicKey {
+                        profile,
+                        inner: RecipientPublicKeyInner::MlKem1024(Box::new(public_key)),
+                    },
+                    private_key: RecipientPrivateKey {
+                        profile,
+                        inner: RecipientPrivateKeyInner::MlKem1024(private_key),
+                    },
+                })
             }
         }
     }
@@ -1515,9 +1599,28 @@ pub mod draft_ietf_hpke_pq_05 {
         }
     }
 
+    impl fmt::Debug for Encapsulation {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Encapsulation")
+                .field("profile", &self.profile)
+                .field("bytes", &self.as_bytes())
+                .finish()
+        }
+    }
+
     /// Stateful sender context.  It intentionally has no `Clone` impl, which
-    /// prevents copying its sequence number and reusing a nonce.
+    /// prevents copying its sequence number and reusing a nonce. Its [`Debug`]
+    /// implementation deliberately never prints key material: it shows only
+    /// the type name and the bound profile.
     pub struct SenderContext(Draft05BaseContext);
+
+    impl fmt::Debug for SenderContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("SenderContext")
+                .field("profile", &self.0.profile)
+                .finish_non_exhaustive()
+        }
+    }
 
     impl SenderContext {
         /// Seal one message using the next RFC 9180-derived nonce.
@@ -1537,7 +1640,17 @@ pub mod draft_ietf_hpke_pq_05 {
 
     /// Stateful recipient context.  It intentionally has no `Clone` impl,
     /// preventing a duplicated sequence from accepting the same nonce twice.
+    /// Its [`Debug`] implementation deliberately never prints key material: it
+    /// shows only the type name and the bound profile.
     pub struct RecipientContext(Draft05BaseContext);
+
+    impl fmt::Debug for RecipientContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientContext")
+                .field("profile", &self.0.profile)
+                .finish_non_exhaustive()
+        }
+    }
 
     impl RecipientContext {
         /// Authenticate and open one message using the next RFC 9180-derived
@@ -2129,14 +2242,16 @@ pub mod draft_ietf_hpke_pq_05_full {
                 reason: "hybrid KEM not implemented",
             });
         }
-        let mut r = [0u8; 160];
+        let mut r = Zeroizing::new([0u8; 160]);
         if let Some(seed) = deterministic {
             if seed.len() != r.len() {
                 return Err(Error::InvalidEncapsulation);
             }
             r.copy_from_slice(seed);
         } else {
-            rand::rngs::OsRng.fill_bytes(&mut r);
+            rand::rngs::OsRng
+                .try_fill_bytes(&mut r[..])
+                .map_err(|_| Error::InternalInvariant)?;
         }
         let pqpk = MlKem768PublicKey::from_bytes(&key.bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
             .map_err(|_| Error::InvalidRecipientPublicKey)?;
@@ -2155,10 +2270,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         let mut bytes = Vec::with_capacity(MLKEM768_P256_ENCAPSULATION_BYTES);
         bytes.extend_from_slice(pqenc.as_bytes());
         bytes.extend_from_slice(eph.public_key().to_encoded_point(false).as_bytes());
-        Ok((
-            HybridEncapsulation { kem, bytes },
-            MlKemSharedSecret(Zeroizing::new(comb)),
-        ))
+        Ok((HybridEncapsulation { kem, bytes }, MlKemSharedSecret(comb)))
     }
     fn hybrid_decapsulate(
         kem: Kem,
@@ -2193,7 +2305,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             &enc.bytes[ML_KEM_768_ENCAPSULATED_KEY_BYTES..],
             &recipient_public.as_bytes()[ML_KEM_768_PUBLIC_KEY_BYTES..],
         );
-        Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+        Ok(MlKemSharedSecret(comb))
     }
 
     #[cfg(test)]
@@ -2244,11 +2356,11 @@ pub mod draft_ietf_hpke_pq_05_full {
         let h = seed;
         let mut x = Shake256::default();
         x.update(h);
-        let mut material = [0u8; 192];
-        x.finalize_xof().read(&mut material);
-        let mut pqseed = [0u8; 64];
+        let mut material = Zeroizing::new([0u8; 192]);
+        x.finalize_xof().read(&mut material[..]);
+        let mut pqseed = Zeroizing::new([0u8; 64]);
         pqseed.copy_from_slice(&material[..64]);
-        let (pq, privk) = expand_768_seed(pqseed);
+        let (pq, privk) = expand_768_seed(*pqseed);
         let sk = derive_p256_from_material(&material[64..])?;
         Ok((pq, privk, sk))
     }
@@ -2270,11 +2382,11 @@ pub mod draft_ietf_hpke_pq_05_full {
         // the latter as a big-endian scalar candidate.
         let mut x = Shake256::default();
         x.update(seed);
-        let mut material = [0u8; 112];
-        x.finalize_xof().read(&mut material);
-        let mut pqseed = [0u8; 64];
+        let mut material = Zeroizing::new([0u8; 112]);
+        x.finalize_xof().read(&mut material[..]);
+        let mut pqseed = Zeroizing::new([0u8; 64]);
         pqseed.copy_from_slice(&material[..64]);
-        let (pq, privk) = expand_1024_seed(pqseed);
+        let (pq, privk) = expand_1024_seed(*pqseed);
         let scalar =
             P384SecretKey::from_slice(&material[64..]).map_err(|_| Error::InternalInvariant)?;
         Ok((pq, privk, scalar))
@@ -2286,14 +2398,16 @@ pub mod draft_ietf_hpke_pq_05_full {
         if key.kem != Kem::MlKem1024P384 {
             return Err(Error::InvalidRecipientPublicKey);
         }
-        let mut r = [0u8; 80];
+        let mut r = Zeroizing::new([0u8; 80]);
         if let Some(seed) = deterministic {
             if seed.len() != r.len() {
                 return Err(Error::InvalidEncapsulation);
             }
             r.copy_from_slice(seed);
         } else {
-            rand::rngs::OsRng.fill_bytes(&mut r);
+            rand::rngs::OsRng
+                .try_fill_bytes(&mut r[..])
+                .map_err(|_| Error::InternalInvariant)?;
         }
         let pqpk = MlKem1024PublicKey::from_bytes(&key.bytes[..ML_KEM_1024_PUBLIC_KEY_BYTES])
             .map_err(|_| Error::InvalidRecipientPublicKey)?;
@@ -2319,7 +2433,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 kem: Kem::MlKem1024P384,
                 bytes,
             },
-            MlKemSharedSecret(Zeroizing::new(comb)),
+            MlKemSharedSecret(comb),
         ))
     }
     fn hybrid_p384_decapsulate(
@@ -2345,7 +2459,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             &recipient.as_bytes()[ML_KEM_1024_PUBLIC_KEY_BYTES..],
             b"MLKEM1024-P384",
         );
-        Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+        Ok(MlKemSharedSecret(comb))
     }
     fn derive_hybrid_x25519_key_pair(
         seed: &[u8],
@@ -2354,11 +2468,11 @@ pub mod draft_ietf_hpke_pq_05_full {
         // X25519 scalar. The scalar is clamped by x25519-dalek at use.
         let mut x = Shake256::default();
         x.update(seed);
-        let mut material = [0u8; 96];
-        x.finalize_xof().read(&mut material);
-        let mut pqseed = [0u8; 64];
+        let mut material = Zeroizing::new([0u8; 96]);
+        x.finalize_xof().read(&mut material[..]);
+        let mut pqseed = Zeroizing::new([0u8; 64]);
         pqseed.copy_from_slice(&material[..64]);
-        let (pq, privk) = expand_768_seed(pqseed);
+        let (pq, privk) = expand_768_seed(*pqseed);
         let scalar = X25519SecretKey::from(
             <[u8; X25519_POINT_BYTES]>::try_from(&material[64..])
                 .map_err(|_| Error::InternalInvariant)?,
@@ -2372,14 +2486,16 @@ pub mod draft_ietf_hpke_pq_05_full {
         if key.kem != Kem::MlKem768X25519 {
             return Err(Error::InvalidRecipientPublicKey);
         }
-        let mut r = [0u8; 64];
+        let mut r = Zeroizing::new([0u8; 64]);
         if let Some(seed) = deterministic {
             if seed.len() != r.len() {
                 return Err(Error::InvalidEncapsulation);
             }
             r.copy_from_slice(seed);
         } else {
-            rand::rngs::OsRng.fill_bytes(&mut r);
+            rand::rngs::OsRng
+                .try_fill_bytes(&mut r[..])
+                .map_err(|_| Error::InternalInvariant)?;
         }
         let pqpk = MlKem768PublicKey::from_bytes(&key.bytes[..ML_KEM_768_PUBLIC_KEY_BYTES])
             .map_err(|_| Error::InvalidRecipientPublicKey)?;
@@ -2409,7 +2525,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 kem: Kem::MlKem768X25519,
                 bytes,
             },
-            MlKemSharedSecret(Zeroizing::new(comb)),
+            MlKemSharedSecret(comb),
         ))
     }
     fn hybrid_x25519_decapsulate(
@@ -2437,19 +2553,25 @@ pub mod draft_ietf_hpke_pq_05_full {
             &recipient.as_bytes()[ML_KEM_768_PUBLIC_KEY_BYTES..],
             &[0x5c, 0x2e, 0x2f, 0x2f, 0x5e, 0x5c],
         );
-        Ok(MlKemSharedSecret(Zeroizing::new(comb)))
+        Ok(MlKemSharedSecret(comb))
     }
-    fn combine_hybrid(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8]) -> [u8; 32] {
+    fn combine_hybrid(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8]) -> Zeroizing<[u8; 32]> {
         combine_hybrid_for(pq, t, ct, ek, b"MLKEM768-P256")
     }
-    fn combine_hybrid_for(pq: &[u8], t: &[u8], ct: &[u8], ek: &[u8], label: &[u8]) -> [u8; 32] {
+    fn combine_hybrid_for(
+        pq: &[u8],
+        t: &[u8],
+        ct: &[u8],
+        ek: &[u8],
+        label: &[u8],
+    ) -> Zeroizing<[u8; 32]> {
         let mut h = Sha3_256::new();
         sha3::Digest::update(&mut h, pq);
         sha3::Digest::update(&mut h, t);
         sha3::Digest::update(&mut h, ct);
         sha3::Digest::update(&mut h, ek);
         sha3::Digest::update(&mut h, label);
-        h.finalize().into()
+        Zeroizing::new(h.finalize().into())
     }
 
     #[derive(Clone, Eq, PartialEq)]
@@ -2507,6 +2629,15 @@ pub mod draft_ietf_hpke_pq_05_full {
         }
     }
 
+    impl fmt::Debug for RecipientPublicKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientPublicKey")
+                .field("kem", &self.kem)
+                .field("bytes", &self.as_bytes())
+                .finish()
+        }
+    }
+
     enum RecipientPrivateKeyInner {
         MlKem512(MlKem512PrivateKey),
         MlKem768(MlKem768PrivateKey),
@@ -2515,9 +2646,21 @@ pub mod draft_ietf_hpke_pq_05_full {
     }
 
     /// Secret 64-byte FIPS 203 seed for the selected draft KEM.
+    ///
+    /// This type deliberately does not implement `Clone`. Its [`Debug`]
+    /// implementation deliberately never prints seed material: it shows only
+    /// the type name and the bound KEM.
     pub struct RecipientPrivateKey {
         kem: Kem,
         inner: RecipientPrivateKeyInner,
+    }
+
+    impl fmt::Debug for RecipientPrivateKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientPrivateKey")
+                .field("kem", &self.kem)
+                .finish_non_exhaustive()
+        }
     }
 
     impl RecipientPrivateKey {
@@ -2594,6 +2737,19 @@ pub mod draft_ietf_hpke_pq_05_full {
         pub fn private_key(&self) -> &RecipientPrivateKey {
             &self.private_key
         }
+        /// Consume the pair to move its public and private key into separate
+        /// application-owned stores.
+        pub fn into_parts(self) -> (RecipientPublicKey, RecipientPrivateKey) {
+            (self.public_key, self.private_key)
+        }
+    }
+
+    impl fmt::Debug for RecipientKeyPair {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientKeyPair")
+                .field("kem", &self.public_key.kem)
+                .finish_non_exhaustive()
+        }
     }
 
     /// Generate a FIPS 203 seed-format recipient key pair with the OS CSPRNG.
@@ -2642,7 +2798,8 @@ pub mod draft_ietf_hpke_pq_05_full {
             }
             Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => {
                 let mut seed = Zeroizing::new([0_u8; HYBRID_SEED_BYTES]);
-                rng.fill_bytes(&mut seed[..]);
+                rng.try_fill_bytes(&mut seed[..])
+                    .map_err(|_| Error::InternalInvariant)?;
                 let private_key = HybridPrivateKey::from_seed(kem, seed);
                 let public_key = HybridPublicKey::derive(kem, private_key.as_seed_bytes())?;
                 Ok(RecipientKeyPair {
@@ -2810,10 +2967,39 @@ pub mod draft_ietf_hpke_pq_05_full {
         }
     }
 
-    /// Stateful sender context.  It deliberately is not `Clone`.
+    impl fmt::Debug for Encapsulation {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Encapsulation")
+                .field("kem", &self.kem)
+                .field("bytes", &self.as_bytes())
+                .finish()
+        }
+    }
+
+    /// Stateful sender context.  It deliberately is not `Clone`. Its
+    /// [`Debug`] implementation deliberately never prints key material: it
+    /// shows only the type name and the bound suite.
     pub struct SenderContext(Context);
-    /// Stateful recipient context.  It deliberately is not `Clone`.
+    /// Stateful recipient context.  It deliberately is not `Clone`. Its
+    /// [`Debug`] implementation deliberately never prints key material: it
+    /// shows only the type name and the bound suite.
     pub struct RecipientContext(Context);
+
+    impl fmt::Debug for SenderContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("SenderContext")
+                .field("suite", &self.0.suite)
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl fmt::Debug for RecipientContext {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("RecipientContext")
+                .field("suite", &self.0.suite)
+                .finish_non_exhaustive()
+        }
+    }
 
     impl SenderContext {
         /// Seal with the next internally derived nonce.
@@ -2821,8 +3007,21 @@ pub mod draft_ietf_hpke_pq_05_full {
             self.0.seal(aad, plaintext)
         }
         /// Export without changing the message sequence.
+        ///
+        /// This returns a plain, non-zeroizing `Vec<u8>`. Prefer
+        /// [`Self::export_zeroizing`] when the caller is not about to move the
+        /// exported secret into another zeroizing container immediately.
         pub fn export(&self, context: &[u8], output_len: usize) -> Result<Vec<u8>, Error> {
             self.0.export(context, output_len)
+        }
+        /// Export without changing the message sequence, returning a
+        /// self-zeroizing buffer instead of a plain `Vec<u8>`.
+        pub fn export_zeroizing(
+            &self,
+            context: &[u8],
+            output_len: usize,
+        ) -> Result<Zeroizing<Vec<u8>>, Error> {
+            self.0.export(context, output_len).map(Zeroizing::new)
         }
         /// The exact suite bound to this context.
         pub const fn suite(&self) -> Suite {
@@ -2832,12 +3031,38 @@ pub mod draft_ietf_hpke_pq_05_full {
 
     impl RecipientContext {
         /// Open with the next internally derived nonce.
+        ///
+        /// This returns a plain, non-zeroizing `Vec<u8>`. Prefer
+        /// [`Self::open_zeroizing`] when the caller is not about to move the
+        /// decrypted plaintext into another zeroizing container immediately.
         pub fn open(&mut self, aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Error> {
             self.0.open(aad, ciphertext)
         }
+        /// Open with the next internally derived nonce, returning a
+        /// self-zeroizing buffer instead of a plain `Vec<u8>`.
+        pub fn open_zeroizing(
+            &mut self,
+            aad: &[u8],
+            ciphertext: &[u8],
+        ) -> Result<Zeroizing<Vec<u8>>, Error> {
+            self.0.open(aad, ciphertext).map(Zeroizing::new)
+        }
         /// Export without changing the message sequence.
+        ///
+        /// This returns a plain, non-zeroizing `Vec<u8>`. Prefer
+        /// [`Self::export_zeroizing`] when the caller is not about to move the
+        /// exported secret into another zeroizing container immediately.
         pub fn export(&self, context: &[u8], output_len: usize) -> Result<Vec<u8>, Error> {
             self.0.export(context, output_len)
+        }
+        /// Export without changing the message sequence, returning a
+        /// self-zeroizing buffer instead of a plain `Vec<u8>`.
+        pub fn export_zeroizing(
+            &self,
+            context: &[u8],
+            output_len: usize,
+        ) -> Result<Zeroizing<Vec<u8>>, Error> {
+            self.0.export(context, output_len).map(Zeroizing::new)
         }
         /// The exact suite bound to this context.
         pub const fn suite(&self) -> Suite {
@@ -3168,7 +3393,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                     Aes256GcmSiv::new_from_slice(&self.key)
                         .map_err(|_| Error::InternalInvariant)?
                         .encrypt(
-                            &nonce,
+                            nonce,
                             aes_gcm_siv::aead::Payload {
                                 msg: plaintext,
                                 aad,
@@ -3247,7 +3472,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                     Aes256GcmSiv::new_from_slice(&self.key)
                         .map_err(|_| Error::InternalInvariant)?
                         .decrypt(
-                            &nonce,
+                            nonce,
                             aes_gcm_siv::aead::Payload {
                                 msg: ciphertext,
                                 aad,
@@ -3275,14 +3500,14 @@ pub mod draft_ietf_hpke_pq_05_full {
         }
 
         fn export(&self, context: &[u8], output_len: usize) -> Result<Vec<u8>, Error> {
-            if self.suite.kdf.is_one_stage() {
+            let value = if self.suite.kdf.is_one_stage() {
                 labeled_derive(
                     self.suite,
                     &self.exporter_secret,
                     b"sec",
                     context,
                     output_len,
-                )
+                )?
             } else {
                 labeled_expand(
                     self.suite,
@@ -3290,8 +3515,9 @@ pub mod draft_ietf_hpke_pq_05_full {
                     b"sec",
                     context,
                     output_len,
-                )
-            }
+                )?
+            };
+            Ok(value.to_vec())
         }
 
         fn nonce(&self) -> Result<Vec<u8>, Error> {
@@ -3340,27 +3566,15 @@ pub mod draft_ietf_hpke_pq_05_full {
         context.extend_from_slice(&psk_id_hash);
         context.extend_from_slice(&info_hash);
         let secret = labeled_extract(suite, shared_secret, b"secret", psk)?;
-        let key = Zeroizing::new(labeled_expand(
-            suite,
-            &secret,
-            b"key",
-            &context,
-            suite.aead.key_len(),
-        )?);
-        let nonce = Zeroizing::new(labeled_expand(
+        let key = labeled_expand(suite, &secret, b"key", &context, suite.aead.key_len())?;
+        let nonce = labeled_expand(
             suite,
             &secret,
             b"base_nonce",
             &context,
             suite.aead.nonce_len(),
-        )?);
-        let exporter = Zeroizing::new(labeled_expand(
-            suite,
-            &secret,
-            b"exp",
-            &context,
-            suite.kdf.nh(),
-        )?);
+        )?;
+        let exporter = labeled_expand(suite, &secret, b"exp", &context, suite.kdf.nh())?;
         Ok((key, nonce, exporter))
     }
 
@@ -3419,9 +3633,24 @@ pub mod draft_ietf_hpke_pq_05_full {
         input.extend_from_slice(label);
         input.extend_from_slice(ikm);
         let value = match suite.kdf {
-            Kdf::HkdfSha256 => Hkdf::<Sha256>::extract(Some(salt), &input).0.to_vec(),
-            Kdf::HkdfSha384 => Hkdf::<Sha384>::extract(Some(salt), &input).0.to_vec(),
-            Kdf::HkdfSha512 => Hkdf::<Sha512>::extract(Some(salt), &input).0.to_vec(),
+            Kdf::HkdfSha256 => {
+                let mut prk = Hkdf::<Sha256>::extract(Some(salt), &input).0;
+                let value = prk.to_vec();
+                prk.as_mut_slice().zeroize();
+                value
+            }
+            Kdf::HkdfSha384 => {
+                let mut prk = Hkdf::<Sha384>::extract(Some(salt), &input).0;
+                let value = prk.to_vec();
+                prk.as_mut_slice().zeroize();
+                value
+            }
+            Kdf::HkdfSha512 => {
+                let mut prk = Hkdf::<Sha512>::extract(Some(salt), &input).0;
+                let value = prk.to_vec();
+                prk.as_mut_slice().zeroize();
+                value
+            }
             _ => return Err(Error::InternalInvariant),
         };
         Ok(Zeroizing::new(value))
@@ -3433,7 +3662,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         label: &[u8],
         info: &[u8],
         output_len: usize,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Zeroizing<Vec<u8>>, Error> {
         if suite.kdf.is_one_stage() {
             return Err(Error::InternalInvariant);
         }
@@ -3454,7 +3683,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         info_bytes.extend_from_slice(&suite.suite_id());
         info_bytes.extend_from_slice(label);
         info_bytes.extend_from_slice(info);
-        let mut output = vec![0; output_len];
+        let mut output = Zeroizing::new(vec![0; output_len]);
         match suite.kdf {
             Kdf::HkdfSha256 => Hkdf::<Sha256>::from_prk(prk)
                 .map_err(|_| Error::InternalInvariant)?
@@ -3485,7 +3714,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         label: &[u8],
         context: &[u8],
         output_len: usize,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Zeroizing<Vec<u8>>, Error> {
         let length: u16 = output_len
             .try_into()
             .map_err(|_| Error::OutputLengthTooLarge {
@@ -3507,7 +3736,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         input.extend_from_slice(label);
         input.extend_from_slice(&length.to_be_bytes());
         input.extend_from_slice(context);
-        let mut output = vec![0; output_len];
+        let mut output = Zeroizing::new(vec![0; output_len]);
         match suite.kdf {
             Kdf::Shake128 => {
                 let mut xof = Shake128::default();
@@ -3532,6 +3761,196 @@ pub mod draft_ietf_hpke_pq_05_full {
             _ => return Err(Error::InternalInvariant),
         }
         Ok(output)
+    }
+
+    #[cfg(test)]
+    mod hardening_tests {
+        use super::*;
+
+        /// Small deterministic xorshift PRNG so these tests can exercise
+        /// randomized-content inputs without pulling in a new dependency.
+        struct XorShift64(u64);
+
+        impl XorShift64 {
+            fn new(seed: u64) -> Self {
+                Self(seed | 1)
+            }
+            fn next_u64(&mut self) -> u64 {
+                let mut x = self.0;
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                self.0 = x;
+                x
+            }
+            fn fill(&mut self, buf: &mut [u8]) {
+                for chunk in buf.chunks_mut(8) {
+                    let v = self.next_u64().to_le_bytes();
+                    chunk.copy_from_slice(&v[..chunk.len()]);
+                }
+            }
+        }
+
+        const ALL_KEMS: [Kem; 6] = [
+            Kem::MlKem512,
+            Kem::MlKem768,
+            Kem::MlKem1024,
+            Kem::MlKem768P256,
+            Kem::MlKem1024P384,
+            Kem::MlKem768X25519,
+        ];
+
+        fn public_key_len(kem: Kem) -> usize {
+            match kem {
+                Kem::MlKem512 => ML_KEM_512_PUBLIC_KEY_BYTES,
+                Kem::MlKem768 => ML_KEM_768_PUBLIC_KEY_BYTES,
+                Kem::MlKem1024 => ML_KEM_1024_PUBLIC_KEY_BYTES,
+                Kem::MlKem768P256 => MLKEM768_P256_PUBLIC_KEY_BYTES,
+                Kem::MlKem1024P384 => MLKEM1024_P384_PUBLIC_KEY_BYTES,
+                Kem::MlKem768X25519 => MLKEM768_X25519_PUBLIC_KEY_BYTES,
+            }
+        }
+
+        fn private_seed_len(kem: Kem) -> usize {
+            match kem {
+                Kem::MlKem512 => ML_KEM_512_PRIVATE_KEY_BYTES,
+                Kem::MlKem768 => ML_KEM_768_PRIVATE_KEY_BYTES,
+                Kem::MlKem1024 => ML_KEM_1024_PRIVATE_KEY_BYTES,
+                Kem::MlKem768P256 | Kem::MlKem1024P384 | Kem::MlKem768X25519 => HYBRID_SEED_BYTES,
+            }
+        }
+
+        fn encapsulation_len(kem: Kem) -> usize {
+            match kem {
+                Kem::MlKem512 => ML_KEM_512_ENCAPSULATED_KEY_BYTES,
+                Kem::MlKem768 => ML_KEM_768_ENCAPSULATED_KEY_BYTES,
+                Kem::MlKem1024 => ML_KEM_1024_ENCAPSULATED_KEY_BYTES,
+                Kem::MlKem768P256 => MLKEM768_P256_ENCAPSULATION_BYTES,
+                Kem::MlKem1024P384 => MLKEM1024_P384_ENCAPSULATION_BYTES,
+                Kem::MlKem768X25519 => MLKEM768_X25519_ENCAPSULATION_BYTES,
+            }
+        }
+
+        #[test]
+        fn from_bytes_parsers_never_panic_across_every_length_and_random_content() {
+            let mut rng = XorShift64::new(0xC0FF_EE15_5EED_1234);
+            for kem in ALL_KEMS {
+                for len in 0..=(public_key_len(kem) + 1) {
+                    let mut buf = vec![0u8; len];
+                    rng.fill(&mut buf);
+                    let _ = RecipientPublicKey::from_bytes(kem, &buf);
+                }
+                for len in 0..=(private_seed_len(kem) + 1) {
+                    let mut buf = vec![0u8; len];
+                    rng.fill(&mut buf);
+                    let _ = RecipientPrivateKey::from_seed_bytes(kem, &buf);
+                }
+                for len in 0..=(encapsulation_len(kem) + 1) {
+                    let mut buf = vec![0u8; len];
+                    rng.fill(&mut buf);
+                    let _ = Encapsulation::from_bytes(kem, &buf);
+                }
+                // A handful of extra random-content passes at the exact valid
+                // length: a fixed all-zero-then-filled buffer under-exercises
+                // content-dependent validation (ML-KEM public-key validation,
+                // SEC1 point decoding, X25519 clamping).
+                for _ in 0..8 {
+                    let mut pk = vec![0u8; public_key_len(kem)];
+                    rng.fill(&mut pk);
+                    let _ = RecipientPublicKey::from_bytes(kem, &pk);
+                    let mut sk = vec![0u8; private_seed_len(kem)];
+                    rng.fill(&mut sk);
+                    let _ = RecipientPrivateKey::from_seed_bytes(kem, &sk);
+                    let mut enc = vec![0u8; encapsulation_len(kem)];
+                    rng.fill(&mut enc);
+                    let _ = Encapsulation::from_bytes(kem, &enc);
+                }
+            }
+        }
+
+        #[test]
+        fn derive_recipient_key_pair_rejects_every_wrong_seed_length() {
+            for kem in ALL_KEMS {
+                for len in [0usize, 1, 31, 33, 63, 65, 100] {
+                    let seed = vec![0x42u8; len];
+                    assert!(
+                        derive_recipient_key_pair(kem, &seed).is_err(),
+                        "a {len}-byte seed must be rejected for {kem:?}"
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn open_zeroizing_matches_open_and_export_zeroizing_matches_export() {
+            let kem = Kem::MlKem768;
+            let seed = [0x11u8; 32];
+            let pair = derive_recipient_key_pair(kem, &seed).unwrap();
+            let suite = Suite::new(kem, Kdf::HkdfSha256, Aead::Aes128Gcm);
+            let (encapsulation, mut sender) =
+                setup_base_sender(suite, pair.public_key(), b"info").unwrap();
+
+            let aad = b"aad";
+            let msg1 = b"hello world, this is a plaintext";
+            let ct1 = sender.seal(aad, msg1).unwrap();
+
+            // Open the same ciphertext independently through two fresh
+            // recipient contexts so both the plain and zeroizing paths see
+            // the same (first) sequence number.
+            let mut receiver_plain =
+                setup_base_receiver(suite, pair.private_key(), &encapsulation, b"info").unwrap();
+            let mut receiver_zeroizing =
+                setup_base_receiver(suite, pair.private_key(), &encapsulation, b"info").unwrap();
+            let plain = receiver_plain.open(aad, &ct1).unwrap();
+            let zeroizing = receiver_zeroizing.open_zeroizing(aad, &ct1).unwrap();
+            assert_eq!(plain, zeroizing.as_slice());
+
+            let export_plain = sender.export(b"ctx", 32).unwrap();
+            let export_zeroizing = sender.export_zeroizing(b"ctx", 32).unwrap();
+            assert_eq!(export_plain, export_zeroizing.as_slice());
+        }
+
+        #[test]
+        fn recipient_key_pair_into_parts_round_trips_bytes() {
+            let kem = Kem::MlKem1024;
+            let seed = [0x99u8; 32];
+            let pair = derive_recipient_key_pair(kem, &seed).unwrap();
+            let public_bytes = pair.public_key().as_bytes().to_vec();
+            let private_bytes = pair.private_key().as_seed_bytes().to_vec();
+            let (public, private) = pair.into_parts();
+            assert_eq!(public.as_bytes(), public_bytes.as_slice());
+            assert_eq!(private.as_seed_bytes(), private_bytes.as_slice());
+        }
+
+        #[test]
+        fn private_key_and_context_debug_never_prints_seed_material() {
+            let kem = Kem::MlKem768;
+            let seed = [0x77u8; 32];
+            let pair = derive_recipient_key_pair(kem, &seed).unwrap();
+            let seed_hex_prefix: String = pair.private_key().as_seed_bytes()[..8]
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+
+            let debug_private = format!("{:?}", pair.private_key());
+            assert!(!debug_private.contains(seed_hex_prefix.as_str()));
+            assert!(debug_private.len() < 200);
+
+            let debug_pair = format!("{pair:?}");
+            assert!(!debug_pair.contains(seed_hex_prefix.as_str()));
+
+            let suite = Suite::new(kem, Kdf::HkdfSha256, Aead::Aes128Gcm);
+            let (encapsulation, sender) =
+                setup_base_sender(suite, pair.public_key(), b"info").unwrap();
+            let receiver =
+                setup_base_receiver(suite, pair.private_key(), &encapsulation, b"info").unwrap();
+            let debug_sender = format!("{sender:?}");
+            let debug_receiver = format!("{receiver:?}");
+            assert!(!debug_sender.contains(seed_hex_prefix.as_str()));
+            assert!(!debug_receiver.contains(seed_hex_prefix.as_str()));
+            assert!(debug_sender.len() < 200);
+            assert!(debug_receiver.len() < 200);
+        }
     }
 }
 
@@ -3788,10 +4207,8 @@ mod tests {
 
     #[test]
     fn pinned_draft_05_ml_kem_base_mode_vectors_cover_setup_schedule_aead_and_export() {
-        // TODO(publish): the vector corpus lives in the workspace root; move it into
-        // this crate before packaging crypt_guard_core for crates.io.
         let vectors: Vec<DraftVector> = serde_json::from_str(include_str!(
-            "../../../../tests/vectors/hpke-pq-draft-05-test-vectors.json"
+            "../../tests/vectors/hpke-pq-draft-05-test-vectors.json"
         ))
         .expect("the pinned draft-05 vector corpus must remain valid JSON");
         let selected: Vec<_> = vectors
@@ -3995,10 +4412,8 @@ mod tests {
 
     #[test]
     fn p256_hybrid_combiner_matches_the_pinned_shared_secret() {
-        // TODO(publish): the vector corpus lives in the workspace root; move it into
-        // this crate before packaging crypt_guard_core for crates.io.
         let vectors: Vec<DraftVector> = serde_json::from_str(include_str!(
-            "../../../../tests/vectors/hpke-pq-draft-05-test-vectors.json"
+            "../../tests/vectors/hpke-pq-draft-05-test-vectors.json"
         ))
         .expect("the pinned draft-05 vector corpus must remain valid JSON");
         let vector = vectors

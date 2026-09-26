@@ -11,7 +11,7 @@ use zeroize::Zeroize;
 
 /// Represents the AES cipher for encryption and decryption processes.
 /// It holds cryptographic information and a shared secret for operations.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherAES {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
@@ -20,6 +20,18 @@ pub struct CipherAES {
 impl Drop for CipherAES {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherAES {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherAES")
+            .field("infos", &self.infos)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .finish()
     }
 }
 
@@ -33,7 +45,7 @@ impl fmt::Display for CipherAES {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherAesGcmSiv {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
@@ -43,6 +55,19 @@ pub struct CipherAesGcmSiv {
 impl Drop for CipherAesGcmSiv {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherAesGcmSiv {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherAesGcmSiv")
+            .field("infos", &self.infos)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .field("iv", &self.iv)
+            .finish()
     }
 }
 
@@ -56,7 +81,7 @@ impl fmt::Display for CipherAesGcmSiv {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherAesCtr {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
@@ -66,6 +91,19 @@ pub struct CipherAesCtr {
 impl Drop for CipherAesCtr {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherAesCtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherAesCtr")
+            .field("infos", &self.infos)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .field("iv", &self.iv)
+            .finish()
     }
 }
 
@@ -79,7 +117,7 @@ impl fmt::Display for CipherAesCtr {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherAesXts {
     pub infos: CryptographicInformation,
     pub sharedsecret: Vec<u8>,
@@ -88,6 +126,18 @@ pub struct CipherAesXts {
 impl Drop for CipherAesXts {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherAesXts {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherAesXts")
+            .field("infos", &self.infos)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .finish()
     }
 }
 
@@ -103,7 +153,7 @@ impl fmt::Display for CipherAesXts {
 
 /// Represents the XChaCha20 cipher for encryption and decryption processes.
 /// It includes cryptographic information, a nonce for the operation, and a shared secret.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherChaCha {
     pub infos: CryptographicInformation,
     pub nonce: [u8; 24],
@@ -113,6 +163,19 @@ pub struct CipherChaCha {
 impl Drop for CipherChaCha {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherChaCha {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherChaCha")
+            .field("infos", &self.infos)
+            .field("nonce", &self.nonce)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .finish()
     }
 }
 
@@ -128,7 +191,7 @@ impl fmt::Display for CipherChaCha {
 
 /// Represents the XChaCha20Poly1305 cipher for encryption and decryption processes.
 /// It includes cryptographic information, a nonce for the operation, and a shared secret.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CipherChaChaPoly {
     pub infos: CryptographicInformation,
     pub nonce: [u8; 24],
@@ -138,6 +201,19 @@ pub struct CipherChaChaPoly {
 impl Drop for CipherChaChaPoly {
     fn drop(&mut self) {
         self.sharedsecret.zeroize();
+    }
+}
+
+impl fmt::Debug for CipherChaChaPoly {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CipherChaChaPoly")
+            .field("infos", &self.infos)
+            .field("nonce", &self.nonce)
+            .field(
+                "sharedsecret",
+                &format_args!("<redacted {} bytes>", self.sharedsecret.len()),
+            )
+            .finish()
     }
 }
 
@@ -256,13 +332,33 @@ impl fmt::Display for CryptographicMetadata {
 /// Contains information necessary for performing cryptographic operations, including the content
 /// to be encrypted or decrypted, a passphrase, metadata defining the operation context, and a flag
 /// indicating whether the content should be saved securely.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct CryptographicInformation {
     pub content: Vec<u8>,
     pub passphrase: Vec<u8>,
     pub metadata: CryptographicMetadata,
     pub safe: bool,
     pub location: Option<FileMetadata>,
+}
+
+/// Manual `Debug` impl that redacts `content` and `passphrase`, both of which
+/// may hold plaintext or key material, showing only their lengths.
+impl fmt::Debug for CryptographicInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CryptographicInformation")
+            .field(
+                "content",
+                &format_args!("<redacted {} bytes>", self.content.len()),
+            )
+            .field(
+                "passphrase",
+                &format_args!("<redacted {} bytes>", self.passphrase.len()),
+            )
+            .field("metadata", &self.metadata)
+            .field("safe", &self.safe)
+            .field("location", &self.location)
+            .finish()
+    }
 }
 
 impl Drop for CryptographicInformation {
@@ -287,5 +383,47 @@ impl fmt::Display for CryptographicInformation {
             self.metadata,
             self.content.len()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MARKER: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0x13, 0x37, 0xCA, 0xFE];
+
+    fn info(content: Vec<u8>, passphrase: Vec<u8>) -> CryptographicInformation {
+        CryptographicInformation {
+            content,
+            passphrase,
+            metadata: CryptographicMetadata {
+                process: Process::Encryption,
+                encryption_type: CryptographicMechanism::AES,
+                key_type: KeyEncapMechanism::Kyber1024,
+                content_type: ContentType::Message,
+            },
+            safe: false,
+            location: None,
+        }
+    }
+
+    #[test]
+    fn cryptographic_information_debug_redacts_secrets() {
+        let infos = info(MARKER.to_vec(), MARKER.to_vec());
+        let debug_str = format!("{:?}", infos);
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+        assert!(debug_str.contains("redacted"));
+    }
+
+    #[test]
+    fn cipher_aes_debug_redacts_sharedsecret() {
+        let cipher = CipherAES {
+            infos: info(vec![1, 2, 3], vec![4, 5, 6]),
+            sharedsecret: MARKER.to_vec(),
+        };
+        let debug_str = format!("{:?}", cipher);
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+        assert!(!debug_str.contains(&format!("{:?}", vec![1u8, 2, 3])));
+        assert!(!debug_str.contains(&format!("{:?}", vec![4u8, 5, 6])));
     }
 }

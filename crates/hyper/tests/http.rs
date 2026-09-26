@@ -118,7 +118,7 @@ async fn routing_limits_and_error_mapping() {
                 "/v1/keys/app/k1:encrypt",
                 b"0123456789abcdefXX",
             ),
-            // Within the limit, request codec not implemented yet.
+            // Within the limit but not a CGK1 frame.
             req(Method::POST, "/v1/keys/app/k1:encrypt", b"small"),
         ],
     )
@@ -132,7 +132,7 @@ async fn routing_limits_and_error_mapping() {
             StatusCode::METHOD_NOT_ALLOWED,
             StatusCode::BAD_REQUEST,
             StatusCode::PAYLOAD_TOO_LARGE,
-            StatusCode::NOT_IMPLEMENTED,
+            StatusCode::BAD_REQUEST,
         ]
     );
 }

@@ -108,6 +108,17 @@ impl SessionKey {
     ///
     /// # Returns
     /// A new `SessionKey`.
+    ///
+    /// # Security
+    /// `bytes` is taken by value. Because `[u8; 32]` implements `Copy`, if the
+    /// caller passes a named local variable here (rather than a fresh literal),
+    /// that variable is **not** moved-out-of by the call — the compiler copies
+    /// the bytes into `Self` and the caller's local retains its own copy of the
+    /// same secret bytes. Callers holding secret key material in a local `[u8; 32]`
+    /// before calling this constructor should explicitly `zeroize()` that local
+    /// after the call (see `kdf::hkdf::derive_session_key` for the pattern this
+    /// module follows). This constructor cannot zeroize the caller's copy itself,
+    /// since it only ever observes its own by-value copy.
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }

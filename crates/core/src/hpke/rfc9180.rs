@@ -153,10 +153,7 @@ impl PrivateKey {
     /// Parse and validate an RFC 9180 KEM private key.
     pub fn from_bytes(kem_id: KemId, bytes: &[u8]) -> Result<Self, Rfc9180Error> {
         let bytes = canonicalize_private_key(kem_id, bytes)?;
-        Ok(Self {
-            kem_id,
-            bytes: Zeroizing::new(bytes),
-        })
+        Ok(Self { kem_id, bytes })
     }
 
     /// The private key's registered KEM identifier.
@@ -251,6 +248,19 @@ impl SenderContext {
     ) -> Result<Vec<u8>, Rfc9180Error> {
         self.inner.export(exporter_context, output_len)
     }
+
+    /// [`Self::export`], but the returned secret is [`Zeroizing`].
+    ///
+    /// Prefer this over [`Self::export`] whenever the caller can keep working
+    /// with a `Zeroizing` buffer, since it avoids leaving an unwiped copy of
+    /// the exported secret on the heap.
+    pub fn export_zeroizing(
+        &self,
+        exporter_context: &[u8],
+        output_len: usize,
+    ) -> Result<Zeroizing<Vec<u8>>, Rfc9180Error> {
+        Ok(Zeroizing::new(self.export(exporter_context, output_len)?))
+    }
 }
 
 /// RFC 9180 receiver context. It owns sequence state and is intentionally not
@@ -275,6 +285,19 @@ impl ReceiverContext {
         }
     }
 
+    /// [`Self::open`], but the returned plaintext is [`Zeroizing`].
+    ///
+    /// Prefer this over [`Self::open`] whenever the caller can keep working
+    /// with a `Zeroizing` buffer, since it avoids leaving an unwiped copy of
+    /// the decrypted plaintext on the heap.
+    pub fn open_zeroizing(
+        &mut self,
+        aad: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, Rfc9180Error> {
+        Ok(Zeroizing::new(self.open(aad, ciphertext)?))
+    }
+
     /// Export an RFC 9180 exporter secret without consuming a message nonce.
     pub fn export(
         &self,
@@ -282,6 +305,19 @@ impl ReceiverContext {
         output_len: usize,
     ) -> Result<Vec<u8>, Rfc9180Error> {
         self.inner.export(exporter_context, output_len)
+    }
+
+    /// [`Self::export`], but the returned secret is [`Zeroizing`].
+    ///
+    /// Prefer this over [`Self::export`] whenever the caller can keep working
+    /// with a `Zeroizing` buffer, since it avoids leaving an unwiped copy of
+    /// the exported secret on the heap.
+    pub fn export_zeroizing(
+        &self,
+        exporter_context: &[u8],
+        output_len: usize,
+    ) -> Result<Zeroizing<Vec<u8>>, Rfc9180Error> {
+        Ok(Zeroizing::new(self.export(exporter_context, output_len)?))
     }
 }
 
@@ -453,12 +489,22 @@ enum ReceiverMode<'a> {
     },
 }
 
-trait SenderOperations {
+// `SenderOperations`/`ReceiverOperations` are private (module-internal) traits:
+// no external code can implement them, so adding a `Send + Sync` supertrait
+// bound here is not a breaking change. Every concrete implementation in this
+// module (the `hpke`-crate-backed `SenderBackend`/`ReceiverBackend`, and the
+// hand-rolled X448 `X448SenderBackend`/`X448ReceiverBackend`) is built solely
+// from `Send + Sync` primitives (byte buffers, fixed-size arrays, and the
+// `hpke` crate's own AEAD/KDF/KEM marker types), so this bound costs nothing
+// and lets `SenderContext`/`ReceiverContext` (which store `Box<dyn ...>`)
+// be `Send + Sync` automatically. See the `assert_send`/`assert_sync` checks
+// in this module's tests.
+trait SenderOperations: Send + Sync {
     fn seal(&mut self, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, Rfc9180Error>;
     fn export(&self, exporter_context: &[u8], output_len: usize) -> Result<Vec<u8>, Rfc9180Error>;
 }
 
-trait ReceiverOperations {
+trait ReceiverOperations: Send + Sync {
     fn open(&mut self, aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Rfc9180Error>;
     fn export(&self, exporter_context: &[u8], output_len: usize) -> Result<Vec<u8>, Rfc9180Error>;
 }
@@ -494,34 +540,39 @@ impl X448Context {
     ) -> Result<Self, Rfc9180Error> {
         validate_x448_psk_inputs(mode, psk, psk_id)?;
 
-        let psk_id_hash = suite.labeled_extract(b"", b"psk_id_hash", psk_id);
-        let info_hash = suite.labeled_extract(b"", b"info_hash", info);
-        let mut key_schedule_context = Vec::with_capacity(1 + psk_id_hash.len() + info_hash.len());
+        let psk_id_hash = suite.labeled_extract_zeroizing(b"", b"psk_id_hash", psk_id);
+        let info_hash = suite.labeled_extract_zeroizing(b"", b"info_hash", info);
+        let mut key_schedule_context =
+            Zeroizing::new(Vec::with_capacity(1 + psk_id_hash.len() + info_hash.len()));
         key_schedule_context.push(mode.as_u8());
         key_schedule_context.extend_from_slice(&psk_id_hash);
         key_schedule_context.extend_from_slice(&info_hash);
 
-        let secret = Zeroizing::new(suite.labeled_extract(shared_secret, b"secret", psk));
+        let secret = suite.labeled_extract_zeroizing(shared_secret, b"secret", psk);
         let key_len = x448_aead_key_len(suite.aead_id())?;
         let aead_key = suite
-            .labeled_expand(&secret, b"key", &key_schedule_context, key_len)
+            .labeled_expand_zeroizing(&secret, b"key", &key_schedule_context, key_len)
             .map_err(|_| Rfc9180Error::ExportLengthTooLarge)?;
         let nonce = if suite.aead_id() == AeadId::ExportOnly {
-            [0_u8; HPKE_NONCE_LEN]
+            Zeroizing::new([0_u8; HPKE_NONCE_LEN])
         } else {
-            suite
-                .labeled_expand(
+            let expanded = suite
+                .labeled_expand_zeroizing(
                     &secret,
                     b"base_nonce",
                     &key_schedule_context,
                     HPKE_NONCE_LEN,
                 )
-                .map_err(|_| Rfc9180Error::ExportLengthTooLarge)?
-                .try_into()
-                .map_err(|_| Rfc9180Error::SealFailed)?
+                .map_err(|_| Rfc9180Error::ExportLengthTooLarge)?;
+            Zeroizing::new(
+                expanded
+                    .to_vec()
+                    .try_into()
+                    .map_err(|_| Rfc9180Error::SealFailed)?,
+            )
         };
         let exporter_secret = suite
-            .labeled_expand(
+            .labeled_expand_zeroizing(
                 &secret,
                 b"exp",
                 &key_schedule_context,
@@ -530,9 +581,9 @@ impl X448Context {
             .map_err(|_| Rfc9180Error::ExportLengthTooLarge)?;
         Ok(Self {
             suite,
-            aead_key: Zeroizing::new(aead_key),
-            base_nonce: Zeroizing::new(nonce),
-            exporter_secret: Zeroizing::new(exporter_secret),
+            aead_key,
+            base_nonce: nonce,
+            exporter_secret,
             sequence: [0_u8; HPKE_NONCE_LEN],
         })
     }
@@ -701,7 +752,14 @@ struct SenderBackend<A: BackendAead, K: BackendKdf, Kem: BackendKem> {
     context: AeadCtxS<A, K, Kem>,
 }
 
-impl<A: BackendAead, K: BackendKdf, Kem: BackendKem> SenderOperations for SenderBackend<A, K, Kem> {
+// The concrete `hpke` algorithm types are zero-sized markers and therefore
+// `Send + Sync`; the bounds make that explicit for the boxed trait objects.
+impl<A, K, Kem> SenderOperations for SenderBackend<A, K, Kem>
+where
+    A: BackendAead + Send + Sync,
+    K: BackendKdf + Send + Sync,
+    Kem: BackendKem + Send + Sync,
+{
     fn seal(&mut self, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, Rfc9180Error> {
         self.context
             .seal(plaintext, aad)
@@ -721,8 +779,11 @@ struct ReceiverBackend<A: BackendAead, K: BackendKdf, Kem: BackendKem> {
     context: AeadCtxR<A, K, Kem>,
 }
 
-impl<A: BackendAead, K: BackendKdf, Kem: BackendKem> ReceiverOperations
-    for ReceiverBackend<A, K, Kem>
+impl<A, K, Kem> ReceiverOperations for ReceiverBackend<A, K, Kem>
+where
+    A: BackendAead + Send + Sync,
+    K: BackendKdf + Send + Sync,
+    Kem: BackendKem + Send + Sync,
 {
     fn open(&mut self, aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Rfc9180Error> {
         self.context
@@ -825,17 +886,22 @@ fn clamp_x448_private_key(mut bytes: [u8; X448_KEY_LEN]) -> [u8; X448_KEY_LEN] {
     bytes
 }
 
-fn x448_labeled_extract(salt: &[u8], label: &[u8], ikm: &[u8]) -> [u8; X448_SHARED_SECRET_LEN] {
+fn x448_labeled_extract(
+    salt: &[u8],
+    label: &[u8],
+    ikm: &[u8],
+) -> Zeroizing<[u8; X448_SHARED_SECRET_LEN]> {
     use hkdf::Hkdf;
     use sha2_011::Sha512;
 
-    let mut labeled_ikm =
-        Vec::with_capacity(b"HPKE-v1".len() + X448_KEM_SUITE_ID.len() + label.len() + ikm.len());
+    let mut labeled_ikm = Zeroizing::new(Vec::with_capacity(
+        b"HPKE-v1".len() + X448_KEM_SUITE_ID.len() + label.len() + ikm.len(),
+    ));
     labeled_ikm.extend_from_slice(b"HPKE-v1");
     labeled_ikm.extend_from_slice(X448_KEM_SUITE_ID);
     labeled_ikm.extend_from_slice(label);
     labeled_ikm.extend_from_slice(ikm);
-    Hkdf::<Sha512>::extract(Some(salt), &labeled_ikm).0.into()
+    Zeroizing::new(Hkdf::<Sha512>::extract(Some(salt), &labeled_ikm).0.into())
 }
 
 fn x448_labeled_expand(
@@ -859,20 +925,18 @@ fn x448_labeled_expand(
     labeled_info.extend_from_slice(label);
     labeled_info.extend_from_slice(info);
     let hkdf = Hkdf::<Sha512>::from_prk(prk).map_err(|_| Rfc9180Error::ExportLengthTooLarge)?;
-    let mut output = vec![0_u8; output_len];
+    let mut output = Zeroizing::new(vec![0_u8; output_len]);
     hkdf.expand(&labeled_info, &mut output)
         .map_err(|_| Rfc9180Error::ExportLengthTooLarge)?;
-    Ok(output)
+    Ok(output.to_vec())
 }
 
 fn x448_derive_key_pair(
     ikm: &[u8],
 ) -> Result<([u8; X448_KEY_LEN], [u8; X448_KEY_LEN]), Rfc9180Error> {
     let dkp_prk = x448_labeled_extract(b"", b"dkp_prk", ikm);
-    let secret_key = as_x448_array(
-        &x448_labeled_expand(&dkp_prk, b"sk", b"", X448_KEY_LEN)?,
-        KemKeyKind::Private,
-    )?;
+    let expanded_sk = Zeroizing::new(x448_labeled_expand(&dkp_prk[..], b"sk", b"", X448_KEY_LEN)?);
+    let secret_key = as_x448_array(&expanded_sk, KemKeyKind::Private)?;
     let public_key = crrl::x448::x448_base(&secret_key);
     Ok((secret_key, public_key))
 }
@@ -880,7 +944,7 @@ fn x448_derive_key_pair(
 fn x448_extract_and_expand(dh: &[u8], kem_context: &[u8]) -> Result<Vec<u8>, Rfc9180Error> {
     let eae_prk = x448_labeled_extract(b"", b"eae_prk", dh);
     x448_labeled_expand(
-        &eae_prk,
+        &eae_prk[..],
         b"shared_secret",
         kem_context,
         X448_SHARED_SECRET_LEN,
@@ -899,15 +963,16 @@ fn x448_dh(private_key: &[u8], public_key: &[u8]) -> Result<[u8; X448_KEY_LEN], 
 }
 
 fn generate_x448_key_pair() -> Result<KeyPair, Rfc9180Error> {
-    let mut ikm = [0_u8; X448_KEY_LEN];
+    let mut ikm = Zeroizing::new([0_u8; X448_KEY_LEN]);
     let mut rng = OsRng.unwrap_err();
-    rng.try_fill_bytes(&mut ikm)
+    rng.try_fill_bytes(&mut *ikm)
         .map_err(|_| Rfc9180Error::EncapsulationFailed)?;
     // RFC 9180 permits GenerateKeyPair to be implemented as
     // DeriveKeyPair(random(Nsk)). Preserve the RFC derivation labels rather
     // than treating raw operating-system bytes as the private key directly.
-    let (derived_private_bytes, public_bytes) = x448_derive_key_pair(&ikm)?;
-    let private_bytes = clamp_x448_private_key(derived_private_bytes);
+    let (derived_private_bytes, public_bytes) = x448_derive_key_pair(&ikm[..])?;
+    let derived_private_bytes = Zeroizing::new(derived_private_bytes);
+    let private_bytes = Zeroizing::new(clamp_x448_private_key(*derived_private_bytes));
     Ok(KeyPair {
         public_key: PublicKey {
             kem_id: X448_KEM_ID,
@@ -920,6 +985,12 @@ fn generate_x448_key_pair() -> Result<KeyPair, Rfc9180Error> {
     })
 }
 
+// Every call site guards `KemId::DhKemX448HkdfSha512` before reaching this
+// macro (X448 has no `hpke`-crate backend `Kem` type to dispatch to), so this
+// arm is not expected to execute. It nonetheless returns a typed
+// `Rfc9180Error` instead of panicking via `unreachable!`, so a future dispatch
+// path that forgets the X448 guard fails safely with a normal `Result` error
+// rather than aborting the process.
 macro_rules! dispatch_kem {
     ($kem_id:expr, $function:ident $(, $argument:expr )* $(,)?) => {
         match $kem_id {
@@ -927,11 +998,19 @@ macro_rules! dispatch_kem {
             KemId::DhKemP384HkdfSha384 => $function::<DhP384HkdfSha384>($kem_id $(, $argument)*),
             KemId::DhKemP521HkdfSha512 => $function::<DhP521HkdfSha512>($kem_id $(, $argument)*),
             KemId::DhKemX25519HkdfSha256 => $function::<X25519HkdfSha256>($kem_id $(, $argument)*),
-            KemId::DhKemX448HkdfSha512 => unreachable!("X448 is dispatched before hpke backend KEM dispatch"),
+            KemId::DhKemX448HkdfSha512 => {
+                return Err(Rfc9180Error::KemMismatch {
+                    expected: $kem_id,
+                    actual: KemId::DhKemX448HkdfSha512,
+                })
+            }
         }
     };
 }
 
+// See `dispatch_kem!`: every call site guards X448 before reaching this
+// macro, since X448 is handled entirely by `setup_x448_sender`/
+// `setup_x448_receiver` rather than the `hpke`-crate backend dispatched here.
 macro_rules! dispatch_suite {
     ($suite:expr, $function:ident $(, $argument:expr )* $(,)?) => {{
         let suite = $suite;
@@ -940,7 +1019,12 @@ macro_rules! dispatch_suite {
             KemId::DhKemP384HkdfSha384 => dispatch_kdf_aead!(suite, $function, DhP384HkdfSha384 $(, $argument)*),
             KemId::DhKemP521HkdfSha512 => dispatch_kdf_aead!(suite, $function, DhP521HkdfSha512 $(, $argument)*),
             KemId::DhKemX25519HkdfSha256 => dispatch_kdf_aead!(suite, $function, X25519HkdfSha256 $(, $argument)*),
-            KemId::DhKemX448HkdfSha512 => unreachable!("X448 is dispatched before hpke backend suite dispatch"),
+            KemId::DhKemX448HkdfSha512 => {
+                return Err(Rfc9180Error::KemMismatch {
+                    expected: suite.kem_id(),
+                    actual: KemId::DhKemX448HkdfSha512,
+                })
+            }
         }
     }};
 }
@@ -967,8 +1051,18 @@ macro_rules! dispatch_aead {
 }
 
 fn generate_key_pair_for<Kem: BackendKem>(kem_id: KemId) -> Result<KeyPair, Rfc9180Error> {
+    use zeroize::Zeroize;
+
     let mut rng = OsRng.unwrap_err();
     let (private_key, public_key) = Kem::gen_keypair(&mut rng);
+    // `to_bytes()` returns a `GenericArray`, which the `zeroize` crate does
+    // not implement `Zeroize` for directly (no blanket impl, and no
+    // `generic-array` feature is enabled), so it cannot be held in a
+    // `Zeroizing<_>` wrapper. Copy it out and wipe the temporary via its
+    // slice view instead.
+    let mut private_key_bytes = private_key.to_bytes();
+    let private_key_vec = Zeroizing::new(private_key_bytes.to_vec());
+    private_key_bytes.as_mut_slice().zeroize();
     Ok(KeyPair {
         public_key: PublicKey {
             kem_id,
@@ -976,7 +1070,7 @@ fn generate_key_pair_for<Kem: BackendKem>(kem_id: KemId) -> Result<KeyPair, Rfc9
         },
         private_key: PrivateKey {
             kem_id,
-            bytes: Zeroizing::new(private_key.to_bytes().to_vec()),
+            bytes: private_key_vec,
         },
     })
 }
@@ -1033,12 +1127,19 @@ fn validate_private_key(kem_id: KemId, bytes: &[u8]) -> Result<(), Rfc9180Error>
     }
 }
 
-fn canonicalize_private_key(kem_id: KemId, bytes: &[u8]) -> Result<Vec<u8>, Rfc9180Error> {
+fn canonicalize_private_key(
+    kem_id: KemId,
+    bytes: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, Rfc9180Error> {
     validate_private_key(kem_id, bytes)?;
     if kem_id == X448_KEM_ID {
-        Ok(clamp_x448_private_key(as_x448_array(bytes, KemKeyKind::Private)?).to_vec())
+        let clamped = Zeroizing::new(clamp_x448_private_key(as_x448_array(
+            bytes,
+            KemKeyKind::Private,
+        )?));
+        Ok(Zeroizing::new(clamped.to_vec()))
     } else {
-        Ok(bytes.to_vec())
+        Ok(Zeroizing::new(bytes.to_vec()))
     }
 }
 
@@ -1134,9 +1235,9 @@ fn setup_sender_for<A, K, Kem>(
     info: &[u8],
 ) -> Result<(EncapsulatedKey, SenderContext), Rfc9180Error>
 where
-    A: BackendAead + 'static,
-    K: BackendKdf + 'static,
-    Kem: BackendKem + 'static,
+    A: BackendAead + Send + Sync + 'static,
+    K: BackendKdf + Send + Sync + 'static,
+    Kem: BackendKem + Send + Sync + 'static,
 {
     let recipient = decode_public_key::<Kem>(suite.kem_id(), recipient_public_key)?;
     let mut rng = OsRng.unwrap_err();
@@ -1197,9 +1298,9 @@ fn setup_receiver_for<A, K, Kem>(
     info: &[u8],
 ) -> Result<ReceiverContext, Rfc9180Error>
 where
-    A: BackendAead + 'static,
-    K: BackendKdf + 'static,
-    Kem: BackendKem + 'static,
+    A: BackendAead + Send + Sync + 'static,
+    K: BackendKdf + Send + Sync + 'static,
+    Kem: BackendKem + Send + Sync + 'static,
 {
     let private = decode_private_key::<Kem>(suite.kem_id(), recipient_private_key)?;
     let enc = decode_encapsulated_key::<Kem>(suite.kem_id(), enc)?;
@@ -1240,7 +1341,8 @@ fn setup_x448_sender(
     let recipient_public = as_x448_array(recipient_public_key.as_bytes(), KemKeyKind::Public)?;
     let ephemeral = generate_x448_key_pair()?;
     let encapsulated = as_x448_array(ephemeral.public_key.as_bytes(), KemKeyKind::Encapsulated)?;
-    let mut dh = x448_dh(&ephemeral.private_key.bytes, &recipient_public)?.to_vec();
+    let mut dh = Zeroizing::new(Vec::with_capacity(2 * X448_KEY_LEN));
+    dh.extend_from_slice(&x448_dh(&ephemeral.private_key.bytes, &recipient_public)?);
     let mut kem_context = Vec::with_capacity(X448_KEY_LEN * 3);
     kem_context.extend_from_slice(&encapsulated);
     kem_context.extend_from_slice(&recipient_public);
@@ -1251,8 +1353,8 @@ fn setup_x448_sender(
         SenderMode::Auth { private_key } => {
             let sender_public =
                 crrl::x448::x448_base(&as_x448_array(&private_key.bytes, KemKeyKind::Private)?);
-            let static_dh = x448_dh(&private_key.bytes, &recipient_public)?;
-            dh.extend_from_slice(&static_dh);
+            let static_dh = Zeroizing::new(x448_dh(&private_key.bytes, &recipient_public)?);
+            dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
             (Mode::Auth, &[][..], &[][..])
         }
@@ -1263,8 +1365,8 @@ fn setup_x448_sender(
         } => {
             let sender_public =
                 crrl::x448::x448_base(&as_x448_array(&private_key.bytes, KemKeyKind::Private)?);
-            let static_dh = x448_dh(&private_key.bytes, &recipient_public)?;
-            dh.extend_from_slice(&static_dh);
+            let static_dh = Zeroizing::new(x448_dh(&private_key.bytes, &recipient_public)?);
+            dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
             (Mode::AuthPsk, psk, psk_id)
         }
@@ -1291,10 +1393,14 @@ fn setup_x448_receiver(
     mode: ReceiverMode<'_>,
     info: &[u8],
 ) -> Result<ReceiverContext, Rfc9180Error> {
-    let recipient_private = as_x448_array(&recipient_private_key.bytes, KemKeyKind::Private)?;
+    let recipient_private = Zeroizing::new(as_x448_array(
+        &recipient_private_key.bytes,
+        KemKeyKind::Private,
+    )?);
     let recipient_public = crrl::x448::x448_base(&recipient_private);
     let encapsulated = as_x448_array(enc.as_bytes(), KemKeyKind::Encapsulated)?;
-    let mut dh = x448_dh(&recipient_private, &encapsulated)?.to_vec();
+    let mut dh = Zeroizing::new(Vec::with_capacity(2 * X448_KEY_LEN));
+    dh.extend_from_slice(&x448_dh(&recipient_private[..], &encapsulated)?);
     let mut kem_context = Vec::with_capacity(X448_KEY_LEN * 3);
     kem_context.extend_from_slice(&encapsulated);
     kem_context.extend_from_slice(&recipient_public);
@@ -1304,8 +1410,8 @@ fn setup_x448_receiver(
         ReceiverMode::Psk { psk, psk_id } => (Mode::Psk, psk, psk_id),
         ReceiverMode::Auth { public_key } => {
             let sender_public = as_x448_array(public_key.as_bytes(), KemKeyKind::Public)?;
-            let static_dh = x448_dh(&recipient_private, &sender_public)?;
-            dh.extend_from_slice(&static_dh);
+            let static_dh = Zeroizing::new(x448_dh(&recipient_private[..], &sender_public)?);
+            dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
             (Mode::Auth, &[][..], &[][..])
         }
@@ -1315,8 +1421,8 @@ fn setup_x448_receiver(
             psk_id,
         } => {
             let sender_public = as_x448_array(public_key.as_bytes(), KemKeyKind::Public)?;
-            let static_dh = x448_dh(&recipient_private, &sender_public)?;
-            dh.extend_from_slice(&static_dh);
+            let static_dh = Zeroizing::new(x448_dh(&recipient_private[..], &sender_public)?);
+            dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
             (Mode::AuthPsk, psk, psk_id)
         }
@@ -1332,7 +1438,142 @@ fn setup_x448_receiver(
 
 #[cfg(test)]
 mod tests {
-    use super::{x448_dh, X448_KEY_LEN};
+    use super::*;
+
+    /// A tiny, deterministic xorshift64 PRNG used only to generate reproducible
+    /// fuzz-style byte strings for the no-panic sweeps below. It is not
+    /// cryptographically secure and must never be used outside `#[cfg(test)]`.
+    struct Xorshift64(u64);
+
+    impl Xorshift64 {
+        fn new(seed: u64) -> Self {
+            // xorshift64 requires a non-zero state.
+            Self(seed | 1)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+
+        fn fill(&mut self, buf: &mut [u8]) {
+            for chunk in buf.chunks_mut(8) {
+                let bytes = self.next_u64().to_le_bytes();
+                chunk.copy_from_slice(&bytes[..chunk.len()]);
+            }
+        }
+    }
+
+    const ALL_KEM_IDS: [KemId; 5] = [
+        KemId::DhKemP256HkdfSha256,
+        KemId::DhKemP384HkdfSha384,
+        KemId::DhKemP521HkdfSha512,
+        KemId::DhKemX25519HkdfSha256,
+        KemId::DhKemX448HkdfSha512,
+    ];
+
+    const fn matching_kdf_id(kem_id: KemId) -> KdfId {
+        match kem_id {
+            KemId::DhKemP256HkdfSha256 | KemId::DhKemX25519HkdfSha256 => KdfId::HkdfSha256,
+            KemId::DhKemP384HkdfSha384 => KdfId::HkdfSha384,
+            KemId::DhKemP521HkdfSha512 | KemId::DhKemX448HkdfSha512 => KdfId::HkdfSha512,
+        }
+    }
+
+    #[test]
+    fn contexts_are_send_and_sync() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<SenderContext>();
+        assert_send::<ReceiverContext>();
+        assert_sync::<SenderContext>();
+        assert_sync::<ReceiverContext>();
+    }
+
+    #[test]
+    fn kem_material_parsers_never_panic_across_lengths_and_random_bytes() {
+        // Generously larger than every registered KEM's longest RFC 9180
+        // encoding (DHKEM(P-521, ...)'s SEC1 uncompressed public key, at 133
+        // bytes, is the longest of the five).
+        const MAX_PROBED_LEN: usize = 160;
+
+        for kem_id in ALL_KEM_IDS {
+            let mut rng = Xorshift64::new(0x9E37_79B9_7F4A_7C15 ^ u64::from(kem_id.as_u16()));
+
+            // Exhaustively sweep every length from empty to one past the
+            // probed maximum, each time with fresh random content.
+            for len in 0..=(MAX_PROBED_LEN + 1) {
+                let mut bytes = vec![0_u8; len];
+                rng.fill(&mut bytes);
+
+                let _ = PublicKey::from_bytes(kem_id, &bytes);
+                let _ = PrivateKey::from_bytes(kem_id, &bytes);
+                let _ = EncapsulatedKey::from_bytes(kem_id, &bytes);
+            }
+
+            // A further batch of random lengths and random content, still
+            // fully deterministic given the seed above.
+            for _ in 0..256 {
+                let len = (rng.next_u64() as usize) % (MAX_PROBED_LEN + 2);
+                let mut bytes = vec![0_u8; len];
+                rng.fill(&mut bytes);
+
+                let _ = PublicKey::from_bytes(kem_id, &bytes);
+                let _ = PrivateKey::from_bytes(kem_id, &bytes);
+                let _ = EncapsulatedKey::from_bytes(kem_id, &bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn open_zeroizing_and_export_zeroizing_match_plain_variants_for_every_kem() {
+        for kem_id in ALL_KEM_IDS {
+            let suite = HpkeSuite::new(kem_id, matching_kdf_id(kem_id), AeadId::ChaCha20Poly1305);
+            let recipient = generate_key_pair(kem_id).unwrap();
+
+            let (enc, mut sender) =
+                setup_base_s(suite, &recipient.public_key, b"rfc9180 zeroizing parity").unwrap();
+            let mut receiver_for_open = setup_base_r(
+                suite,
+                &recipient.private_key,
+                &enc,
+                b"rfc9180 zeroizing parity",
+            )
+            .unwrap();
+            let mut receiver_for_open_zeroizing = setup_base_r(
+                suite,
+                &recipient.private_key,
+                &enc,
+                b"rfc9180 zeroizing parity",
+            )
+            .unwrap();
+
+            let ciphertext = sender.seal(b"aad", b"zeroizing parity payload").unwrap();
+
+            let plain_open = receiver_for_open.open(b"aad", &ciphertext).unwrap();
+            let zeroizing_open = receiver_for_open_zeroizing
+                .open_zeroizing(b"aad", &ciphertext)
+                .unwrap();
+            assert_eq!(plain_open, zeroizing_open.to_vec());
+            assert_eq!(plain_open, b"zeroizing parity payload");
+
+            let plain_export = sender.export(b"export-context", 48).unwrap();
+            let zeroizing_export = sender.export_zeroizing(b"export-context", 48).unwrap();
+            assert_eq!(plain_export, zeroizing_export.to_vec());
+
+            let plain_receiver_export = receiver_for_open.export(b"export-context", 48).unwrap();
+            let zeroizing_receiver_export = receiver_for_open
+                .export_zeroizing(b"export-context", 48)
+                .unwrap();
+            assert_eq!(plain_receiver_export, zeroizing_receiver_export.to_vec());
+            assert_eq!(plain_export, plain_receiver_export);
+        }
+    }
 
     fn x448_bytes(encoded: &str) -> [u8; X448_KEY_LEN] {
         let mut bytes = [0_u8; X448_KEY_LEN];

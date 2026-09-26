@@ -17,6 +17,7 @@ pub fn status_for(err: CryptoServiceError, config: &HttpConfig) -> StatusCode {
     match err {
         CryptoServiceError::Malformed => StatusCode::BAD_REQUEST,
         CryptoServiceError::AuthenticationFailed => StatusCode::UNPROCESSABLE_ENTITY,
+        CryptoServiceError::Unauthenticated => StatusCode::UNAUTHORIZED,
         CryptoServiceError::NotFound => StatusCode::NOT_FOUND,
         CryptoServiceError::Forbidden if config.hide_forbidden_keys => StatusCode::NOT_FOUND,
         CryptoServiceError::Forbidden => StatusCode::FORBIDDEN,

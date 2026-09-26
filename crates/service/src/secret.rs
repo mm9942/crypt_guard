@@ -11,7 +11,7 @@
 
 use core::fmt;
 
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Owned, zeroize-on-drop, non-`Clone` secret bytes.
 pub struct SecretBytes {
@@ -39,11 +39,43 @@ impl SecretBytes {
 
     /// Take ownership of a `Vec<u8>`.
     ///
-    /// Spare capacity is released first; memory left behind by earlier
-    /// reallocations of the vector cannot be erased, so build secret vectors
-    /// with their final capacity.
-    pub fn from_vec(secret: Vec<u8>) -> Self {
-        Self::from_boxed(secret.into_boxed_slice())
+    /// If the vector has spare capacity, `into_boxed_slice` would reallocate
+    /// and leave the secret behind, unzeroized, in the old allocation. So in
+    /// that case the bytes are copied into an exact allocation and the whole
+    /// source allocation (including spare capacity) is zeroized before it is
+    /// freed. Memory left behind by *earlier* reallocations of the vector
+    /// cannot be erased; build secret vectors with their final capacity.
+    pub fn from_vec(mut secret: Vec<u8>) -> Self {
+        if secret.capacity() == secret.len() {
+            // Exact fit: converting moves the allocation without copying.
+            return Self::from_boxed(secret.into_boxed_slice());
+        }
+        let exact = Self::copy_from_slice(&secret);
+        // `Vec<u8>::zeroize` clears the initialized bytes and the spare
+        // capacity of the allocation.
+        secret.zeroize();
+        exact
+    }
+
+    /// Concatenate chunks into one exactly sized secret, copying each byte
+    /// exactly once and never reallocating. Returns `None` if the total
+    /// length overflows `usize`.
+    ///
+    /// This is the ingress path for chunked network bodies: the chunks stay
+    /// where they are and only one zeroizing copy is made.
+    pub fn concat<C: AsRef<[u8]>>(chunks: &[C]) -> Option<Self> {
+        let total = chunks
+            .iter()
+            .try_fold(0usize, |acc, chunk| acc.checked_add(chunk.as_ref().len()))?;
+        let mut inner = Zeroizing::new(vec![0u8; total].into_boxed_slice());
+        let mut offset = 0;
+        for chunk in chunks {
+            let chunk = chunk.as_ref();
+            let end = offset + chunk.len();
+            inner[offset..end].copy_from_slice(chunk);
+            offset = end;
+        }
+        Some(Self { inner })
     }
 
     /// Number of secret bytes.

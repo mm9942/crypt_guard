@@ -24,7 +24,7 @@ default = [
 # ── Cryptographic core (mirrors crypt_guard_core features 1:1) ────────────────
 cgv2-compat              = ["crypt_guard_core/cgv2-compat"]
 ml-kem-backend           = ["crypt_guard_core/ml-kem-backend"]
-ml-dsa-backend           = ["crypt_guard_core/ml-dsa-backend"]
+ml-dsa-backend           = ["crypt_guard_core/ml-dsa-backend", "crypt_guard_service?/ml-dsa"]
 sign-slhdsa              = ["crypt_guard_core/sign-slhdsa"]
 legacy-pqclean           = ["crypt_guard_core/legacy-pqclean"]
 aes-gcm-siv-cipher       = ["crypt_guard_core/aes-gcm-siv-cipher"]
@@ -56,6 +56,10 @@ turboshake = { version = "=0.7.1", default-features = false, features = ["zeroiz
 zeroize = { version = "1.8.1", features = ["derive"] }
 
 # ── Example declarations ─────────────────────────────────────────────────────
+[[example]]
+name = "pq_hpke"
+path = "examples/pq_hpke.rs"
+
 [[example]]
 name = "encrypt_aes"
 path = "examples/encrypt_aes.rs"

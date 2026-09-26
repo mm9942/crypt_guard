@@ -1,11 +1,11 @@
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};
+// `KeyControlVariant` (legacy Kyber KEM dispatch) only exists with `legacy-pqclean`;
+// gate its import so this file compiles standalone under `aes-ctr` alone.
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::KeyControlVariant;
 use crate::{
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
-    },
     cryptography::{
         hmac_sign::{Operation, Sign, SignType},
         *,
@@ -117,7 +117,7 @@ impl CipherAesCtr {
             Operation::Sign,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
 
         let mut buf = data;
         cipher.apply_keystream(&mut buf);
@@ -144,7 +144,7 @@ impl CipherAesCtr {
             Operation::Verify,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
 
         //println!("Verified: {:?}", &data);
         let iv = self.iv();
@@ -152,6 +152,9 @@ impl CipherAesCtr {
     }
 }
 
+// The KEM-based `CryptographicFunctions` impl depends on `KeyControlVariant`
+// (legacy Kyber key control), so it is only available under `legacy-pqclean`.
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherAesCtr {
     /// Encrypts the provided data using the public key.
     ///

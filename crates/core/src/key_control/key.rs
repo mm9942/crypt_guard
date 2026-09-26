@@ -25,6 +25,7 @@
 
 use crate::error::CryptError;
 use crate::key_control::*;
+use std::fmt;
 use std::path::PathBuf;
 use zeroize::Zeroize;
 
@@ -36,12 +37,60 @@ use zeroize::Zeroize;
 ///
 /// # Concurrency
 /// `Clone + Send + Sync`.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone)]
 pub struct Key {
     /// The type of the key.
     key_type: KeyTypes,
     /// The raw key bytes.
     content: Vec<u8>,
+}
+
+/// Manual `Debug` impl that redacts secret-bearing content.
+///
+/// For `SecretKey` and `SharedSecret` key types, the raw bytes are never
+/// written to the formatter — only the key type and byte length are shown.
+/// Other key types (public key, ciphertext) are not secret and are printed
+/// as before.
+impl fmt::Debug for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.key_type {
+            KeyTypes::SecretKey | KeyTypes::SharedSecret => f
+                .debug_struct("Key")
+                .field("key_type", &self.key_type)
+                .field(
+                    "content",
+                    &format_args!("<redacted {} bytes>", self.content.len()),
+                )
+                .finish(),
+            _ => f
+                .debug_struct("Key")
+                .field("key_type", &self.key_type)
+                .field("content", &self.content)
+                .finish(),
+        }
+    }
+}
+
+/// Manual, constant-time `PartialEq` impl.
+///
+/// The byte comparison walks every byte of the longer buffer without
+/// short-circuiting on the first mismatch, so equality checks on secret key
+/// material do not leak timing information about *where* two keys differ.
+impl PartialEq for Key {
+    fn eq(&self, other: &Self) -> bool {
+        let type_eq = self.key_type == other.key_type;
+        let len_eq = self.content.len() == other.content.len();
+        let max_len = self.content.len().max(other.content.len());
+
+        let mut diff: u8 = 0;
+        for i in 0..max_len {
+            let a = self.content.get(i).copied().unwrap_or(0);
+            let b = other.content.get(i).copied().unwrap_or(0);
+            diff |= a ^ b;
+        }
+
+        type_eq && len_eq && diff == 0
+    }
 }
 
 impl Drop for Key {
@@ -76,7 +125,8 @@ impl Key {
     /// This replaces the old `optimize()` which called `.unwrap()` on pqcrypto conversions.
     /// If the byte slice does not match the expected key structure, the raw bytes are
     /// returned as-is (preserving the previous fallback behaviour).
-    fn validate_and_copy(key_type: &KeyTypes, content: Vec<u8>) -> Vec<u8> {
+    #[cfg_attr(not(feature = "legacy-pqclean"), allow(unused_mut))]
+    fn validate_and_copy(key_type: &KeyTypes, mut content: Vec<u8>) -> Vec<u8> {
         #[cfg(feature = "legacy-pqclean")]
         {
             use pqcrypto_kyber::kyber1024;
@@ -84,22 +134,32 @@ impl Key {
             match key_type {
                 KeyTypes::PublicKey => {
                     if let Ok(k) = kyber1024::PublicKey::from_bytes(&content) {
-                        return k.as_bytes().to_vec();
+                        let validated = k.as_bytes().to_vec();
+                        // The caller's buffer is superseded by `validated`; wipe it
+                        // before it is dropped so no stale copy of the key lingers.
+                        content.zeroize();
+                        return validated;
                     }
                 }
                 KeyTypes::SecretKey => {
                     if let Ok(k) = kyber1024::SecretKey::from_bytes(&content) {
-                        return k.as_bytes().to_vec();
+                        let validated = k.as_bytes().to_vec();
+                        content.zeroize();
+                        return validated;
                     }
                 }
                 KeyTypes::Ciphertext => {
                     if let Ok(k) = kyber1024::Ciphertext::from_bytes(&content) {
-                        return k.as_bytes().to_vec();
+                        let validated = k.as_bytes().to_vec();
+                        content.zeroize();
+                        return validated;
                     }
                 }
                 KeyTypes::SharedSecret => {
                     if let Ok(k) = kyber1024::SharedSecret::from_bytes(&content) {
-                        return k.as_bytes().to_vec();
+                        let validated = k.as_bytes().to_vec();
+                        content.zeroize();
+                        return validated;
                     }
                 }
                 _ => {}
@@ -243,6 +303,11 @@ impl Key {
         let pk = kyber1024::PublicKey::from_bytes(self.content()?)
             .map_err(|_| CryptError::InvalidKemPublicKey)?;
         let (ss, ct) = kyber1024::encapsulate(&pk);
+        // `ss.as_bytes().to_vec()` is passed straight into `Key::new_shared_secret`,
+        // which takes ownership of the buffer; `Key`'s `Drop` impl zeroizes it, so
+        // no separate leftover copy of the shared secret exists to scrub here. The
+        // opaque `ss`/`ct` values themselves expose no mutable byte access and
+        // cannot be zeroized directly.
         Ok((
             Key::new_ciphertext(ct.as_bytes().to_vec()),
             Key::new_shared_secret(ss.as_bytes().to_vec()),
@@ -281,11 +346,68 @@ impl Key {
             .map_err(|_| CryptError::InvalidKemSecretKey)?;
         let ss = kyber1024::decapsulate(&ct, &sk);
         use pqcrypto_traits::kem::SharedSecret as SST;
+        // See the comment in `encap_inner`: the `to_vec()` result is moved
+        // directly into `Key`, whose `Drop` impl zeroizes it on release.
         Ok(Key::new_shared_secret(ss.as_bytes().to_vec()))
     }
 
     #[cfg(not(feature = "legacy-pqclean"))]
     fn decap_inner(&self, _ciphertext: Key) -> Result<Key, CryptError> {
         Err(CryptError::UnsupportedOperation)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A distinctive byte pattern unlikely to appear by coincidence in the
+    /// `Debug` output unless the raw bytes are actually printed.
+    const MARKER: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0x13, 0x37, 0xCA, 0xFE];
+
+    #[test]
+    fn secret_key_debug_redacts_content() {
+        let key = Key::new_secret_key(MARKER.to_vec());
+        let debug_str = format!("{:?}", key);
+        assert!(
+            !debug_str.contains("222"),
+            "decimal byte leaked: {debug_str}"
+        );
+        assert!(!debug_str.contains("de, ad, be, ef"));
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+        assert!(debug_str.contains("SecretKey"));
+        assert!(debug_str.contains(&MARKER.len().to_string()));
+    }
+
+    #[test]
+    fn shared_secret_debug_redacts_content() {
+        let key = Key::new_shared_secret(MARKER.to_vec());
+        let debug_str = format!("{:?}", key);
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+        assert!(debug_str.contains("SharedSecret"));
+    }
+
+    #[test]
+    fn public_key_debug_still_shows_bytes() {
+        // Public keys are not secret; Debug output is unchanged from the
+        // previous derived behaviour.
+        let key = Key::new_public_key(MARKER.to_vec());
+        let debug_str = format!("{:?}", key);
+        assert!(debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+    }
+
+    #[test]
+    fn partial_eq_still_works() {
+        let a = Key::new_secret_key(MARKER.to_vec());
+        let b = Key::new_secret_key(MARKER.to_vec());
+        let mut c = MARKER.to_vec();
+        c[0] ^= 0xFF;
+        let c = Key::new_secret_key(c);
+
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+
+        let pub_a = Key::new_public_key(MARKER.to_vec());
+        assert_ne!(a, pub_a, "different key types must not compare equal");
     }
 }

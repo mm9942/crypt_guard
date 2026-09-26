@@ -14,6 +14,8 @@
 use core::convert::TryInto;
 use std::{error::Error as StdError, fmt};
 
+use zeroize::Zeroizing;
+
 pub use crate::hpke_pq::draft_ietf_hpke_pq_05_full::{
     derive_recipient_key_pair, generate_recipient_key_pair,
     setup_base_receiver as setup_base_receiver_inner, setup_base_sender as setup_base_sender_inner,
@@ -166,7 +168,25 @@ impl HpkeEnvelope {
     }
 
     /// Encode the versioned container.
+    ///
+    /// The encapsulation and ciphertext lengths are encoded as big-endian
+    /// `u32`s, so this record format supports encapsulation/ciphertext
+    /// buffers up to `u32::MAX` bytes each. In debug builds a `debug_assert!`
+    /// enforces that bound; in release builds a caller-supplied buffer larger
+    /// than that would silently truncate via `as u32`. Callers that cannot
+    /// prove ahead of time that this envelope stays within the bound (for
+    /// example, one rebuilt from untrusted or programmatically assembled
+    /// parts) should prefer the fallible [`Self::try_to_bytes`], which
+    /// returns [`EnvelopeError::InvalidEncoding`] instead of truncating.
     pub fn to_bytes(&self) -> Vec<u8> {
+        debug_assert!(
+            self.encapsulation.len() <= u32::MAX as usize,
+            "HpkeEnvelope::to_bytes: encapsulation length exceeds u32::MAX; use try_to_bytes"
+        );
+        debug_assert!(
+            self.ciphertext.len() <= u32::MAX as usize,
+            "HpkeEnvelope::to_bytes: ciphertext length exceeds u32::MAX; use try_to_bytes"
+        );
         let mut encoded =
             Vec::with_capacity(FIXED_HEADER_LEN + self.encapsulation.len() + self.ciphertext.len());
         encoded.extend_from_slice(&ENVELOPE_MAGIC);
@@ -179,6 +199,35 @@ impl HpkeEnvelope {
         encoded.extend_from_slice(&self.encapsulation);
         encoded.extend_from_slice(&self.ciphertext);
         encoded
+    }
+
+    /// Fallible variant of [`Self::to_bytes`].
+    ///
+    /// Returns [`EnvelopeError::InvalidEncoding`] instead of truncating when
+    /// the encapsulation or ciphertext length does not fit in the record's
+    /// 32-bit length fields (or, in principle, when the combined record
+    /// length would overflow `usize`).
+    pub fn try_to_bytes(&self) -> Result<Vec<u8>, EnvelopeError> {
+        if self.encapsulation.len() > u32::MAX as usize || self.ciphertext.len() > u32::MAX as usize
+        {
+            return Err(EnvelopeError::InvalidEncoding);
+        }
+        let total = FIXED_HEADER_LEN
+            .checked_add(self.encapsulation.len())
+            .and_then(|n| n.checked_add(self.ciphertext.len()))
+            .ok_or(EnvelopeError::InvalidEncoding)?;
+        let mut encoded = Vec::with_capacity(total);
+        encoded.extend_from_slice(&ENVELOPE_MAGIC);
+        encoded.extend_from_slice(&ENVELOPE_VERSION.to_be_bytes());
+        encoded.extend_from_slice(&self.suite.kem().id().to_be_bytes());
+        encoded.extend_from_slice(&self.suite.kdf().id().to_be_bytes());
+        encoded.extend_from_slice(&self.suite.aead().id().to_be_bytes());
+        encoded.extend_from_slice(&(self.encapsulation.len() as u32).to_be_bytes());
+        encoded.extend_from_slice(&(self.ciphertext.len() as u32).to_be_bytes());
+        encoded.extend_from_slice(&self.encapsulation);
+        encoded.extend_from_slice(&self.ciphertext);
+        debug_assert_eq!(encoded.len(), total);
+        Ok(encoded)
     }
 
     /// Parse a versioned container without attempting to decrypt it.
@@ -251,6 +300,10 @@ impl HpkeEnvelope {
     }
 
     /// Open one v3 transport record.  `info` and AAD must match the sender.
+    ///
+    /// The returned `Vec<u8>` is ordinary, non-zeroizing heap memory: it is
+    /// not wiped when dropped. Prefer [`Self::open_zeroizing`] whenever the
+    /// plaintext is sensitive, which is the common case for HPKE payloads.
     pub fn open(
         &self,
         recipient: &RecipientPrivateKey,
@@ -261,9 +314,82 @@ impl HpkeEnvelope {
         let mut receiver = setup_base_receiver_inner(self.suite, recipient, &encapsulation, info)?;
         receiver.open(aad, &self.ciphertext)
     }
+
+    /// Open one v3 transport record like [`Self::open`], returning the
+    /// plaintext wrapped in [`Zeroizing`].
+    ///
+    /// This calls [`Self::open`] and immediately moves its `Vec<u8>` result
+    /// into a `Zeroizing` wrapper, so the plaintext is never held in the
+    /// caller-visible, non-zeroizing form for longer than the single
+    /// intervening move. Note that `Zeroizing<Vec<u8>>` zeroizes the vector's
+    /// *entire allocated capacity* on drop (via `Vec`'s `Zeroize`
+    /// implementation), not just its logical length, which also covers any
+    /// spare capacity the underlying AEAD call may have left allocated.
+    pub fn open_zeroizing(
+        &self,
+        recipient: &RecipientPrivateKey,
+        info: &[u8],
+        aad: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, Error> {
+        self.open(recipient, info, aad).map(Zeroizing::new)
+    }
+
+    /// Decode a wire-format v3 envelope and open it in one step.
+    ///
+    /// This is a convenience that composes [`Self::from_bytes`] and
+    /// [`Self::open_zeroizing`], surfacing both fallible stages through a
+    /// single [`EnvelopeOpenError`].
+    pub fn open_bytes_zeroizing(
+        bytes: &[u8],
+        recipient: &RecipientPrivateKey,
+        info: &[u8],
+        aad: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, EnvelopeOpenError> {
+        let envelope = Self::from_bytes(bytes)?;
+        envelope
+            .open_zeroizing(recipient, info, aad)
+            .map_err(EnvelopeOpenError::from)
+    }
 }
 
-fn suite_from_ids(kem: u16, kdf: u16, aead: u16) -> Result<Suite, EnvelopeError> {
+/// Combined decode-then-open error for [`HpkeEnvelope::open_bytes_zeroizing`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnvelopeOpenError {
+    /// The wire bytes did not decode as a valid v3 envelope.
+    Envelope(EnvelopeError),
+    /// The envelope decoded, but the HPKE decapsulation/open step failed.
+    Hpke(Error),
+}
+
+impl fmt::Display for EnvelopeOpenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Envelope(e) => fmt::Display::fmt(e, f),
+            Self::Hpke(e) => fmt::Display::fmt(e, f),
+        }
+    }
+}
+
+impl StdError for EnvelopeOpenError {}
+
+impl From<EnvelopeError> for EnvelopeOpenError {
+    fn from(err: EnvelopeError) -> Self {
+        Self::Envelope(err)
+    }
+}
+
+impl From<Error> for EnvelopeOpenError {
+    fn from(err: Error) -> Self {
+        Self::Hpke(err)
+    }
+}
+
+/// Map wire-format v3 envelope identifiers to a [`Suite`].
+///
+/// Returns [`EnvelopeError::UnsupportedSuite`] carrying the offending raw
+/// identifiers if `kem`, `kdf`, or `aead` is not one of the values this v3
+/// profile recognizes.
+pub fn suite_from_ids(kem: u16, kdf: u16, aead: u16) -> Result<Suite, EnvelopeError> {
     let kem = match kem {
         0x0040 => Kem::MlKem512,
         0x0041 => Kem::MlKem768,
@@ -307,6 +433,13 @@ fn suite_from_ids(kem: u16, kdf: u16, aead: u16) -> Result<Suite, EnvelopeError>
     Ok(Suite::new(kem, kdf, aead))
 }
 
+/// The wire-format `(kem, kdf, aead)` identifier triple for `suite`, as used
+/// by the v3 envelope header. Inverse of [`suite_from_ids`] for any suite it
+/// can produce.
+pub const fn suite_ids(suite: Suite) -> (u16, u16, u16) {
+    (suite.kem().id(), suite.kdf().id(), suite.aead().id())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +478,278 @@ mod tests {
             parsed.open(keys.private_key(), b"i", b"a").unwrap(),
             b"payload"
         );
+    }
+
+    #[test]
+    fn wrong_aad_fails_authentication() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"info", b"aad", b"m").unwrap();
+        assert_eq!(
+            envelope.open(keys.private_key(), b"info", b"wrong-aad"),
+            Err(Error::AuthenticationFailed)
+        );
+    }
+
+    /// Assemble raw v3 envelope wire bytes from explicit field values,
+    /// independent of any consistency between the declared lengths and the
+    /// actual payload length -- used to craft malformed/truncated/oversized
+    /// records for negative tests.
+    fn craft_bytes_raw(
+        magic: [u8; 4],
+        version: u16,
+        kem: u16,
+        kdf: u16,
+        aead: u16,
+        enc_len: u32,
+        ct_len: u32,
+        payload: &[u8],
+    ) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&magic);
+        out.extend_from_slice(&version.to_be_bytes());
+        out.extend_from_slice(&kem.to_be_bytes());
+        out.extend_from_slice(&kdf.to_be_bytes());
+        out.extend_from_slice(&aead.to_be_bytes());
+        out.extend_from_slice(&enc_len.to_be_bytes());
+        out.extend_from_slice(&ct_len.to_be_bytes());
+        out.extend_from_slice(payload);
+        out
+    }
+
+    #[test]
+    fn unsupported_version_is_rejected() {
+        let (kem, kdf, aead) = suite_ids(DEFAULT_SUITE);
+        let bytes = craft_bytes_raw(ENVELOPE_MAGIC, 0xffff, kem, kdf, aead, 0, 0, &[]);
+        assert_eq!(
+            HpkeEnvelope::from_bytes(&bytes),
+            Err(EnvelopeError::UnsupportedVersion { actual: 0xffff })
+        );
+    }
+
+    #[test]
+    fn unsupported_kem_id_is_reported() {
+        let (_, kdf, aead) = suite_ids(DEFAULT_SUITE);
+        let bytes = craft_bytes_raw(
+            ENVELOPE_MAGIC,
+            ENVELOPE_VERSION,
+            0xdead,
+            kdf,
+            aead,
+            0,
+            0,
+            &[],
+        );
+        assert_eq!(
+            HpkeEnvelope::from_bytes(&bytes),
+            Err(EnvelopeError::UnsupportedSuite {
+                kem: 0xdead,
+                kdf,
+                aead
+            })
+        );
+    }
+
+    #[test]
+    fn unsupported_kdf_id_is_reported() {
+        let (kem, _, aead) = suite_ids(DEFAULT_SUITE);
+        let bytes = craft_bytes_raw(
+            ENVELOPE_MAGIC,
+            ENVELOPE_VERSION,
+            kem,
+            0xdead,
+            aead,
+            0,
+            0,
+            &[],
+        );
+        assert_eq!(
+            HpkeEnvelope::from_bytes(&bytes),
+            Err(EnvelopeError::UnsupportedSuite {
+                kem,
+                kdf: 0xdead,
+                aead
+            })
+        );
+    }
+
+    #[test]
+    fn unsupported_aead_id_is_reported() {
+        let (kem, kdf, _) = suite_ids(DEFAULT_SUITE);
+        let bytes = craft_bytes_raw(
+            ENVELOPE_MAGIC,
+            ENVELOPE_VERSION,
+            kem,
+            kdf,
+            0xdead,
+            0,
+            0,
+            &[],
+        );
+        assert_eq!(
+            HpkeEnvelope::from_bytes(&bytes),
+            Err(EnvelopeError::UnsupportedSuite {
+                kem,
+                kdf,
+                aead: 0xdead
+            })
+        );
+    }
+
+    #[test]
+    fn truncated_records_never_panic_and_always_err() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"i", b"a", b"payload").unwrap();
+        let encoded = envelope.to_bytes();
+        for len in 0..encoded.len() {
+            assert!(
+                HpkeEnvelope::from_bytes(&encoded[..len]).is_err(),
+                "truncation to {len} bytes unexpectedly parsed"
+            );
+        }
+        // The full-length record must still parse.
+        assert!(HpkeEnvelope::from_bytes(&encoded).is_ok());
+    }
+
+    #[test]
+    fn trailing_byte_is_rejected() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"i", b"a", b"payload").unwrap();
+        let mut encoded = envelope.to_bytes();
+        encoded.push(0);
+        assert_eq!(
+            HpkeEnvelope::from_bytes(&encoded),
+            Err(EnvelopeError::InvalidEncoding)
+        );
+    }
+
+    #[test]
+    fn huge_declared_lengths_never_panic_and_err() {
+        let (kem, kdf, aead) = suite_ids(DEFAULT_SUITE);
+        // Neither length matches the (empty) actual payload, and their sum
+        // must not panic via overflow even though each individually is huge.
+        for (enc_len, ct_len) in [
+            (0xFFFF_FFFFu32, 0u32),
+            (0u32, 0xFFFF_FFFFu32),
+            (0xFFFF_FFFFu32, 0xFFFF_FFFFu32),
+        ] {
+            let bytes = craft_bytes_raw(
+                ENVELOPE_MAGIC,
+                ENVELOPE_VERSION,
+                kem,
+                kdf,
+                aead,
+                enc_len,
+                ct_len,
+                &[],
+            );
+            assert!(HpkeEnvelope::from_bytes(&bytes).is_err());
+        }
+    }
+
+    #[test]
+    fn bit_flips_are_detected_for_multiple_suites() {
+        let suites = [
+            DEFAULT_SUITE,
+            Suite::new(Kem::MlKem768P256, Kdf::HkdfSha256, Aead::Aes128Gcm),
+        ];
+        for suite in suites {
+            let keys = generate_recipient_key_pair(suite.kem()).unwrap();
+
+            let mut tampered_enc =
+                HpkeEnvelope::seal(suite, keys.public_key(), b"info", b"aad", b"message").unwrap();
+            tampered_enc.encapsulation[0] ^= 0x01;
+            match tampered_enc.open(keys.private_key(), b"info", b"aad") {
+                Err(Error::AuthenticationFailed) | Err(Error::InvalidEncapsulation) => {}
+                other => panic!("suite {suite:?}: expected tamper detection, got {other:?}"),
+            }
+
+            let mut tampered_ct =
+                HpkeEnvelope::seal(suite, keys.public_key(), b"info", b"aad", b"message").unwrap();
+            let last = tampered_ct.ciphertext.len() - 1;
+            tampered_ct.ciphertext[last] ^= 0x01;
+            assert_eq!(
+                tampered_ct.open(keys.private_key(), b"info", b"aad"),
+                Err(Error::AuthenticationFailed),
+                "suite {suite:?}: ciphertext tamper was not detected as AuthenticationFailed"
+            );
+        }
+    }
+
+    #[test]
+    fn open_zeroizing_matches_open() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"i", b"a", b"payload").unwrap();
+        let plain = envelope.open(keys.private_key(), b"i", b"a").unwrap();
+        let zeroizing = envelope
+            .open_zeroizing(keys.private_key(), b"i", b"a")
+            .unwrap();
+        assert_eq!(plain.as_slice(), zeroizing.as_slice());
+
+        let bytes = envelope.to_bytes();
+        let via_bytes =
+            HpkeEnvelope::open_bytes_zeroizing(&bytes, keys.private_key(), b"i", b"a").unwrap();
+        assert_eq!(plain.as_slice(), via_bytes.as_slice());
+    }
+
+    #[test]
+    fn try_to_bytes_matches_to_bytes() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"i", b"a", b"payload").unwrap();
+        assert_eq!(envelope.to_bytes(), envelope.try_to_bytes().unwrap());
+    }
+
+    #[test]
+    fn suite_from_ids_round_trips_default_suite() {
+        let (kem, kdf, aead) = suite_ids(DEFAULT_SUITE);
+        assert_eq!(suite_from_ids(kem, kdf, aead).unwrap(), DEFAULT_SUITE);
+    }
+
+    /// Minimal deterministic xorshift64 PRNG so the fuzz-style test below is
+    /// reproducible without pulling in a `rand` dependency.
+    struct XorShift64(u64);
+
+    impl XorShift64 {
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+
+        fn next_byte(&mut self) -> u8 {
+            (self.next_u64() & 0xff) as u8
+        }
+    }
+
+    #[test]
+    fn random_bytes_never_panic_in_from_bytes() {
+        let mut rng = XorShift64(0x9E37_79B9_7F4A_7C15);
+        for i in 0..10_000u32 {
+            let len = (rng.next_u64() % 96) as usize;
+            let mut buf = Vec::with_capacity(len);
+            for _ in 0..len {
+                buf.push(rng.next_byte());
+            }
+            // Fully random buffer: exercises the magic/version/length checks.
+            let _ = HpkeEnvelope::from_bytes(&buf);
+
+            // Same random tail, but behind a valid "CGH3" prefix: exercises
+            // version/suite/length parsing paths past the magic check.
+            let mut prefixed = ENVELOPE_MAGIC.to_vec();
+            prefixed.extend_from_slice(&buf);
+            let _ = HpkeEnvelope::from_bytes(&prefixed);
+            if i % 997 == 0 {
+                // Occasionally also round-trip through try_to_bytes-shaped
+                // sizes to make sure nothing panics on odd small lengths.
+                let _ = HpkeEnvelope::from_bytes(&prefixed[..prefixed.len().min(24)]);
+            }
+        }
     }
 }

@@ -1252,3 +1252,93 @@ fn encrypt_file_XChaCha20_Kyber512() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+// Merged from the orphaned kyber_tests.rs: encryption-only (no round-trip via
+// separate encrypt/decrypt macro helpers) coverage for AES-XTS that the rest of
+// this file did not otherwise exercise for `Data` content.
+#[test]
+fn encrypt_data_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = [5u8; 0x400];
+    let passphrase = "Test Passphrase";
+
+    // Generate key pair
+    let (public_key, secret_key) =
+        KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+    // Instantiate Kyber for encryption with Kyber1024
+    let mut encryptor =
+        Kyber::<Encryption, Kyber1024, Data, AesXts>::new(public_key.clone(), None)?;
+
+    // Encrypt message
+    let (encrypt_message, cipher) = encryptor.encrypt_data(message.to_vec(), passphrase)?;
+
+    // Instantiate Kyber for decryption with Kyber1024
+    let decryptor = Kyber::<Decryption, Kyber1024, Data, AesXts>::new(secret_key, None)?;
+
+    // Decrypt message
+    let decrypt_message =
+        decryptor.decrypt_data(encrypt_message.clone(), passphrase, cipher.to_owned())?;
+
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypt_message, message);
+
+    Ok(())
+}
+
+// Merged from the orphaned kyber_tests.rs: AES-XTS file round-trip, which the
+// rest of this file did not otherwise cover for `Files` content.
+#[test]
+fn encrypt_file_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
+    let message = "Hey, how are you doing?";
+
+    let tmp_dir = Builder::new()
+        .prefix("messages")
+        .tempdir()
+        .map_err(CryptError::from)?;
+
+    let enc_path = tmp_dir.path().join("message.txt");
+    let dec_path = tmp_dir.path().join("message.txt.enc");
+
+    fs::write(&enc_path, message.as_bytes())?;
+
+    let passphrase = "Test Passphrase";
+
+    // Generate key pair
+    let (public_key, secret_key) =
+        KeyControKyber1024::keypair().expect("Failed to generate keypair");
+
+    // Instantiate Kyber for encryption with Kyber1024
+    let mut encryptor =
+        Kyber::<Encryption, Kyber1024, Files, AesXts>::new(public_key.clone(), None)?;
+
+    // Encrypt message
+    let (_encrypt_message, cipher) = encryptor.encrypt_file(enc_path.clone(), passphrase)?;
+
+    let _ = fs::remove_file(enc_path.clone());
+
+    // Instantiate Kyber for decryption with Kyber1024
+    let decryptor = Kyber::<Decryption, Kyber1024, Files, AesXts>::new(secret_key, None)?;
+
+    // Decrypt message
+    let decrypt_message =
+        decryptor.decrypt_file(dec_path.clone(), passphrase, cipher.to_owned())?;
+
+    // Convert Vec<u8> to String for comparison
+    let decrypted_text =
+        String::from_utf8(decrypt_message).expect("Failed to convert decrypted message to string");
+
+    // Assert that the decrypted message matches the original message
+    assert_eq!(decrypted_text, message);
+
+    assert!(
+        enc_path.exists(),
+        "Decrypted file should exist after decryption."
+    );
+    let decrypted_message = fs::read_to_string(&enc_path)?;
+    assert_eq!(
+        decrypted_message, message,
+        "Decrypted message should match the original message."
+    );
+
+    Ok(())
+}

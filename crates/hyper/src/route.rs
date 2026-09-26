@@ -5,7 +5,7 @@
 //! GET  /v1/keys/{namespace}/{id}[@version]         describe
 //! GET  /v1/keys/{namespace}/{id}[@version]/public  public key
 //! POST /v1/keys/{namespace}/{id}[@version]:{op}    encrypt | decrypt | sign | verify |
-//!                                                rotate | disable | destroy |
+//!                                                rotate | disable | enable | destroy |
 //!                                                wrap | unwrap | rewrap
 //! ```
 //!
@@ -39,6 +39,8 @@ pub enum RouteOp {
     Rotate,
     /// `POST …:disable`
     Disable,
+    /// `POST …:enable`
+    Enable,
     /// `POST …:destroy`
     Destroy,
     /// `POST …:wrap`
@@ -58,6 +60,7 @@ impl RouteOp {
             "verify" => Self::Verify,
             "rotate" => Self::Rotate,
             "disable" => Self::Disable,
+            "enable" => Self::Enable,
             "destroy" => Self::Destroy,
             "wrap" => Self::Wrap,
             "unwrap" => Self::Unwrap,
@@ -74,6 +77,7 @@ impl RouteOp {
             | Self::PublicKey
             | Self::Rotate
             | Self::Disable
+            | Self::Enable
             | Self::Destroy => limits.metadata,
             Self::Sign | Self::Verify => limits.sign,
             Self::Encrypt | Self::Decrypt => limits.crypt,

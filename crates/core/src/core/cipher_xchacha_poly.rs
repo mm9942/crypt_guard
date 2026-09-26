@@ -145,7 +145,7 @@ impl CipherChaChaPoly {
             Operation::Sign,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         let encrypted = cipher
             .encrypt(nonce, &*data)
             .map_err(|e| CryptError::new(e.to_string().as_str()))?;
@@ -176,7 +176,7 @@ impl CipherChaChaPoly {
             Operation::Verify,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         let nonce = *self.nonce();
         Ok((data, nonce))
     }
@@ -196,7 +196,10 @@ impl CryptographicFunctions for CipherChaChaPoly {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let (sharedsecret, ciphertext) = key.encap(&public_key)?;
         let _ = self.set_shared_secret(sharedsecret);
+        // File mode: read the plaintext file, then persist `<file>.enc`.
+        self.infos.load_file_content()?;
         let (encrypted_data, nonce) = self.encryption()?;
+        self.infos.persist_file_output(&encrypted_data)?;
         println!("Please write down this nonce: {}", hex::encode(nonce));
         Ok((encrypted_data, ciphertext))
     }
@@ -213,7 +216,9 @@ impl CryptographicFunctions for CipherChaChaPoly {
         let key = KeyControlVariant::new(self.infos.metadata.key_type()?);
         let sharedsecret = key.decap(&secret_key, &ciphertext)?;
         let _ = self.set_shared_secret(sharedsecret);
+        self.infos.load_file_content()?;
         let (decrypted_data, _nonce) = self.decryption()?;
+        self.infos.persist_file_output(&decrypted_data)?;
         Ok(decrypted_data)
     }
 }

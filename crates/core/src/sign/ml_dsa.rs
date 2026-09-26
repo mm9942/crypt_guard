@@ -39,7 +39,7 @@ use ml_dsa::Keypair as MlDsaKeypairTrait;
 use crate::error::CryptError;
 use crate::kem::backend::rand_core_010;
 use crate::sign::algorithm::SignAlgorithm;
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// ML-DSA signing key newtype (secret; `ZeroizeOnDrop`).
 ///
@@ -123,11 +123,20 @@ macro_rules! impl_ml_dsa {
             fn keypair(
                 rng: &mut impl rand_core_010::CryptoRng,
             ) -> Result<(Self::SigningKey, Self::VerifyingKey), CryptError> {
+                // `sk` (the SigningKey itself) implements `ZeroizeOnDrop` (its seed and
+                // expanded-key fields are wiped when it goes out of scope at the end of
+                // this function, since the `ml-dsa` `zeroize` feature is enabled).
                 let sk: SigningKey<$param> = Generate::generate_from_rng(rng);
                 // MlDsaKeypairTrait provides .verifying_key()
                 let vk: VerifyingKey<$param> = MlDsaKeypairTrait::verifying_key(&sk);
                 // Serialize: signing key as seed (32 bytes), verifying key as encoded bytes.
-                let sk_bytes = KeyExport::to_bytes(&sk).as_slice().to_vec();
+                // `KeyExport::to_bytes(&sk)` returns a stack-allocated `Array` holding the
+                // secret 32-byte seed; copy it into the returned `Vec` and then wipe the
+                // `Array` temporary explicitly rather than relying only on its eventual
+                // stack reuse.
+                let mut sk_seed = KeyExport::to_bytes(&sk);
+                let sk_bytes = sk_seed.as_slice().to_vec();
+                sk_seed.as_mut_slice().zeroize();
                 let vk_bytes = KeyExport::to_bytes(&vk).as_slice().to_vec();
                 Ok((
                     MlDsaSigningKey::from_bytes(sk_bytes),
@@ -136,6 +145,9 @@ macro_rules! impl_ml_dsa {
             }
 
             fn sign(sk: &Self::SigningKey, message: &[u8]) -> Result<Self::Sig, CryptError> {
+                // `signing_key` is re-parsed from the stored seed on every call; it
+                // implements `ZeroizeOnDrop` (via the `ml-dsa` `zeroize` feature) and is
+                // wiped automatically when it drops at the end of this function.
                 let signing_key = SigningKey::<$param>::new_from_slice(sk.as_bytes())
                     .map_err(|_| CryptError::SigningFailed)?;
                 let sig: Signature<$param> = Signer::sign(&signing_key, message);
@@ -183,3 +195,98 @@ pub struct MlDsa87Impl;
 impl_ml_dsa!(MlDsa44Impl, MlDsa44);
 impl_ml_dsa!(MlDsa65Impl, MlDsa65);
 impl_ml_dsa!(MlDsa87Impl, MlDsa87);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kem::backend::OsRng;
+
+    const MESSAGE: &[u8] = b"CryptGuard ML-DSA test message";
+
+    fn sign_verify_round_trip<A: SignAlgorithm>() {
+        let mut rng = OsRng;
+        let (sk, vk) = A::keypair(&mut rng).expect("keypair generation should succeed");
+        let sig = A::sign(&sk, MESSAGE).expect("signing should succeed");
+        A::verify(&vk, MESSAGE, &sig).expect("signature should verify against the signed message");
+    }
+
+    fn tampered_message_is_rejected<A: SignAlgorithm>() {
+        let mut rng = OsRng;
+        let (sk, vk) = A::keypair(&mut rng).expect("keypair generation should succeed");
+        let sig = A::sign(&sk, MESSAGE).expect("signing should succeed");
+        assert!(
+            A::verify(&vk, b"a different, tampered message", &sig).is_err(),
+            "verification must fail for a message that was not signed"
+        );
+    }
+
+    /// Not generic over `A: SignAlgorithm`, because it needs to construct a
+    /// concrete `MlDsaSignature` (`A::Sig` is an opaque associated type from the
+    /// caller's point of view, even though every `MlDsa*Impl` happens to use the
+    /// same concrete `Sig` type).
+    fn tampered_signature_is_rejected<A>(sk: &A::SigningKey, vk: &A::VerifyingKey)
+    where
+        A: SignAlgorithm<Sig = MlDsaSignature>,
+    {
+        let sig = A::sign(sk, MESSAGE).expect("signing should succeed");
+        let mut bad_sig_bytes = sig.as_ref().to_vec();
+        // Flip a bit in the first byte to corrupt the signature.
+        bad_sig_bytes[0] ^= 0x01;
+        let bad_sig = MlDsaSignature::from_bytes(bad_sig_bytes);
+        assert!(
+            A::verify(vk, MESSAGE, &bad_sig).is_err(),
+            "verification must fail for a tampered signature"
+        );
+    }
+
+    #[test]
+    fn ml_dsa_44_sign_verify_round_trip() {
+        sign_verify_round_trip::<MlDsa44Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_65_sign_verify_round_trip() {
+        sign_verify_round_trip::<MlDsa65Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_87_sign_verify_round_trip() {
+        sign_verify_round_trip::<MlDsa87Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_44_tampered_message_rejected() {
+        tampered_message_is_rejected::<MlDsa44Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_65_tampered_message_rejected() {
+        tampered_message_is_rejected::<MlDsa65Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_87_tampered_message_rejected() {
+        tampered_message_is_rejected::<MlDsa87Impl>();
+    }
+
+    #[test]
+    fn ml_dsa_44_tampered_signature_rejected() {
+        let mut rng = OsRng;
+        let (sk, vk) = MlDsa44Impl::keypair(&mut rng).expect("keypair generation");
+        tampered_signature_is_rejected::<MlDsa44Impl>(&sk, &vk);
+    }
+
+    #[test]
+    fn ml_dsa_65_tampered_signature_rejected() {
+        let mut rng = OsRng;
+        let (sk, vk) = MlDsa65Impl::keypair(&mut rng).expect("keypair generation");
+        tampered_signature_is_rejected::<MlDsa65Impl>(&sk, &vk);
+    }
+
+    #[test]
+    fn ml_dsa_87_tampered_signature_rejected() {
+        let mut rng = OsRng;
+        let (sk, vk) = MlDsa87Impl::keypair(&mut rng).expect("keypair generation");
+        tampered_signature_is_rejected::<MlDsa87Impl>(&sk, &vk);
+    }
+}

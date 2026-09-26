@@ -320,6 +320,210 @@ impl From<SigningErr> for CryptError {
     }
 }
 
+// ── HPKE subsystem conversions ─────────────────────────────────────────────────
+//
+// The impls below adapt every HPKE-family error type in this crate onto the
+// existing [`CryptError`] variants above. No new `CryptError` variant is added.
+//
+// All authentication-failure variants across every source type below map onto
+// the single [`CryptError::AuthenticationFailed`] variant, so no caller can use
+// the mapped `CryptError` to distinguish *why* an AEAD/KEM authentication check
+// failed (ciphertext vs. AAD vs. key vs. a same-size tampered KEM encapsulation
+// rejected implicitly). This preserves the no-oracle guarantees documented on
+// the source error types themselves.
+//
+// ── `crate::hpke_pq::draft_ietf_hpke_pq_05_full::Error` ────────────────────────
+// (the same type is re-exported as `crate::pq_hpke::Error`; one `impl` covers
+// both paths since they name the identical type)
+//
+// | Source variant                        | `CryptError` variant        |
+// |----------------------------------------|-----------------------------|
+// | `UnavailableCapability { .. }`         | `UnsupportedAlgorithm`      |
+// | `KemMismatch { .. }`                   | `InvalidKeyType`            |
+// | `InvalidRecipientPublicKey`            | `InvalidKemPublicKey`       |
+// | `InvalidRecipientPrivateKey`           | `InvalidKemSecretKey`       |
+// | `InvalidEncapsulation`                 | `InvalidKemCiphertext`      |
+// | `InvalidPskInputs { .. }`              | `InvalidParameters`         |
+// | `OutputLengthTooLarge { .. }`          | `InvalidParameters`         |
+// | `InputLengthTooLarge { .. }`           | `InvalidParameters`         |
+// | `ExportOnlyAead`                       | `UnsupportedAlgorithm`      |
+// | `AuthenticationFailed`                 | `AuthenticationFailed`      |
+// | `MessageLimitReached`                  | `InvalidNonce`              |
+// | `InternalInvariant`                    | `CustomError` (message kept)|
+impl From<crate::hpke_pq::draft_ietf_hpke_pq_05_full::Error> for CryptError {
+    fn from(err: crate::hpke_pq::draft_ietf_hpke_pq_05_full::Error) -> Self {
+        use crate::hpke_pq::draft_ietf_hpke_pq_05_full::Error as E;
+        match err {
+            E::UnavailableCapability { .. } => CryptError::UnsupportedAlgorithm,
+            E::KemMismatch { .. } => CryptError::InvalidKeyType,
+            E::InvalidRecipientPublicKey => CryptError::InvalidKemPublicKey,
+            E::InvalidRecipientPrivateKey => CryptError::InvalidKemSecretKey,
+            E::InvalidEncapsulation => CryptError::InvalidKemCiphertext,
+            E::InvalidPskInputs { .. } => CryptError::InvalidParameters,
+            E::OutputLengthTooLarge { .. } => CryptError::InvalidParameters,
+            E::InputLengthTooLarge { .. } => CryptError::InvalidParameters,
+            E::ExportOnlyAead => CryptError::UnsupportedAlgorithm,
+            E::AuthenticationFailed => CryptError::AuthenticationFailed,
+            E::MessageLimitReached => CryptError::InvalidNonce,
+            E::InternalInvariant => CryptError::CustomError(err_to_internal_message(&err)),
+        }
+    }
+}
+
+// ── `crate::hpke_pq::draft_ietf_hpke_pq_05::Error` (older, distinct type) ──────
+//
+// | Source variant                        | `CryptError` variant        |
+// |----------------------------------------|-----------------------------|
+// | `InvalidRecipientPublicKey`            | `InvalidKemPublicKey`       |
+// | `InvalidRecipientPrivateKey`           | `InvalidKemSecretKey`       |
+// | `InvalidEncapsulation`                 | `InvalidKemCiphertext`      |
+// | `ProfileMismatch { .. }`               | `InvalidKeyType`            |
+// | `AuthenticationFailed`                 | `AuthenticationFailed`      |
+// | `OutputLengthTooLarge { .. }`          | `InvalidParameters`         |
+// | `MessageLimitReached`                  | `InvalidNonce`              |
+// | `InternalFailure`                      | `CustomError` (message kept)|
+impl From<crate::hpke_pq::draft_ietf_hpke_pq_05::Error> for CryptError {
+    fn from(err: crate::hpke_pq::draft_ietf_hpke_pq_05::Error) -> Self {
+        use crate::hpke_pq::draft_ietf_hpke_pq_05::Error as E;
+        match err {
+            E::InvalidRecipientPublicKey => CryptError::InvalidKemPublicKey,
+            E::InvalidRecipientPrivateKey => CryptError::InvalidKemSecretKey,
+            E::InvalidEncapsulation => CryptError::InvalidKemCiphertext,
+            E::ProfileMismatch { .. } => CryptError::InvalidKeyType,
+            E::AuthenticationFailed => CryptError::AuthenticationFailed,
+            E::OutputLengthTooLarge { .. } => CryptError::InvalidParameters,
+            E::MessageLimitReached => CryptError::InvalidNonce,
+            E::InternalFailure => {
+                CryptError::CustomError(format!("HPKE PQ draft-05 internal error: {}", err))
+            }
+        }
+    }
+}
+
+// ── `crate::pq_hpke::EnvelopeError` ─────────────────────────────────────────────
+//
+// | Source variant                | `CryptError` variant        |
+// |--------------------------------|-----------------------------|
+// | `InvalidMagic`                 | `InvalidEnvelope`           |
+// | `UnsupportedVersion { .. }`    | `UnsupportedEnvelopeVersion`|
+// | `UnsupportedSuite { .. }`      | `UnsupportedAlgorithm`      |
+// | `InvalidEncoding`              | `InvalidEnvelope`           |
+impl From<crate::pq_hpke::EnvelopeError> for CryptError {
+    fn from(err: crate::pq_hpke::EnvelopeError) -> Self {
+        use crate::pq_hpke::EnvelopeError as E;
+        match err {
+            E::InvalidMagic => CryptError::InvalidEnvelope,
+            E::UnsupportedVersion { .. } => CryptError::UnsupportedEnvelopeVersion,
+            E::UnsupportedSuite { .. } => CryptError::UnsupportedAlgorithm,
+            E::InvalidEncoding => CryptError::InvalidEnvelope,
+        }
+    }
+}
+
+// ── `crate::hpke::HpkeError` (RFC 9180 foundation primitives) ──────────────────
+//
+// | Source variant                        | `CryptError` variant        |
+// |----------------------------------------|-----------------------------|
+// | `OutputLengthTooLarge { .. }`          | `InvalidParameters`         |
+// | `InvalidPseudorandomKeyLength { .. }`  | `InvalidParameters`         |
+// | `HkdfOutputLengthTooLarge { .. }`      | `InvalidParameters`         |
+// | `InvalidPskInputs { .. }`              | `InvalidParameters`         |
+// | `UnsupportedKeyScheduleMode { .. }`    | `UnsupportedOperation`      |
+// | `MessageLimitReached`                  | `InvalidNonce`              |
+// | `ExportOnlyAead`                       | `UnsupportedAlgorithm`      |
+// | `UnsupportedAead { .. }`               | `UnsupportedAlgorithm`      |
+// | `InvalidAeadKeyLength { .. }`          | `InvalidDataLength`         |
+// | `InvalidAeadNonceLength { .. }`        | `InvalidNonce`              |
+// | `AuthenticationFailed`                 | `AuthenticationFailed`      |
+impl From<crate::hpke::HpkeError> for CryptError {
+    fn from(err: crate::hpke::HpkeError) -> Self {
+        use crate::hpke::HpkeError as E;
+        match err {
+            E::OutputLengthTooLarge { .. } => CryptError::InvalidParameters,
+            E::InvalidPseudorandomKeyLength { .. } => CryptError::InvalidParameters,
+            E::HkdfOutputLengthTooLarge { .. } => CryptError::InvalidParameters,
+            E::InvalidPskInputs { .. } => CryptError::InvalidParameters,
+            E::UnsupportedKeyScheduleMode { .. } => CryptError::UnsupportedOperation,
+            E::MessageLimitReached => CryptError::InvalidNonce,
+            E::ExportOnlyAead => CryptError::UnsupportedAlgorithm,
+            E::UnsupportedAead { .. } => CryptError::UnsupportedAlgorithm,
+            E::InvalidAeadKeyLength { .. } => CryptError::InvalidDataLength,
+            E::InvalidAeadNonceLength { .. } => CryptError::InvalidNonce,
+            E::AuthenticationFailed => CryptError::AuthenticationFailed,
+        }
+    }
+}
+
+// ── `crate::hpke::rfc9180::Rfc9180Error` (complete RFC 9180 setup layer) ───────
+//
+// | Source variant                        | `CryptError` variant                       |
+// |----------------------------------------|--------------------------------------------|
+// | `KemMismatch { .. }`                   | `InvalidKeyType`                           |
+// | `InvalidKemEncoding { kind: Public, .. }`   | `InvalidKemPublicKey`                  |
+// | `InvalidKemEncoding { kind: Private, .. }`  | `InvalidKemSecretKey`                  |
+// | `InvalidKemEncoding { kind: Encapsulated, .. }` | `InvalidKemCiphertext`             |
+// | `InvalidPskInputs { .. }`              | `InvalidParameters`                        |
+// | `ExportOnlyAead`                       | `UnsupportedAlgorithm`                     |
+// | `EncapsulationFailed`                  | `EncapsulationError`                       |
+// | `DecapsulationFailed`                  | `DecapsulationError`                       |
+// | `InvalidDhSharedSecret`                | `InvalidKemPublicKey` (degenerate DH input)|
+// | `AuthenticationFailed`                 | `AuthenticationFailed`                     |
+// | `MessageLimitReached`                  | `InvalidNonce`                             |
+// | `ExportLengthTooLarge`                 | `InvalidParameters`                        |
+// | `SealFailed`                           | `EncryptionFailed`                         |
+impl From<crate::hpke::rfc9180::Rfc9180Error> for CryptError {
+    fn from(err: crate::hpke::rfc9180::Rfc9180Error) -> Self {
+        use crate::hpke::rfc9180::{KemKeyKind, Rfc9180Error as E};
+        match err {
+            E::KemMismatch { .. } => CryptError::InvalidKeyType,
+            E::InvalidKemEncoding { kind, .. } => match kind {
+                KemKeyKind::Public => CryptError::InvalidKemPublicKey,
+                KemKeyKind::Private => CryptError::InvalidKemSecretKey,
+                KemKeyKind::Encapsulated => CryptError::InvalidKemCiphertext,
+            },
+            E::InvalidPskInputs { .. } => CryptError::InvalidParameters,
+            E::ExportOnlyAead => CryptError::UnsupportedAlgorithm,
+            E::EncapsulationFailed => CryptError::EncapsulationError,
+            E::DecapsulationFailed => CryptError::DecapsulationError,
+            E::InvalidDhSharedSecret => CryptError::InvalidKemPublicKey,
+            E::AuthenticationFailed => CryptError::AuthenticationFailed,
+            E::MessageLimitReached => CryptError::InvalidNonce,
+            E::ExportLengthTooLarge => CryptError::InvalidParameters,
+            E::SealFailed => CryptError::EncryptionFailed,
+        }
+    }
+}
+
+// ── `crate::signed_hpke::SignedHpkeError` (application-layer envelope signing) ─
+//
+// | Source variant                | `CryptError` variant                          |
+// |--------------------------------|-----------------------------------------------|
+// | `UnsupportedVersion { .. }`    | `UnsupportedEnvelopeVersion`                  |
+// | `FieldTooLong { .. }`          | `InvalidEnvelope`                             |
+// | `Signing(e)`                   | `e` itself (already a `CryptError`)           |
+// | `SignatureVerification(e)`     | `e` itself (already a `CryptError`)           |
+impl From<crate::signed_hpke::SignedHpkeError> for CryptError {
+    fn from(err: crate::signed_hpke::SignedHpkeError) -> Self {
+        use crate::signed_hpke::SignedHpkeError as E;
+        match err {
+            E::UnsupportedVersion { .. } => CryptError::UnsupportedEnvelopeVersion,
+            E::FieldTooLong { .. } => CryptError::InvalidEnvelope,
+            E::Signing(inner) => inner,
+            E::SignatureVerification(inner) => inner,
+        }
+    }
+}
+
+/// Format an internal-invariant HPKE PQ error for [`CryptError::CustomError`].
+///
+/// # Description
+/// Used only for the rare "this should be unreachable" internal-invariant
+/// variants, which carry no cryptographic detail of their own and are never
+/// used to classify attacker-controlled input.
+fn err_to_internal_message(err: &crate::hpke_pq::draft_ietf_hpke_pq_05_full::Error) -> String {
+    format!("HPKE PQ draft-05 (full) internal error: {}", err)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Digital signature subsystem error type.
@@ -441,5 +645,258 @@ impl From<io::Error> for SigningErr {
 impl From<pqcrypto_traits::Error> for SigningErr {
     fn from(_: pqcrypto_traits::Error) -> Self {
         SigningErr::SignatureVerificationFailed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CryptError;
+
+    // ── `draft_ietf_hpke_pq_05_full::Error` (== `pq_hpke::Error`) ──────────────
+
+    #[test]
+    fn full_error_representative_mappings() {
+        use crate::hpke_pq::draft_ietf_hpke_pq_05_full::{Aead, Error, Kdf, Kem, Suite};
+
+        assert!(matches!(
+            CryptError::from(Error::InvalidRecipientPublicKey),
+            CryptError::InvalidKemPublicKey
+        ));
+        assert!(matches!(
+            CryptError::from(Error::InvalidRecipientPrivateKey),
+            CryptError::InvalidKemSecretKey
+        ));
+        assert!(matches!(
+            CryptError::from(Error::InvalidEncapsulation),
+            CryptError::InvalidKemCiphertext
+        ));
+        assert!(matches!(
+            CryptError::from(Error::UnavailableCapability {
+                suite: Suite::new(Kem::MlKem1024P384, Kdf::Shake256, Aead::ChaCha20Poly1305),
+                reason: "test",
+            }),
+            CryptError::UnsupportedAlgorithm
+        ));
+        assert!(matches!(
+            CryptError::from(Error::ExportOnlyAead),
+            CryptError::UnsupportedAlgorithm
+        ));
+        assert!(matches!(
+            CryptError::from(Error::KemMismatch {
+                expected: Kem::MlKem1024,
+                actual: Kem::MlKem768,
+            }),
+            CryptError::InvalidKeyType
+        ));
+        assert!(matches!(
+            CryptError::from(Error::MessageLimitReached),
+            CryptError::InvalidNonce
+        ));
+        assert!(matches!(
+            CryptError::from(Error::InternalInvariant),
+            CryptError::CustomError(_)
+        ));
+    }
+
+    // ── `draft_ietf_hpke_pq_05::Error` (older, distinct type) ──────────────────
+
+    #[test]
+    fn draft05_error_representative_mappings() {
+        use crate::hpke_pq::draft_ietf_hpke_pq_05::{Error, Profile};
+
+        assert!(matches!(
+            CryptError::from(Error::InvalidRecipientPublicKey),
+            CryptError::InvalidKemPublicKey
+        ));
+        assert!(matches!(
+            CryptError::from(Error::InvalidEncapsulation),
+            CryptError::InvalidKemCiphertext
+        ));
+        assert!(matches!(
+            CryptError::from(Error::ProfileMismatch {
+                expected: Profile::MlKem768HkdfSha256Aes128Gcm,
+                actual: Profile::MlKem1024HkdfSha384Aes256Gcm,
+            }),
+            CryptError::InvalidKeyType
+        ));
+        assert!(matches!(
+            CryptError::from(Error::MessageLimitReached),
+            CryptError::InvalidNonce
+        ));
+        assert!(matches!(
+            CryptError::from(Error::InternalFailure),
+            CryptError::CustomError(_)
+        ));
+    }
+
+    // ── `pq_hpke::EnvelopeError` ────────────────────────────────────────────────
+
+    #[test]
+    fn envelope_error_representative_mappings() {
+        use crate::pq_hpke::EnvelopeError;
+
+        assert!(matches!(
+            CryptError::from(EnvelopeError::InvalidMagic),
+            CryptError::InvalidEnvelope
+        ));
+        assert!(matches!(
+            CryptError::from(EnvelopeError::InvalidEncoding),
+            CryptError::InvalidEnvelope
+        ));
+        assert!(matches!(
+            CryptError::from(EnvelopeError::UnsupportedVersion { actual: 99 }),
+            CryptError::UnsupportedEnvelopeVersion
+        ));
+        assert!(matches!(
+            CryptError::from(EnvelopeError::UnsupportedSuite {
+                kem: 1,
+                kdf: 1,
+                aead: 1
+            }),
+            CryptError::UnsupportedAlgorithm
+        ));
+    }
+
+    // ── `hpke::HpkeError` ───────────────────────────────────────────────────────
+
+    #[test]
+    fn hpke_error_representative_mappings() {
+        use crate::hpke::{AeadId, HpkeError, Mode};
+
+        assert!(matches!(
+            CryptError::from(HpkeError::UnsupportedKeyScheduleMode { mode: Mode::Auth }),
+            CryptError::UnsupportedOperation
+        ));
+        assert!(matches!(
+            CryptError::from(HpkeError::ExportOnlyAead),
+            CryptError::UnsupportedAlgorithm
+        ));
+        assert!(matches!(
+            CryptError::from(HpkeError::UnsupportedAead {
+                aead_id: AeadId::ExportOnly
+            }),
+            CryptError::UnsupportedAlgorithm
+        ));
+        assert!(matches!(
+            CryptError::from(HpkeError::InvalidAeadKeyLength {
+                aead_id: AeadId::AesGcm128,
+                actual: 8,
+                required: 16,
+            }),
+            CryptError::InvalidDataLength
+        ));
+        assert!(matches!(
+            CryptError::from(HpkeError::InvalidAeadNonceLength {
+                aead_id: AeadId::AesGcm128,
+                actual: 8,
+                required: 12,
+            }),
+            CryptError::InvalidNonce
+        ));
+        assert!(matches!(
+            CryptError::from(HpkeError::MessageLimitReached),
+            CryptError::InvalidNonce
+        ));
+    }
+
+    // ── `hpke::rfc9180::Rfc9180Error` ───────────────────────────────────────────
+
+    #[test]
+    fn rfc9180_error_representative_mappings() {
+        use crate::hpke::rfc9180::{KemKeyKind, Rfc9180Error};
+        use crate::hpke::KemId;
+
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::InvalidKemEncoding {
+                kem_id: KemId::DhKemP256HkdfSha256,
+                kind: KemKeyKind::Public,
+            }),
+            CryptError::InvalidKemPublicKey
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::InvalidKemEncoding {
+                kem_id: KemId::DhKemP256HkdfSha256,
+                kind: KemKeyKind::Private,
+            }),
+            CryptError::InvalidKemSecretKey
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::InvalidKemEncoding {
+                kem_id: KemId::DhKemP256HkdfSha256,
+                kind: KemKeyKind::Encapsulated,
+            }),
+            CryptError::InvalidKemCiphertext
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::EncapsulationFailed),
+            CryptError::EncapsulationError
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::DecapsulationFailed),
+            CryptError::DecapsulationError
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::InvalidDhSharedSecret),
+            CryptError::InvalidKemPublicKey
+        ));
+        assert!(matches!(
+            CryptError::from(Rfc9180Error::SealFailed),
+            CryptError::EncryptionFailed
+        ));
+    }
+
+    // ── `signed_hpke::SignedHpkeError` ──────────────────────────────────────────
+
+    #[test]
+    fn signed_hpke_error_representative_mappings() {
+        use crate::signed_hpke::SignedHpkeError;
+
+        assert!(matches!(
+            CryptError::from(SignedHpkeError::UnsupportedVersion { version: 5 }),
+            CryptError::UnsupportedEnvelopeVersion
+        ));
+        assert!(matches!(
+            CryptError::from(SignedHpkeError::FieldTooLong {
+                field: "info",
+                length: 1 << 20,
+            }),
+            CryptError::InvalidEnvelope
+        ));
+        assert!(matches!(
+            CryptError::from(SignedHpkeError::Signing(CryptError::InvalidParameters)),
+            CryptError::InvalidParameters
+        ));
+        assert!(matches!(
+            CryptError::from(SignedHpkeError::SignatureVerification(
+                CryptError::SignatureVerificationFailed
+            )),
+            CryptError::SignatureVerificationFailed
+        ));
+    }
+
+    // ── No authentication oracle: every source type's auth failure lands on the
+    // ── same `CryptError` variant. ───────────────────────────────────────────────
+
+    #[test]
+    fn authentication_failures_map_to_one_variant_with_no_oracle() {
+        use crate::hpke::rfc9180::Rfc9180Error;
+        use crate::hpke::HpkeError;
+        use crate::hpke_pq::draft_ietf_hpke_pq_05 as draft05;
+        use crate::hpke_pq::draft_ietf_hpke_pq_05_full as full;
+
+        let mapped = [
+            CryptError::from(full::Error::AuthenticationFailed),
+            CryptError::from(draft05::Error::AuthenticationFailed),
+            CryptError::from(HpkeError::AuthenticationFailed),
+            CryptError::from(Rfc9180Error::AuthenticationFailed),
+        ];
+
+        for err in mapped {
+            assert!(
+                matches!(err, CryptError::AuthenticationFailed),
+                "authentication failure did not map to CryptError::AuthenticationFailed: {:?}",
+                err
+            );
+        }
     }
 }

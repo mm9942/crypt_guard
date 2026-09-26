@@ -39,6 +39,7 @@ use ml_kem::{
     kem::{Decapsulate, Encapsulate, FromSeed, Kem, KeyExport, TryKeyInit},
     MlKem1024, MlKem512, MlKem768,
 };
+use zeroize::Zeroize;
 
 /// Size marker for ML-KEM-512.
 ///
@@ -118,12 +119,16 @@ macro_rules! impl_ml_kem {
                 rng: &mut impl rand_core_010::CryptoRng,
             ) -> Result<(Self::PublicKey, Self::SecretKey), CryptError> {
                 let (dk, ek) = <$kem_ty>::generate_keypair_from_rng(rng);
-                // ek: encapsulation key — exported via to_bytes()
+                // ek: encapsulation key — public, no zeroization required.
                 let ek_bytes = ek.to_bytes();
                 let pk = MlKemPublicKey::from_bytes(ek_bytes.as_slice().to_vec());
-                // dk: decapsulation key — exported via to_seed() (compact 64-byte seed)
-                let seed = dk.to_seed().ok_or(CryptError::EncapsulationError)?;
+                // dk: decapsulation key — exported via to_seed() (compact 64-byte seed).
+                // `seed` is secret key material; wipe the stack-allocated `Array`
+                // temporary once its bytes have been copied into the zeroizing
+                // `MlKemSecretKey` newtype.
+                let mut seed = dk.to_seed().ok_or(CryptError::EncapsulationError)?;
                 let sk = MlKemSecretKey::from_bytes(seed.as_slice().to_vec());
+                seed.as_mut_slice().zeroize();
                 Ok((pk, sk))
             }
 
@@ -134,11 +139,15 @@ macro_rules! impl_ml_kem {
                 type EK = <$kem_ty as Kem>::EncapsulationKey;
                 let ek =
                     EK::new_from_slice(pk.as_ref()).map_err(|_| CryptError::InvalidKemPublicKey)?;
-                let (ct, ss) = ek.encapsulate_with_rng(rng);
-                Ok((
+                let (ct, mut ss) = ek.encapsulate_with_rng(rng);
+                // `ss` (the sender's shared secret) is secret; copy it into the
+                // zeroizing `KemSharedSecret` newtype, then wipe the local `Array`.
+                let result = (
                     KemCiphertext::from_bytes(ct.as_slice().to_vec()),
                     KemSharedSecret::from_bytes(ss.as_slice().to_vec()),
-                ))
+                );
+                ss.as_mut_slice().zeroize();
+                Ok(result)
             }
 
             fn decapsulate(
@@ -146,14 +155,21 @@ macro_rules! impl_ml_kem {
                 ct: &Self::Ciphertext,
             ) -> Result<Self::SharedSecret, CryptError> {
                 // Restore from the compact seed bytes saved during keypair generation.
-                let seed_arr = <ml_kem::kem::Seed<$kem_ty>>::try_from(sk.as_ref())
+                // `seed_arr` is a secret decapsulation-key seed; wipe it once the
+                // expanded decapsulation key has been derived from it.
+                let mut seed_arr = <ml_kem::kem::Seed<$kem_ty>>::try_from(sk.as_ref())
                     .map_err(|_| CryptError::InvalidKemSecretKey)?;
                 let dk = <$kem_ty>::from_seed(&seed_arr).0;
-                // Parse the ciphertext from raw bytes.
+                seed_arr.as_mut_slice().zeroize();
+                // Parse the ciphertext from raw bytes (not secret).
                 let ct_arr = <ml_kem::kem::Ciphertext<$kem_ty>>::try_from(ct.as_ref())
                     .map_err(|_| CryptError::InvalidKemCiphertext)?;
-                let ss = dk.decapsulate(&ct_arr);
-                Ok(KemSharedSecret::from_bytes(ss.as_slice().to_vec()))
+                // `ss` (the receiver's shared secret) is secret; copy it into the
+                // zeroizing `KemSharedSecret` newtype, then wipe the local `Array`.
+                let mut ss = dk.decapsulate(&ct_arr);
+                let result = KemSharedSecret::from_bytes(ss.as_slice().to_vec());
+                ss.as_mut_slice().zeroize();
+                Ok(result)
             }
         }
     };
@@ -162,3 +178,70 @@ macro_rules! impl_ml_kem {
 impl_ml_kem!(MlKem512Impl, MlKem512, Size512, KemId::MlKem512);
 impl_ml_kem!(MlKem768Impl, MlKem768, Size768, KemId::MlKem768);
 impl_ml_kem!(MlKem1024Impl, MlKem1024, Size1024, KemId::MlKem1024);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kem::backend::OsRng;
+
+    fn round_trip<B: KemBackend>() {
+        let mut rng = OsRng;
+        let (pk, sk) = B::keypair(&mut rng).expect("keypair generation should succeed");
+        let (ct, ss_send) = B::encapsulate(&pk, &mut rng).expect("encapsulation should succeed");
+        let ss_recv = B::decapsulate(&sk, &ct).expect("decapsulation should succeed");
+        assert_eq!(
+            ss_send.as_ref(),
+            ss_recv.as_ref(),
+            "sender and receiver shared secrets must match"
+        );
+    }
+
+    #[test]
+    fn round_trip_ml_kem_512() {
+        round_trip::<MlKem512Impl>();
+    }
+
+    #[test]
+    fn round_trip_ml_kem_768() {
+        round_trip::<MlKem768Impl>();
+    }
+
+    #[test]
+    fn round_trip_ml_kem_1024() {
+        round_trip::<MlKem1024Impl>();
+    }
+
+    #[test]
+    fn decapsulate_rejects_wrong_length_ciphertext() {
+        let mut rng = OsRng;
+        let (pk, sk) = MlKem768Impl::keypair(&mut rng).expect("keypair generation");
+        let (_ct, _ss) = MlKem768Impl::encapsulate(&pk, &mut rng).expect("encapsulate");
+        let bad_ct = KemCiphertext::from_bytes(vec![0u8; 3]);
+        assert!(
+            MlKem768Impl::decapsulate(&sk, &bad_ct).is_err(),
+            "a malformed (wrong-length) ciphertext must be rejected"
+        );
+    }
+
+    #[test]
+    fn decapsulate_rejects_wrong_length_secret_key() {
+        let mut rng = OsRng;
+        let (pk, _sk) = MlKem768Impl::keypair(&mut rng).expect("keypair generation");
+        let (ct, _ss) = MlKem768Impl::encapsulate(&pk, &mut rng).expect("encapsulate");
+        let bad_sk: MlKemSecretKey<Size768> = MlKemSecretKey::from_bytes(vec![0u8; 3]);
+        assert!(
+            MlKem768Impl::decapsulate(&bad_sk, &ct).is_err(),
+            "a malformed (wrong-length) secret key must be rejected"
+        );
+    }
+
+    #[test]
+    fn encapsulate_rejects_wrong_length_public_key() {
+        let mut rng = OsRng;
+        let bad_pk: MlKemPublicKey<Size768> = MlKemPublicKey::from_bytes(vec![0u8; 3]);
+        assert!(
+            MlKem768Impl::encapsulate(&bad_pk, &mut rng).is_err(),
+            "a malformed (wrong-length) public key must be rejected"
+        );
+    }
+}

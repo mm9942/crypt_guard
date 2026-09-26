@@ -183,6 +183,17 @@ pub struct OsRng;
 /// Each method draws fresh entropy from the operating system. The associated error type
 /// is [`core::convert::Infallible`] because OS entropy failures are surfaced as panics
 /// inside the implementation rather than returned as recoverable errors.
+///
+/// # Panics
+/// Every method panics (via `.expect("getrandom failed")`) if the underlying
+/// [`getrandom::fill`] call fails — for example, if the OS entropy source is
+/// unavailable or the platform is unsupported. This is a deliberate trade-off:
+/// [`OsRng`]'s `Error` type is [`core::convert::Infallible`], which cannot carry
+/// a real error value, so an OS-level failure has no way to be reported to the
+/// caller except by panicking. Applications that must not panic on entropy
+/// failure — long-running services, code invoked from a context where
+/// unwinding/aborting is unacceptable — should use [`TryOsRng`] instead, which
+/// surfaces `getrandom::Error` as an ordinary `Result` rather than panicking.
 impl rand_core_010::TryRng for OsRng {
     type Error = core::convert::Infallible;
     /// Returns a random `u32` drawn from OS entropy.
@@ -210,3 +221,121 @@ impl rand_core_010::TryRng for OsRng {
 /// This empty impl certifies that the entropy produced by [`OsRng`] is suitable for
 /// cryptographic use, satisfying the [`KemBackend`] RNG bound.
 impl rand_core_010::TryCryptoRng for OsRng {}
+
+/// Zero-sized OS-backed cryptographic RNG that surfaces entropy failures as `Err`
+/// instead of panicking.
+///
+/// # Description
+/// Delegates to [`getrandom::fill`] for entropy, exactly like [`OsRng`], but never
+/// panics: an OS entropy failure is returned as `Err(getrandom::Error)` from every
+/// method instead of being unwrapped internally. Prefer this over [`OsRng`] in any
+/// context where a panic (and the resulting unwind or abort) is unacceptable —
+/// for example inside a library that must propagate errors to its own caller, or
+/// a long-running service that should keep running (and retry, log, or fail a
+/// single request) rather than crash on a transient entropy-source hiccup.
+///
+/// All state is transient — construct freely.
+///
+/// # Concurrency
+/// Stateless; safe to construct and use from any thread.
+///
+/// # Examples
+/// ```rust,no_run
+/// use crypt_guard_core::kem::backend::TryOsRng;
+/// use crypt_guard_core::kem::backend::rand_core_010::TryRng;
+///
+/// let mut rng = TryOsRng;
+/// let mut buf = [0u8; 32];
+/// rng.try_fill_bytes(&mut buf).expect("OS entropy source failed");
+/// ```
+pub struct TryOsRng;
+
+/// Fallible RNG implementation for [`TryOsRng`] backed by [`getrandom::fill`].
+///
+/// # Description
+/// Each method draws fresh entropy from the operating system and reports a
+/// failure to do so as `Err(getrandom::Error)`, without panicking.
+impl rand_core_010::TryRng for TryOsRng {
+    type Error = getrandom::Error;
+    /// Returns a random `u32` drawn from OS entropy, or the underlying
+    /// [`getrandom::Error`] on failure.
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        let mut buf = [0u8; 4];
+        getrandom::fill(&mut buf)?;
+        Ok(u32::from_le_bytes(buf))
+    }
+    /// Returns a random `u64` drawn from OS entropy, or the underlying
+    /// [`getrandom::Error`] on failure.
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        let mut buf = [0u8; 8];
+        getrandom::fill(&mut buf)?;
+        Ok(u64::from_le_bytes(buf))
+    }
+    /// Fills `dst` entirely with OS entropy, or returns the underlying
+    /// [`getrandom::Error`] on failure.
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        getrandom::fill(dst)
+    }
+}
+
+/// Marks [`TryOsRng`] as cryptographically secure.
+///
+/// # Description
+/// This empty impl certifies that the entropy produced by [`TryOsRng`] is
+/// suitable for cryptographic use.
+///
+/// Note that [`rand_core_010::CryptoRng`] (the bound [`KemBackend`] requires) is
+/// defined as `TryCryptoRng<Error = Infallible>`, so [`TryOsRng`] — whose error
+/// type is [`getrandom::Error`], not `Infallible` — does not itself satisfy that
+/// narrower bound and cannot be passed directly to [`KemBackend`] methods. It is
+/// meant for call sites that consume [`rand_core_010::TryRng`] /
+/// [`rand_core_010::TryCryptoRng`] directly and want to handle entropy failures
+/// as an ordinary `Result` instead of a panic.
+impl rand_core_010::TryCryptoRng for TryOsRng {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand_core_010::TryRng;
+
+    /// `TryOsRng::try_fill_bytes` should draw real OS entropy: filling a
+    /// reasonably large buffer and getting back all zero bytes has
+    /// astronomically small probability (2^-256 and below for the sizes used
+    /// here) and would indicate the RNG is not actually wired up to entropy.
+    #[test]
+    fn try_os_rng_fills_buffer_with_nonzero_bytes() {
+        let mut rng = TryOsRng;
+        let mut buf = [0u8; 32];
+        rng.try_fill_bytes(&mut buf)
+            .expect("OS entropy source should be available in the test environment");
+        assert!(
+            buf.iter().any(|&b| b != 0),
+            "a 32-byte OS-entropy fill should overwhelmingly not be all zero"
+        );
+    }
+
+    #[test]
+    fn try_os_rng_next_u32_and_u64_are_not_trivially_zero() {
+        let mut rng = TryOsRng;
+        let a = rng
+            .try_next_u32()
+            .expect("OS entropy source should be available");
+        let b = rng
+            .try_next_u64()
+            .expect("OS entropy source should be available");
+        // Not a strict guarantee, but failing would be a 1-in-4-billion (or
+        // 1-in-2^64) coincidence and far more likely indicates a bug.
+        assert_ne!(a, 0);
+        assert_ne!(b, 0);
+    }
+
+    /// [`OsRng`] (the panicking RNG) should still function normally end-to-end.
+    #[test]
+    fn os_rng_fills_buffer_with_nonzero_bytes() {
+        let mut rng = OsRng;
+        let mut buf = [0u8; 32];
+        rng.try_fill_bytes(&mut buf)
+            .expect("OS entropy source should be available in the test environment");
+        assert!(buf.iter().any(|&b| b != 0));
+    }
+}

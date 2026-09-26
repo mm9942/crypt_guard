@@ -29,7 +29,7 @@ struct EchoProvider {
 
 impl CryptoProvider for EchoProvider {
     fn execute(&mut self, request: CryptoRequest) -> Result<CryptoResponse, CryptoServiceError> {
-        self.seen.push(request.request_id);
+        self.seen.push(request.context.request_id);
         Ok(CryptoResponse::PublicKey(PublicBlob::new(vec![1, 2, 3])))
     }
 }

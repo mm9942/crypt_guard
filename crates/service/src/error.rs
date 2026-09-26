@@ -15,6 +15,8 @@ use crypt_guard_core::pq_hpke::{EnvelopeError, Error as HpkeError};
 pub enum CryptoServiceError {
     /// The provider does not implement this operation or algorithm.
     Unsupported,
+    /// The caller presented no valid credentials.
+    Unauthenticated,
     /// The key does not exist or is not visible to the caller.
     NotFound,
     /// The caller may not perform this operation on this key.
@@ -38,6 +40,7 @@ impl CryptoServiceError {
     pub fn name(self) -> &'static str {
         match self {
             Self::Unsupported => "unsupported",
+            Self::Unauthenticated => "unauthenticated",
             Self::NotFound => "not_found",
             Self::Forbidden => "forbidden",
             Self::Conflict => "conflict",
@@ -54,6 +57,7 @@ impl fmt::Display for CryptoServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Unsupported => "operation not supported",
+            Self::Unauthenticated => "not authenticated",
             Self::NotFound => "key not found",
             Self::Forbidden => "operation not permitted",
             Self::Conflict => "key state conflict",

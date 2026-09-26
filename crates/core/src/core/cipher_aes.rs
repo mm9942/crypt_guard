@@ -1,9 +1,9 @@
 //use super::*;
+// `KeyControlVariant` (legacy Kyber KEM dispatch) only exists with `legacy-pqclean`;
+// gate its import so this file compiles standalone under `legacy-aes` alone.
+#[cfg(feature = "legacy-pqclean")]
+use crate::core::KeyControlVariant;
 use crate::{
-    core::{
-        // removed unused KyberKeyFunctions per clippy
-        KeyControlVariant,
-    },
     cryptography::{
         hmac_sign::{Operation, Sign, SignType},
         *,
@@ -81,7 +81,7 @@ impl CipherAES {
     fn encryption(&mut self) -> Result<Vec<u8>, CryptError> {
         let file_contained = self.infos.contains_file()?;
         if file_contained && self.infos.metadata.content_type == ContentType::File {
-            self.infos.content = fs::read(self.infos.location()?).unwrap();
+            self.infos.content = fs::read(self.infos.location()?)?;
         }
         let encrypted_data = self.encrypt_aes()?;
         // println!("Encrypted Data: {:?}", encrypted_data);
@@ -93,7 +93,7 @@ impl CipherAES {
             Operation::Sign,
             SignType::Sha512,
         );
-        let data = hmac.hmac();
+        let data = hmac.try_hmac()?;
         if self.infos.safe()? {
             self.infos.set_data(&data)?;
             self.infos.safe_file()?;
@@ -213,7 +213,7 @@ impl CipherAES {
     fn decryption(&mut self) -> Result<Vec<u8>, CryptError> {
         let file_contained = self.infos.contains_file()?;
         if file_contained && self.infos.metadata.content_type == ContentType::File {
-            self.infos.content = fs::read(self.infos.location()?).unwrap();
+            self.infos.content = fs::read(self.infos.location()?)?;
         }
 
         let encrypted_data_with_hmac = self.infos.content()?.to_vec();
@@ -226,7 +226,7 @@ impl CipherAES {
             Operation::Verify,
             SignType::Sha512,
         );
-        let verified_data = verifier.hmac();
+        let verified_data = verifier.try_hmac()?;
 
         self.infos.set_data(&verified_data)?;
         // println!("{:?}", verified_data);
@@ -273,6 +273,9 @@ impl CipherAES {
     }
 }
 
+// The KEM-based `CryptographicFunctions` impl depends on `KeyControlVariant`
+// (legacy Kyber key control), so it is only available under `legacy-pqclean`.
+#[cfg(feature = "legacy-pqclean")]
 impl CryptographicFunctions for CipherAES {
     /// Performs the encryption process using a public key.
     ///

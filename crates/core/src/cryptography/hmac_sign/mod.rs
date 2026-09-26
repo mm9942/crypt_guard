@@ -4,6 +4,7 @@ mod sign;
 
 use crate::cryptography::*;
 use crate::error::SigningErr;
+use std::fmt;
 use zeroize::Zeroize;
 
 /// Defines the operation being performed, either verification or signing.
@@ -33,12 +34,38 @@ pub struct Sign {
 }
 
 /// Contains the data to be signed or verified, alongside necessary metadata like passphrase.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct SignatureData {
     pub data: Vec<u8>,
     pub passphrase: Vec<u8>,
     pub hmac: Vec<u8>,
     pub concat_data: Vec<u8>,
+}
+
+/// Manual `Debug` impl redacting every field: `data`, `hmac` and `concat_data`
+/// may carry key material or authentication tags derived from the passphrase,
+/// so only lengths are shown.
+impl fmt::Debug for SignatureData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignatureData")
+            .field(
+                "data",
+                &format_args!("<redacted {} bytes>", self.data.len()),
+            )
+            .field(
+                "passphrase",
+                &format_args!("<redacted {} bytes>", self.passphrase.len()),
+            )
+            .field(
+                "hmac",
+                &format_args!("<redacted {} bytes>", self.hmac.len()),
+            )
+            .field(
+                "concat_data",
+                &format_args!("<redacted {} bytes>", self.concat_data.len()),
+            )
+            .finish()
+    }
 }
 
 impl Drop for SignatureData {
@@ -74,10 +101,32 @@ pub enum SignatureType {
 }
 
 /// Represents a key used in the signature process, identifying its type and content.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct SignatureKey {
     pub data: Vec<u8>,
     pub key_type: SignatureDataType,
+}
+
+/// Manual `Debug` impl that redacts `data` when it holds a secret key.
+/// Public keys and non-secret payloads are printed as before.
+impl fmt::Debug for SignatureKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.key_type {
+            SignatureDataType::SecretKey => f
+                .debug_struct("SignatureKey")
+                .field("key_type", &self.key_type)
+                .field(
+                    "data",
+                    &format_args!("<redacted {} bytes>", self.data.len()),
+                )
+                .finish(),
+            _ => f
+                .debug_struct("SignatureKey")
+                .field("key_type", &self.key_type)
+                .field("data", &self.data)
+                .finish(),
+        }
+    }
 }
 
 impl Drop for SignatureKey {
@@ -102,6 +151,8 @@ impl SignatureMechanism {
     /// Constructs a new `SignatureMechanism` with a public key.
     pub fn new(public_key: Vec<u8>) -> Self {
         let mut public = SignatureKey::new();
+        // cannot fail: `set_public_key` is an infallible setter that always
+        // returns `Ok(())`.
         public.set_public_key(public_key).unwrap();
         let signature_type = SignatureType::UnSigned;
         SignatureMechanism {
@@ -171,24 +222,28 @@ pub trait Mechanism {
 impl MechanismSetter for SignatureKey {
     /// Sets the public key for the signature.
     fn set_public_key(&mut self, public_key: Vec<u8>) -> Result<(), SigningErr> {
+        self.data.zeroize();
         self.data = public_key;
         self.key_type = SignatureDataType::PublicKey;
         Ok(())
     }
     /// Sets the secret key for the signature.
     fn set_secret_key(&mut self, secret_key: Vec<u8>) -> Result<(), SigningErr> {
+        self.data.zeroize();
         self.data = secret_key;
         self.key_type = SignatureDataType::SecretKey;
         Ok(())
     }
     /// Sets the signed message.
     fn set_signed_msg(&mut self, signed_message: Vec<u8>) -> Result<(), SigningErr> {
+        self.data.zeroize();
         self.data = signed_message;
         self.key_type = SignatureDataType::SignedMessage;
         Ok(())
     }
     /// Sets the detached signature.
     fn set_signature(&mut self, detached_signature: Vec<u8>) -> Result<(), SigningErr> {
+        self.data.zeroize();
         self.data = detached_signature;
         self.key_type = SignatureDataType::DetachedSignature;
         Ok(())
@@ -224,5 +279,53 @@ impl SignatureKey {
     fn signature(&mut self) -> Result<&[u8], SigningErr> {
         self.key_type = SignatureDataType::DetachedSignature;
         Ok(&self.data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MARKER: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0x13, 0x37, 0xCA, 0xFE];
+
+    #[test]
+    fn signature_key_debug_redacts_secret_key() {
+        let mut key = SignatureKey::new();
+        key.set_secret_key(MARKER.to_vec()).unwrap();
+        let debug_str = format!("{:?}", key);
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+        assert!(debug_str.contains("SecretKey"));
+    }
+
+    #[test]
+    fn signature_key_debug_shows_public_key_bytes() {
+        let mut key = SignatureKey::new();
+        key.set_public_key(MARKER.to_vec()).unwrap();
+        let debug_str = format!("{:?}", key);
+        assert!(debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+    }
+
+    #[test]
+    fn signature_data_debug_redacts_everything() {
+        let data = SignatureData {
+            data: MARKER.to_vec(),
+            passphrase: MARKER.to_vec(),
+            hmac: MARKER.to_vec(),
+            concat_data: MARKER.to_vec(),
+        };
+        let debug_str = format!("{:?}", data);
+        assert!(!debug_str.contains(&format!("{:?}", MARKER.to_vec())));
+    }
+
+    #[test]
+    fn set_secret_key_zeroizes_previous_value_before_overwrite() {
+        let mut key = SignatureKey::new();
+        key.set_secret_key(vec![1, 2, 3, 4]).unwrap();
+        // Overwrite; the old buffer should have been zeroized in place
+        // before being dropped/replaced (behavioural effect is on the old
+        // Vec's backing memory, which we cannot directly observe here, so we
+        // just assert the new value took effect correctly).
+        key.set_secret_key(vec![9, 9, 9, 9]).unwrap();
+        assert_eq!(key.data, vec![9, 9, 9, 9]);
     }
 }

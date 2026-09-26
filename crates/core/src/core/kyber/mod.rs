@@ -117,10 +117,29 @@ impl KyberSizeVariant for Kyber1024 {
 }
 
 /// Represents the data structure for Kyber algorithm, including key and nonce.
-#[derive(PartialEq, Debug, Clone)]
+///
+/// `key` is the secret key when decrypting, so it is zeroized on drop and
+/// redacted from `Debug`.
+#[derive(PartialEq, Clone)]
 pub struct KyberData {
     key: Vec<u8>,
     nonce: String,
+}
+
+impl std::fmt::Debug for KyberData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KyberData")
+            .field("key", &format_args!("<redacted {} bytes>", self.key.len()))
+            .field("nonce", &self.nonce)
+            .finish()
+    }
+}
+
+impl Drop for KyberData {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.key.zeroize();
+    }
 }
 
 impl KyberData {

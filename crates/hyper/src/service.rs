@@ -12,18 +12,20 @@ use std::sync::Arc;
 use bytes::Bytes;
 use http::{header, HeaderValue, Request, Response, StatusCode};
 use http_body::Body;
-use http_body_util::{BodyExt, Full, LengthLimitError, Limited};
+use http_body_util::Full;
 use tower_service::Service;
 
 use crypt_guard_service::{
-    service_error, CryptoOperation, CryptoRequest, CryptoResponse, DescribeKey, GetPublicKey,
-    RequestId, VerificationResult,
+    service_error, CryptoRequest, CryptoResponse, RequestContext, RequestId,
 };
 
 use crate::{
+    auth::{Anonymous, Authenticator},
+    body::{collect_secret, BodyError},
+    codec::{decode_request, encode_response},
     config::HttpConfig,
     error::{error_response, status_response},
-    route::{self, Route, RouteError, RouteOp},
+    route::{self, RouteError},
 };
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -36,22 +38,47 @@ pub type ResponseBody = Full<Bytes>;
 /// `Clone` is required by Hyper's `TowerToHyperService`. Cloning copies only
 /// the inner **network handle** (normally a
 /// [`NetworkHandle`](crypt_guard_service::NetworkHandle), i.e. a channel
-/// sender) and shared configuration; no key material and no cryptographic
-/// context is ever reachable from this type.
-#[derive(Clone)]
-pub struct CryptoHttpService<S> {
+/// sender), shared configuration and the shared authenticator; no key
+/// material and no cryptographic context is ever reachable from this type.
+pub struct CryptoHttpService<S, A = Anonymous> {
     inner: S,
     config: Arc<HttpConfig>,
+    authenticator: Arc<A>,
     next_request_id: Arc<AtomicU64>,
 }
 
-impl<S> CryptoHttpService<S> {
-    /// Wrap a cloneable crypto service handle.
+impl<S: Clone, A> Clone for CryptoHttpService<S, A> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            config: Arc::clone(&self.config),
+            authenticator: Arc::clone(&self.authenticator),
+            next_request_id: Arc::clone(&self.next_request_id),
+        }
+    }
+}
+
+impl<S> CryptoHttpService<S, Anonymous> {
+    /// Wrap a cloneable crypto service handle; every request is anonymous
+    /// until an authenticator is set with [`with_authenticator`](Self::with_authenticator).
     pub fn new(inner: S, config: HttpConfig) -> Self {
         Self {
             inner,
             config: Arc::new(config),
+            authenticator: Arc::new(Anonymous),
             next_request_id: Arc::new(AtomicU64::new(1)),
+        }
+    }
+}
+
+impl<S, A> CryptoHttpService<S, A> {
+    /// Replace the authenticator.
+    pub fn with_authenticator<A2: Authenticator>(self, authenticator: A2) -> CryptoHttpService<S, A2> {
+        CryptoHttpService {
+            inner: self.inner,
+            config: self.config,
+            authenticator: Arc::new(authenticator),
+            next_request_id: self.next_request_id,
         }
     }
 
@@ -61,7 +88,7 @@ impl<S> CryptoHttpService<S> {
     }
 }
 
-impl<S> core::fmt::Debug for CryptoHttpService<S> {
+impl<S, A> core::fmt::Debug for CryptoHttpService<S, A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("CryptoHttpService")
             .field("config", &self.config)
@@ -69,13 +96,13 @@ impl<S> core::fmt::Debug for CryptoHttpService<S> {
     }
 }
 
-impl<S, B> Service<Request<B>> for CryptoHttpService<S>
+impl<S, A, B> Service<Request<B>> for CryptoHttpService<S, A>
 where
     S: Service<CryptoRequest, Response = CryptoResponse> + Clone + Send + 'static,
     S::Error: Into<BoxError>,
     S::Future: Send,
+    A: Authenticator,
     B: Body<Data = Bytes> + Send + 'static,
-    B::Error: Into<BoxError>,
 {
     type Response = Response<ResponseBody>;
     type Error = Infallible;
@@ -90,29 +117,33 @@ where
     fn call(&mut self, request: Request<B>) -> Self::Future {
         let inner = self.inner.clone();
         let config = Arc::clone(&self.config);
+        let authenticator = Arc::clone(&self.authenticator);
         let request_id = RequestId(u128::from(
             self.next_request_id.fetch_add(1, Ordering::Relaxed),
         ));
         Box::pin(async move {
-            let response = handle(inner, &config, request_id, request).await;
+            let response = handle(inner, &config, &*authenticator, request_id, request).await;
             Ok(finalize(response))
         })
     }
 }
 
-async fn handle<S, B>(
+async fn handle<S, A, B>(
     mut inner: S,
     config: &HttpConfig,
+    authenticator: &A,
     request_id: RequestId,
     request: Request<B>,
 ) -> Response<ResponseBody>
 where
     S: Service<CryptoRequest, Response = CryptoResponse>,
     S::Error: Into<BoxError>,
+    A: Authenticator,
     B: Body<Data = Bytes>,
-    B::Error: Into<BoxError>,
 {
-    let route = match route::parse(request.method(), request.uri().path()) {
+    let (parts, body) = request.into_parts();
+
+    let route = match route::parse(&parts.method, parts.uri.path()) {
         Ok(route) => route,
         Err(RouteError::NotFound) => return status_response(StatusCode::NOT_FOUND),
         Err(RouteError::MethodNotAllowed) => {
@@ -121,76 +152,38 @@ where
         Err(RouteError::InvalidKey) => return status_response(StatusCode::BAD_REQUEST),
     };
 
+    // Authenticate before reading the body, so unauthenticated callers cannot
+    // make the server buffer (and copy) request payloads.
+    let principal = match authenticator.authenticate(&parts) {
+        Ok(principal) => principal,
+        Err(err) => return error_response(err, config),
+    };
+
     let limit = route.op.body_limit(&config.max_body);
-    let body = match Limited::new(request.into_body(), limit).collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(err) if err.is::<LengthLimitError>() => {
-            return status_response(StatusCode::PAYLOAD_TOO_LARGE)
-        }
+    let body = match collect_secret(body, limit).await {
+        Ok(body) => body,
+        Err(BodyError::TooLarge) => return status_response(StatusCode::PAYLOAD_TOO_LARGE),
+        Err(BodyError::Invalid) => return status_response(StatusCode::BAD_REQUEST),
+    };
+
+    // The body (possibly plaintext) is dropped, zeroized, right after
+    // decoding; secret fields have been copied into their own `SecretBytes`.
+    let operation = match decode_request(route.op, route.key, &body) {
+        Ok(operation) => operation,
         Err(_) => return status_response(StatusCode::BAD_REQUEST),
     };
+    drop(body);
 
-    let operation = match decode(route, body) {
-        Some(operation) => operation,
-        // The request codecs for body-carrying operations are not part of
-        // this skeleton yet.
-        None => return status_response(StatusCode::NOT_IMPLEMENTED),
+    let context = RequestContext {
+        request_id,
+        principal,
     };
-
     if let Err(err) = poll_fn(|cx| inner.poll_ready(cx)).await {
         return error_response(service_error(err.into()), config);
     }
-    match inner.call(CryptoRequest::new(request_id, operation)).await {
-        Ok(response) => encode(response),
+    match inner.call(CryptoRequest::with_context(context, operation)).await {
+        Ok(response) => encode_response(response),
         Err(err) => error_response(service_error(err.into()), config),
-    }
-}
-
-/// Decode a routed request into a service operation.
-///
-/// Returns `None` for operations whose request codec is not implemented yet.
-fn decode(route: Route, _body: Bytes) -> Option<CryptoOperation> {
-    let key = route.key?;
-    match route.op {
-        RouteOp::Describe => Some(CryptoOperation::Describe(DescribeKey { key })),
-        RouteOp::PublicKey => Some(CryptoOperation::PublicKey(GetPublicKey { key })),
-        _ => None,
-    }
-}
-
-fn octet_stream(body: Bytes) -> Response<ResponseBody> {
-    let mut response = Response::new(Full::new(body));
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/octet-stream"),
-    );
-    response
-}
-
-/// Encode a service response.
-fn encode(response: CryptoResponse) -> Response<ResponseBody> {
-    match response {
-        CryptoResponse::PublicKey(blob) => octet_stream(Bytes::from(blob.into_inner())),
-        CryptoResponse::Ciphertext(blob) => octet_stream(Bytes::from(blob.into_inner())),
-        CryptoResponse::Signature(blob) => octet_stream(Bytes::from(blob.into_inner())),
-        // One-way secret egress: every network clone of these `Bytes` shares
-        // the single zeroizing owner, which is erased when the last clone
-        // drops. Copies made by TLS or the kernel are outside that guarantee.
-        CryptoResponse::Plaintext(secret) => octet_stream(Bytes::from_owner(secret.into_egress())),
-        CryptoResponse::Verification(result) => {
-            let text: &'static [u8] = match result {
-                VerificationResult::Valid => b"valid",
-                VerificationResult::Invalid => b"invalid",
-            };
-            let mut response = Response::new(Full::new(Bytes::from_static(text)));
-            response.headers_mut().insert(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("text/plain; charset=utf-8"),
-            );
-            response
-        }
-        // Metadata / key-creation codecs are not part of this skeleton yet.
-        _ => status_response(StatusCode::NOT_IMPLEMENTED),
     }
 }
 

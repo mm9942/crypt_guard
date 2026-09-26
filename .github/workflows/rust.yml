@@ -23,6 +23,14 @@ jobs:
             args: cargo test -p crypt_guard -p crypt_guard_core --no-default-features --features ml-kem-backend,ml-dsa-backend --verbose
           - name: legacy-lane
             args: cargo test -p crypt_guard -p crypt_guard_core --no-default-features --features legacy-pqclean --verbose
+          # CGv2 migration surface, including the typestate compile-fail cases.
+          - name: cgv2-lane
+            args: cargo test -p crypt_guard -p crypt_guard_core --features cgv2-compat --verbose
+          # Runs the legacy unit-test tree in crates/core/src/tests.
+          - name: cgv2-legacy-lane
+            args: cargo test -p crypt_guard -p crypt_guard_core --features cgv2-compat,legacy-pqclean --verbose
+          - name: slhdsa-lane
+            args: cargo test -p crypt_guard_core --features sign-slhdsa --verbose
           # Service and transport layers.
           - name: service
             args: cargo test -p crypt_guard_service --all-features --verbose
@@ -37,6 +45,21 @@ jobs:
     - uses: actions/checkout@v4
     - name: Run ${{ matrix.name }} tests
       run: ${{ matrix.args }}
+
+  feature-matrix:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Every core feature compiles on its own
+      run: |
+        for f in ml-kem-backend ml-dsa-backend sign-slhdsa cgv2-compat legacy-pqclean \
+                 aes-ctr aes-xts legacy-aes aes-gcm-siv-cipher archive zip; do
+          echo "::group::$f"
+          cargo check -p crypt_guard_core --no-default-features --features "$f"
+          echo "::endgroup::"
+        done
+    - name: Examples build
+      run: cargo build --examples --features cgv2-compat,legacy-pqclean
 
   dependency-gates:
     runs-on: ubuntu-latest

@@ -10,7 +10,7 @@ use crypt_guard::hpke::{
 };
 use serde::Deserialize;
 
-const VECTORS: &str = include_str!("vectors/rfc9180-test-vectors.json");
+const VECTORS: &str = include_str!("../crates/core/tests/vectors/rfc9180-test-vectors.json");
 
 #[derive(Deserialize)]
 struct Vector {

@@ -17,6 +17,14 @@
 //! SLH-DSA is NOT in the default feature set because its signature sizes (7–50 KB)
 //! may be unsuitable for many applications.
 //!
+//! # Zeroization
+//! The `slh-dsa` dependency is built with its `zeroize` feature, so its
+//! `SigningKey<P>` wipes `sk_seed`/`sk_prf` on drop. Every transient
+//! `SigningKey` constructed in this module (in [`SignAlgorithm::keypair`] and
+//! [`SignAlgorithm::sign`]) is therefore wiped when it goes out of scope, and
+//! the serialized key bytes copied out of it are zeroized explicitly via
+//! [`zeroize::Zeroize`].
+//!
 //! # Concurrency
 //! All types are `Send + Sync`. Operations are pure functions.
 //!
@@ -40,7 +48,7 @@ use slh_dsa::{
     signature::{Signer, Verifier},
     Shake128f, Shake128s, Shake192f, Shake192s, Shake256f, Shake256s, SigningKey,
 };
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// SLH-DSA signing key newtype (secret; `ZeroizeOnDrop`).
 ///
@@ -123,11 +131,18 @@ macro_rules! impl_slh_dsa {
             fn keypair(
                 rng: &mut impl rand_core_010::CryptoRng,
             ) -> Result<(Self::SigningKey, Self::VerifyingKey), CryptError> {
+                // `sk` wipes its `sk_seed`/`sk_prf` on drop (slh-dsa `zeroize`
+                // feature, enabled in Cargo.toml).
                 let sk = SigningKey::<$param>::new(rng);
                 // sk_bytes layout: [sk_seed(N) | sk_prf(N) | pk_seed(N) | pk_root(N)]
                 // vk bytes are the second half: sk_bytes[sk_len/2..]
-                let sk_bytes = sk.to_bytes().to_vec();
+                // `sk.to_bytes()` returns a stack-allocated `Array` holding the full
+                // secret signing key; copy it into the returned `Vec`s and then wipe
+                // the `Array` temporary explicitly.
+                let mut sk_arr = sk.to_bytes();
+                let sk_bytes = sk_arr.as_slice().to_vec();
                 let vk_bytes = sk_bytes[sk_bytes.len() / 2..].to_vec();
+                sk_arr.as_mut_slice().zeroize();
                 Ok((
                     SlhDsaSigningKey::from_bytes(sk_bytes),
                     SlhDsaVerifyingKey::from_bytes(vk_bytes),
@@ -135,6 +150,8 @@ macro_rules! impl_slh_dsa {
             }
 
             fn sign(sk: &Self::SigningKey, message: &[u8]) -> Result<Self::Sig, CryptError> {
+                // `signing_key` is re-parsed from the stored bytes on every call and
+                // wiped on drop (slh-dsa `zeroize` feature, enabled in Cargo.toml).
                 let signing_key = SigningKey::<$param>::try_from(sk.as_bytes())
                     .map_err(|_| CryptError::SigningFailed)?;
                 // Use deterministic signing (no RNG needed).
@@ -209,3 +226,58 @@ impl_slh_dsa!(SlhDsaShake192fImpl, Shake192f);
 impl_slh_dsa!(SlhDsaShake192sImpl, Shake192s);
 impl_slh_dsa!(SlhDsaShake256fImpl, Shake256f);
 impl_slh_dsa!(SlhDsaShake256sImpl, Shake256s);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kem::backend::OsRng;
+
+    const MESSAGE: &[u8] = b"CryptGuard SLH-DSA test message";
+
+    // Only the "f" (fast) L1 variant is exercised as a full sign/verify round
+    // trip in tests: SLH-DSA signing is comparatively expensive (hypertree
+    // traversal over many WOTS+/FORS instances), and `Shake128f` is
+    // representative of the sign/verify code path shared by every parameter
+    // set through the `impl_slh_dsa!` macro.
+    #[test]
+    fn shake128f_sign_verify_round_trip() {
+        let mut rng = OsRng;
+        let (sk, vk) = SlhDsaShake128fImpl::keypair(&mut rng).expect("keypair generation");
+        let sig = SlhDsaShake128fImpl::sign(&sk, MESSAGE).expect("signing should succeed");
+        SlhDsaShake128fImpl::verify(&vk, MESSAGE, &sig)
+            .expect("signature should verify against the signed message");
+    }
+
+    #[test]
+    fn shake128f_tampered_message_is_rejected() {
+        let mut rng = OsRng;
+        let (sk, vk) = SlhDsaShake128fImpl::keypair(&mut rng).expect("keypair generation");
+        let sig = SlhDsaShake128fImpl::sign(&sk, MESSAGE).expect("signing should succeed");
+        assert!(
+            SlhDsaShake128fImpl::verify(&vk, b"a different, tampered message", &sig).is_err(),
+            "verification must fail for a message that was not signed"
+        );
+    }
+
+    #[test]
+    fn shake128f_tampered_signature_is_rejected() {
+        let mut rng = OsRng;
+        let (sk, vk) = SlhDsaShake128fImpl::keypair(&mut rng).expect("keypair generation");
+        let sig = SlhDsaShake128fImpl::sign(&sk, MESSAGE).expect("signing should succeed");
+        let mut bad_sig_bytes = sig.as_ref().to_vec();
+        bad_sig_bytes[0] ^= 0x01;
+        let bad_sig = SlhDsaSignature::from_bytes(bad_sig_bytes);
+        assert!(
+            SlhDsaShake128fImpl::verify(&vk, MESSAGE, &bad_sig).is_err(),
+            "verification must fail for a tampered signature"
+        );
+    }
+
+    #[test]
+    fn keypair_verifying_key_is_second_half_of_signing_key() {
+        let mut rng = OsRng;
+        let (sk, vk) = SlhDsaShake128fImpl::keypair(&mut rng).expect("keypair generation");
+        assert_eq!(sk.as_bytes().len(), vk.as_bytes().len() * 2);
+        assert_eq!(&sk.as_bytes()[sk.as_bytes().len() / 2..], vk.as_bytes());
+    }
+}

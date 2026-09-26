@@ -132,7 +132,7 @@ impl CipherChaCha {
                     Operation::Sign,
                     SignType::Sha512,
                 );
-                let data = hmac.hmac();
+                let data = hmac.try_hmac()?;
                 if self.infos.safe()? {
                     self.infos.set_data(&data)?;
                     self.infos.safe_file()?;
@@ -146,7 +146,7 @@ impl CipherChaCha {
                     Operation::Verify,
                     SignType::Sha512,
                 );
-                let data = verifier.hmac();
+                let data = verifier.try_hmac()?;
                 self.infos.set_data(&data)?;
                 let (decrypted, nonce_vec) = self.process_data()?;
                 if self.infos.safe()? {

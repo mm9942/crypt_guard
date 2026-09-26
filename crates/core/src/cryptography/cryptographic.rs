@@ -182,9 +182,37 @@ impl CryptographicInformation {
     }
 
     /// Sets the content to be encrypted or decrypted.
+    ///
+    /// The previous content (possibly plaintext) is zeroized before it is
+    /// replaced.
     pub fn set_data(&mut self, data: &[u8]) -> Result<(), CryptError> {
-        let data = data.to_vec();
-        self.content = data;
+        use zeroize::Zeroize;
+        self.content.zeroize();
+        self.content = data.to_vec();
+        Ok(())
+    }
+
+    /// For file operations, load the file at [`location`](Self::location)
+    /// into the content (zeroizing the previous content). No-op otherwise.
+    #[cfg(feature = "legacy-pqclean")]
+    pub(crate) fn load_file_content(&mut self) -> Result<(), CryptError> {
+        if self.contains_file()? && self.metadata.content_type == ContentType::File {
+            let data = std::fs::read(self.location()?)?;
+            use zeroize::Zeroize;
+            self.content.zeroize();
+            self.content = data;
+        }
+        Ok(())
+    }
+
+    /// For file operations with `safe` set, write `data` next to the source
+    /// file (`<file>.enc` when encrypting). No-op otherwise.
+    #[cfg(feature = "legacy-pqclean")]
+    pub(crate) fn persist_file_output(&mut self, data: &[u8]) -> Result<(), CryptError> {
+        if self.safe()? && self.contains_file()? {
+            self.set_data(data)?;
+            self.safe_file()?;
+        }
         Ok(())
     }
 

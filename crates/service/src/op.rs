@@ -13,6 +13,44 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RequestId(pub u128);
 
+/// An authenticated caller identity, as established by the transport.
+///
+/// Not secret (it is an identity, not a credential), so it may be cloned and
+/// logged.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Principal(Box<str>);
+
+impl Principal {
+    /// Wrap an identity string.
+    pub fn new(name: &str) -> Self {
+        Self(name.into())
+    }
+
+    /// Borrow the identity string.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Validated, non-secret context of one request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestContext {
+    /// Correlation id.
+    pub request_id: RequestId,
+    /// Authenticated caller, or `None` for an anonymous request.
+    pub principal: Option<Principal>,
+}
+
+impl RequestContext {
+    /// Context of an anonymous request.
+    pub fn anonymous(request_id: RequestId) -> Self {
+        Self {
+            request_id,
+            principal: None,
+        }
+    }
+}
+
 /// HPKE `info` and AEAD `aad` bound to an encrypt/decrypt or wrap/unwrap.
 ///
 /// Both must match exactly when opening; a mismatch surfaces as the same
@@ -61,6 +99,13 @@ pub struct RotateKey {
 /// Disable a key version.
 #[derive(Debug)]
 pub struct DisableKey {
+    /// The key.
+    pub key: KeyRef,
+}
+
+/// Re-enable a disabled key version.
+#[derive(Debug)]
+pub struct EnableKey {
     /// The key.
     pub key: KeyRef,
 }
@@ -162,6 +207,8 @@ pub enum CryptoOperation {
     Rotate(RotateKey),
     /// See [`DisableKey`].
     Disable(DisableKey),
+    /// See [`EnableKey`].
+    Enable(EnableKey),
     /// See [`DestroyKey`].
     Destroy(DestroyKey),
     /// See [`DescribeKey`].
@@ -184,23 +231,58 @@ pub enum CryptoOperation {
     RewrapKey(RewrapKey),
 }
 
-impl CryptoOperation {
+/// Payload-free kind of a [`CryptoOperation`], for policy decisions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OpKind {
+    /// [`CryptoOperation::Generate`]
+    Generate,
+    /// [`CryptoOperation::Rotate`]
+    Rotate,
+    /// [`CryptoOperation::Disable`]
+    Disable,
+    /// [`CryptoOperation::Enable`]
+    Enable,
+    /// [`CryptoOperation::Destroy`]
+    Destroy,
+    /// [`CryptoOperation::Describe`]
+    Describe,
+    /// [`CryptoOperation::PublicKey`]
+    PublicKey,
+    /// [`CryptoOperation::Encrypt`]
+    Encrypt,
+    /// [`CryptoOperation::Decrypt`]
+    Decrypt,
+    /// [`CryptoOperation::Sign`]
+    Sign,
+    /// [`CryptoOperation::Verify`]
+    Verify,
+    /// [`CryptoOperation::WrapKey`]
+    WrapKey,
+    /// [`CryptoOperation::UnwrapKey`]
+    UnwrapKey,
+    /// [`CryptoOperation::RewrapKey`]
+    RewrapKey,
+}
+
+impl OpKind {
     /// Stable, non-secret operation name for logs and metrics.
-    pub fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
-            Self::Generate(_) => "generate",
-            Self::Rotate(_) => "rotate",
-            Self::Disable(_) => "disable",
-            Self::Destroy(_) => "destroy",
-            Self::Describe(_) => "describe",
-            Self::PublicKey(_) => "public_key",
-            Self::Encrypt(_) => "encrypt",
-            Self::Decrypt(_) => "decrypt",
-            Self::Sign(_) => "sign",
-            Self::Verify(_) => "verify",
-            Self::WrapKey(_) => "wrap",
-            Self::UnwrapKey(_) => "unwrap",
-            Self::RewrapKey(_) => "rewrap",
+            Self::Generate => "generate",
+            Self::Rotate => "rotate",
+            Self::Disable => "disable",
+            Self::Enable => "enable",
+            Self::Destroy => "destroy",
+            Self::Describe => "describe",
+            Self::PublicKey => "public_key",
+            Self::Encrypt => "encrypt",
+            Self::Decrypt => "decrypt",
+            Self::Sign => "sign",
+            Self::Verify => "verify",
+            Self::WrapKey => "wrap",
+            Self::UnwrapKey => "unwrap",
+            Self::RewrapKey => "rewrap",
         }
     }
 
@@ -208,30 +290,91 @@ impl CryptoOperation {
     ///
     /// Mutations must never be retried automatically: a lost response does
     /// not mean the mutation did not happen.
-    pub fn is_mutation(&self) -> bool {
+    pub fn is_mutation(self) -> bool {
         matches!(
             self,
-            Self::Generate(_) | Self::Rotate(_) | Self::Disable(_) | Self::Destroy(_)
+            Self::Generate | Self::Rotate | Self::Disable | Self::Enable | Self::Destroy
         )
+    }
+
+    /// Whether a successful result releases secret bytes to the caller
+    /// (decrypt, unwrap). Policies should grant this explicitly.
+    pub fn is_secret_egress(self) -> bool {
+        matches!(self, Self::Decrypt | Self::UnwrapKey)
+    }
+}
+
+impl CryptoOperation {
+    /// The payload-free kind of this operation.
+    pub fn kind(&self) -> OpKind {
+        match self {
+            Self::Generate(_) => OpKind::Generate,
+            Self::Rotate(_) => OpKind::Rotate,
+            Self::Disable(_) => OpKind::Disable,
+            Self::Enable(_) => OpKind::Enable,
+            Self::Destroy(_) => OpKind::Destroy,
+            Self::Describe(_) => OpKind::Describe,
+            Self::PublicKey(_) => OpKind::PublicKey,
+            Self::Encrypt(_) => OpKind::Encrypt,
+            Self::Decrypt(_) => OpKind::Decrypt,
+            Self::Sign(_) => OpKind::Sign,
+            Self::Verify(_) => OpKind::Verify,
+            Self::WrapKey(_) => OpKind::WrapKey,
+            Self::UnwrapKey(_) => OpKind::UnwrapKey,
+            Self::RewrapKey(_) => OpKind::RewrapKey,
+        }
+    }
+
+    /// Stable, non-secret operation name for logs and metrics.
+    pub fn name(&self) -> &'static str {
+        self.kind().name()
+    }
+
+    /// Whether the operation changes provider state.
+    pub fn is_mutation(&self) -> bool {
+        self.kind().is_mutation()
+    }
+
+    /// Every namespace the operation touches. A policy must authorize all of
+    /// them (a rewrap reads one key and writes under another).
+    pub fn namespaces(&self) -> [Option<&KeyNamespace>; 2] {
+        match self {
+            Self::Generate(op) => [Some(&op.namespace), None],
+            Self::Rotate(op) => [Some(&op.key.namespace), None],
+            Self::Disable(op) => [Some(&op.key.namespace), None],
+            Self::Enable(op) => [Some(&op.key.namespace), None],
+            Self::Destroy(op) => [Some(&op.key.namespace), None],
+            Self::Describe(op) => [Some(&op.key.namespace), None],
+            Self::PublicKey(op) => [Some(&op.key.namespace), None],
+            Self::Encrypt(op) => [Some(&op.key.namespace), None],
+            Self::Decrypt(op) => [Some(&op.key.namespace), None],
+            Self::Sign(op) => [Some(&op.key.namespace), None],
+            Self::Verify(op) => [Some(&op.key.namespace), None],
+            Self::WrapKey(op) => [Some(&op.key.namespace), None],
+            Self::UnwrapKey(op) => [Some(&op.key.namespace), None],
+            Self::RewrapKey(op) => [Some(&op.from.namespace), Some(&op.to.namespace)],
+        }
     }
 }
 
 /// A request to the crypto service. Moved, never cloned.
 #[derive(Debug)]
 pub struct CryptoRequest {
-    /// Correlation id.
-    pub request_id: RequestId,
+    /// Request id and caller.
+    pub context: RequestContext,
     /// The operation.
     pub operation: CryptoOperation,
 }
 
 impl CryptoRequest {
-    /// Build a request.
+    /// Build an anonymous request.
     pub fn new(request_id: RequestId, operation: CryptoOperation) -> Self {
-        Self {
-            request_id,
-            operation,
-        }
+        Self::with_context(RequestContext::anonymous(request_id), operation)
+    }
+
+    /// Build a request with an explicit context.
+    pub fn with_context(context: RequestContext, operation: CryptoOperation) -> Self {
+        Self { context, operation }
     }
 }
 

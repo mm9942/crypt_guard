@@ -361,10 +361,44 @@ pub struct BaseContext {
 
 impl BaseContext {
     /// Construct the context core by consuming a Base-mode [`KeySchedule`].
+    ///
+    /// # Invariant
+    ///
+    /// This function requires `schedule.mode() == Mode::Base`. [`key_schedule`]
+    /// (the only producer of a [`KeySchedule`] in this crate) already rejects
+    /// every other [`Mode`] with [`HpkeError::UnsupportedKeyScheduleMode`], so
+    /// the invariant always holds for schedules built through the public API;
+    /// a debug assertion catches an internal regression that would otherwise
+    /// silently mislabel a non-Base schedule as Base. A caller holding a
+    /// schedule of unproven mode should use [`Self::try_from_key_schedule`]
+    /// instead, which reports the mismatch as an error rather than relying on
+    /// a debug-only check.
     pub fn from_key_schedule(schedule: KeySchedule) -> Self {
+        debug_assert_eq!(
+            schedule.mode,
+            Mode::Base,
+            "BaseContext::from_key_schedule requires a Base-mode KeySchedule"
+        );
+        Self::from_key_schedule_unchecked(schedule)
+    }
+
+    /// Fallible counterpart of [`Self::from_key_schedule`].
+    ///
+    /// Returns [`HpkeError::UnsupportedKeyScheduleMode`] instead of relying on
+    /// a debug assertion when `schedule.mode() != Mode::Base`.
+    pub fn try_from_key_schedule(schedule: KeySchedule) -> Result<Self, HpkeError> {
+        if schedule.mode != Mode::Base {
+            return Err(HpkeError::UnsupportedKeyScheduleMode {
+                mode: schedule.mode,
+            });
+        }
+        Ok(Self::from_key_schedule_unchecked(schedule))
+    }
+
+    fn from_key_schedule_unchecked(schedule: KeySchedule) -> Self {
         let KeySchedule {
             suite,
-            mode,
+            mode: _,
             psk_id_hash: _,
             info_hash: _,
             key_schedule_context: _,
@@ -373,7 +407,6 @@ impl BaseContext {
             base_nonce,
             exporter_secret,
         } = schedule;
-        debug_assert_eq!(mode, Mode::Base);
 
         Self {
             suite,
@@ -389,8 +422,27 @@ impl BaseContext {
     ///
     /// Export does not consume a message sequence number.
     pub fn export(&self, exporter_context: &[u8], output_len: usize) -> Result<Vec<u8>, HpkeError> {
-        self.suite
-            .labeled_expand(&self.exporter_secret, b"sec", exporter_context, output_len)
+        Ok(self
+            .export_zeroizing(exporter_context, output_len)?
+            .to_vec())
+    }
+
+    /// [`Self::export`], but the returned secret is [`Zeroizing`].
+    ///
+    /// Prefer this over [`Self::export`] whenever the caller can keep working
+    /// with a `Zeroizing` buffer, since it avoids leaving an unwiped copy of
+    /// the exported secret on the heap.
+    pub fn export_zeroizing(
+        &self,
+        exporter_context: &[u8],
+        output_len: usize,
+    ) -> Result<Zeroizing<Vec<u8>>, HpkeError> {
+        self.suite.labeled_expand_zeroizing(
+            &self.exporter_secret,
+            b"sec",
+            exporter_context,
+            output_len,
+        )
     }
 
     /// Encrypt `plaintext` with RFC 9180 `Seal(seq, aad, pt)`.
@@ -415,9 +467,22 @@ impl BaseContext {
     /// sequence unchanged, so the caller may retry the same message with the
     /// correct ciphertext or AAD; a successful open advances it exactly once.
     pub fn open(&mut self, aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, HpkeError> {
+        Ok(self.open_zeroizing(aad, ciphertext)?.to_vec())
+    }
+
+    /// [`Self::open`], but the returned plaintext is [`Zeroizing`].
+    ///
+    /// Prefer this over [`Self::open`] whenever the caller can keep working
+    /// with a `Zeroizing` buffer, since it avoids leaving an unwiped copy of
+    /// the decrypted plaintext on the heap.
+    pub fn open_zeroizing(
+        &mut self,
+        aad: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, HpkeError> {
         self.ensure_encrypting_aead()?;
         let nonce = self.nonce_for_current_sequence()?;
-        let plaintext = self.open_with_aead(&nonce, aad, ciphertext)?;
+        let plaintext = Zeroizing::new(self.open_with_aead(&nonce, aad, ciphertext)?);
 
         self.advance_after_success()?;
         Ok(plaintext)
@@ -708,12 +773,26 @@ impl HpkeSuite {
     /// The constructed input key material is
     /// `"HPKE-v1" || suite_id || label || ikm` before the selected HKDF-Extract.
     pub fn labeled_extract(self, salt: &[u8], label: &[u8], ikm: &[u8]) -> Vec<u8> {
+        self.labeled_extract_zeroizing(salt, label, ikm).to_vec()
+    }
+
+    /// [`Self::labeled_extract`], but the returned PRK is [`Zeroizing`].
+    ///
+    /// The intermediate labeled input key material (which embeds `ikm` —
+    /// typically a shared secret or PSK) is also held in a `Zeroizing` buffer
+    /// so it is wiped as soon as this function returns.
+    pub fn labeled_extract_zeroizing(
+        self,
+        salt: &[u8],
+        label: &[u8],
+        ikm: &[u8],
+    ) -> Zeroizing<Vec<u8>> {
         let labeled_ikm = self.labeled_ikm(label, ikm);
-        match self.kdf_id {
+        Zeroizing::new(match self.kdf_id {
             KdfId::HkdfSha256 => Hkdf::<Sha256>::extract(Some(salt), &labeled_ikm).0.to_vec(),
             KdfId::HkdfSha384 => Hkdf::<Sha384>::extract(Some(salt), &labeled_ikm).0.to_vec(),
             KdfId::HkdfSha512 => Hkdf::<Sha512>::extract(Some(salt), &labeled_ikm).0.to_vec(),
-        }
+        })
     }
 
     /// RFC 9180 `LabeledExpand(prk, label, info, L)`.
@@ -727,6 +806,23 @@ impl HpkeSuite {
         info: &[u8],
         output_len: usize,
     ) -> Result<Vec<u8>, HpkeError> {
+        Ok(self
+            .labeled_expand_zeroizing(prk, label, info, output_len)?
+            .to_vec())
+    }
+
+    /// [`Self::labeled_expand`], but the returned output is [`Zeroizing`].
+    ///
+    /// The output buffer is allocated and filled as a `Zeroizing` buffer for
+    /// the whole computation, so no unwiped copy of the expanded key material
+    /// is ever created internally.
+    pub fn labeled_expand_zeroizing(
+        self,
+        prk: &[u8],
+        label: &[u8],
+        info: &[u8],
+        output_len: usize,
+    ) -> Result<Zeroizing<Vec<u8>>, HpkeError> {
         if output_len > u16::MAX as usize {
             return Err(HpkeError::OutputLengthTooLarge {
                 requested: output_len,
@@ -742,7 +838,7 @@ impl HpkeSuite {
         }
 
         let labeled_info = self.labeled_info(label, info, output_len as u16);
-        let mut output = vec![0_u8; output_len];
+        let mut output = Zeroizing::new(vec![0_u8; output_len]);
         match self.kdf_id {
             KdfId::HkdfSha256 => {
                 let hkdf = Hkdf::<Sha256>::from_prk(prk).map_err(|_| {
@@ -790,10 +886,16 @@ impl HpkeSuite {
         Ok(output)
     }
 
-    fn labeled_ikm(self, label: &[u8], ikm: &[u8]) -> Vec<u8> {
+    /// Build the RFC 9180 `LabeledExtract` input key material.
+    ///
+    /// `ikm` is typically a shared secret or PSK, so the concatenated buffer
+    /// is returned as [`Zeroizing`] with its exact final capacity (no
+    /// reallocation, hence no unwiped intermediate heap copy).
+    fn labeled_ikm(self, label: &[u8], ikm: &[u8]) -> Zeroizing<Vec<u8>> {
         let suite_id = self.suite_id();
-        let mut output =
-            Vec::with_capacity(HPKE_VERSION_LABEL.len() + suite_id.len() + label.len() + ikm.len());
+        let mut output = Zeroizing::new(Vec::with_capacity(
+            HPKE_VERSION_LABEL.len() + suite_id.len() + label.len() + ikm.len(),
+        ));
         output.extend_from_slice(HPKE_VERSION_LABEL);
         output.extend_from_slice(&suite_id);
         output.extend_from_slice(label);
@@ -834,33 +936,33 @@ pub fn key_schedule(
         return Err(HpkeError::UnsupportedKeyScheduleMode { mode });
     }
 
-    let psk_id_hash = Zeroizing::new(suite.labeled_extract(b"", b"psk_id_hash", psk_id));
-    let info_hash = Zeroizing::new(suite.labeled_extract(b"", b"info_hash", info));
+    let psk_id_hash = suite.labeled_extract_zeroizing(b"", b"psk_id_hash", psk_id);
+    let info_hash = suite.labeled_extract_zeroizing(b"", b"info_hash", info);
     let mut key_schedule_context =
         Zeroizing::new(Vec::with_capacity(1 + psk_id_hash.len() + info_hash.len()));
     key_schedule_context.push(mode.as_u8());
     key_schedule_context.extend_from_slice(&psk_id_hash);
     key_schedule_context.extend_from_slice(&info_hash);
 
-    let secret = Zeroizing::new(suite.labeled_extract(shared_secret, b"secret", psk));
-    let key = Zeroizing::new(suite.labeled_expand(
+    let secret = suite.labeled_extract_zeroizing(shared_secret, b"secret", psk);
+    let key = suite.labeled_expand_zeroizing(
         &secret,
         b"key",
         &key_schedule_context,
         suite.aead_id.key_len(),
-    )?);
-    let base_nonce = Zeroizing::new(suite.labeled_expand(
+    )?;
+    let base_nonce = suite.labeled_expand_zeroizing(
         &secret,
         b"base_nonce",
         &key_schedule_context,
         suite.aead_id.nonce_len(),
-    )?);
-    let exporter_secret = Zeroizing::new(suite.labeled_expand(
+    )?;
+    let exporter_secret = suite.labeled_expand_zeroizing(
         &secret,
         b"exp",
         &key_schedule_context,
         suite.kdf_id.hash_len(),
-    )?);
+    )?;
 
     Ok(KeySchedule {
         suite,
@@ -896,7 +998,7 @@ mod tests {
     #[test]
     fn labeled_extract_prefix_is_exactly_rfc_9180() {
         assert_eq!(
-            SUITE.labeled_ikm(b"eae_prk", b"input"),
+            SUITE.labeled_ikm(b"eae_prk", b"input").as_slice(),
             b"HPKE-v1HPKE\x00\x20\x00\x01\x00\x03eae_prkinput"
         );
     }
@@ -1242,5 +1344,60 @@ mod tests {
         assert_eq!(export_only.seal(b"", b""), Err(HpkeError::ExportOnlyAead));
         assert_eq!(export_only.open(b"", b""), Err(HpkeError::ExportOnlyAead));
         assert_eq!(export_only.sequence, [0_u8; 12]);
+    }
+
+    #[test]
+    fn open_zeroizing_matches_open() {
+        let mut sender = known_base_context();
+        let mut receiver_a = known_base_context();
+        let mut receiver_b = known_base_context();
+        let aad = b"aad";
+        let plaintext = b"zeroizing parity payload";
+        let ciphertext = sender.seal(aad, plaintext).unwrap();
+
+        let via_plain = receiver_a.open(aad, &ciphertext).unwrap();
+        let via_zeroizing = receiver_b.open_zeroizing(aad, &ciphertext).unwrap();
+
+        assert_eq!(via_plain, via_zeroizing.to_vec());
+        assert_eq!(via_plain, plaintext);
+        assert_eq!(receiver_a.sequence, receiver_b.sequence);
+    }
+
+    #[test]
+    fn export_zeroizing_matches_export() {
+        let context = known_base_context();
+
+        let via_plain = context.export(b"export-context", 32).unwrap();
+        let via_zeroizing = context.export_zeroizing(b"export-context", 32).unwrap();
+
+        assert_eq!(via_plain, via_zeroizing.to_vec());
+    }
+
+    #[test]
+    fn try_from_key_schedule_accepts_base_and_matches_from_key_schedule() {
+        let shared_secret: Vec<u8> = (0_u8..32).collect();
+        let schedule = || {
+            key_schedule(
+                SUITE,
+                Mode::Base,
+                &shared_secret,
+                b"deterministic HPKE schedule",
+                b"",
+                b"",
+            )
+            .unwrap()
+        };
+
+        let mut via_try = BaseContext::try_from_key_schedule(schedule()).unwrap();
+        let mut via_plain = BaseContext::from_key_schedule(schedule());
+
+        assert_eq!(
+            via_try.export(b"ctx", 16).unwrap(),
+            via_plain.export(b"ctx", 16).unwrap()
+        );
+        assert_eq!(
+            via_try.seal(b"aad", b"pt").unwrap(),
+            via_plain.seal(b"aad", b"pt").unwrap()
+        );
     }
 }
