@@ -2,6 +2,7 @@ target/
 *.log
 *.md
 !README.md
+!CHANGELOG.md
 .github/
 Falcon1024/
 key/

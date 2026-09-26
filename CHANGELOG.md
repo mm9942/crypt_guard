@@ -1,0 +1,49 @@
+# Changelog
+
+All notable changes to the CryptGuard crates are documented here. All crates
+(`crypt_guard`, `crypt_guard_core`, `crypt_guard_proc`, `crypt_guard_service`,
+`crypt_guard_hyper`) are released together under one version.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+`cargo release` turns the `Unreleased` section into the released version.
+
+## [Unreleased]
+
+### Added
+- Workspace layout: `crypt_guard` is a facade over `crypt_guard_core`; all
+  existing `crypt_guard::…` paths keep working.
+- `crypt_guard_service` (feature `service`): typed KMS operations,
+  non-`Clone` zeroizing `SecretBytes`, `CryptoProvider`, Tower
+  `CryptoService`, `InMemoryProvider` (HPKE encrypt/decrypt, wrap/unwrap/
+  rewrap, ML-DSA with feature `ml-dsa`, key lifecycle) and
+  `PolicyProvider`/`NamespacePolicy`.
+- `crypt_guard_hyper` (feature `hyper`): HTTP adapter with the `CGK1` codec,
+  bearer-token authentication, bounded zeroizing body collection and the
+  `TowerToHyperService` bridge; `kms_server` example.
+- Core: `open_zeroizing`/`export_zeroizing`, `HpkeEnvelope::try_to_bytes`,
+  `HpkeEnvelope::open_bytes_zeroizing`, `pq_hpke::suite_from_ids`/`suite_ids`,
+  `TryOsRng`, `try_generate_recipient_key_pair`, `RecipientKeyPair::into_parts`,
+  `Sign::try_hmac`, `From` conversions of all error types into `CryptError`.
+- `examples/pq_hpke.rs`.
+
+### Changed
+- RFC 9180 `SenderContext`/`ReceiverContext` are `Send + Sync`.
+- `Debug` of secret-bearing types is redacted; `Key` compares in constant time.
+- Secret key files are created with mode `0600` on Unix.
+- `Sign::hmac` is deprecated in favour of `Sign::try_hmac`.
+
+### Fixed
+- Zeroization of key schedules, hybrid KEM seeds and shared secrets, X448,
+  ML-KEM/ML-DSA/SLH-DSA/HKDF temporaries; AES round keys and SLH-DSA signing
+  keys are wiped on drop.
+- Legacy AES-XTS and XChaCha20-Poly1305 file encryption encrypted an empty
+  plaintext instead of the file.
+- Legacy decryption no longer continues with empty data after a failed HMAC
+  verification.
+- Single-feature builds (`aes-ctr`, `aes-xts`, `legacy-aes`,
+  `aes-gcm-siv-cipher`, `zip`).
+- Panics on crafted key files and in RFC 9180 KEM dispatch.
+
+## [3.0.2]
+
+- Provenance-seed recovery fix (see README release note).

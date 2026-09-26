@@ -3,13 +3,42 @@ members = ["crates/*", "crypt_guard_proc"]
 exclude = ["old"]
 resolver = "2"
 
-[package]
-name = "crypt_guard"
+# Single source of truth for the lockstep version of all published crates.
+# Bump it with `cargo release` (see release.toml), never by hand.
+[workspace.package]
 version = "3.1.0"
 edition = "2021"
-description = "CryptGuard is a post-quantum cryptography framework with NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) plus legacy Kyber/Falcon/Dilithium, combined with AES and XChaCha20."
 license = "MIT"
 repository = "https://github.com/mm9942/crypt_guard"
+
+# Internal crates: path for development, version for crates.io.
+[workspace.dependencies]
+crypt_guard_proc    = { path = "crypt_guard_proc", version = "3.1.0" }
+crypt_guard_core    = { path = "crates/core", version = "3.1.0", default-features = false }
+crypt_guard_service = { path = "crates/service", version = "3.1.0" }
+crypt_guard_hyper   = { path = "crates/hyper", version = "3.1.0" }
+
+[package]
+name = "crypt_guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CryptGuard is a post-quantum cryptography framework with NIST FIPS 203/204/205 (ML-KEM, ML-DSA, SLH-DSA) plus legacy Kyber/Falcon/Dilithium, combined with AES and XChaCha20."
+
+# Release automation (cargo-release, see release.toml). The checks and the
+# README/CHANGELOG rewrites run once, from the facade crate.
+[package.metadata.release]
+pre-release-hook = ["scripts/release_checks.sh", "{{version}}"]
+pre-release-replacements = [
+  { file = "README.md", search = "^# CryptGuard v[0-9]+\\.[0-9]+\\.[0-9]+", replace = "# CryptGuard v{{version}}", exactly = 1 },
+  { file = "README.md", search = "crates\\.io-v[0-9]+\\.[0-9]+\\.[0-9]+-blue", replace = "crates.io-v{{version}}-blue", exactly = 1 },
+  { file = "README.md", search = "docs-v[0-9]+\\.[0-9]+\\.[0-9]+-yellow", replace = "docs-v{{version}}-yellow", exactly = 1 },
+  { file = "README.md", search = "crypt_guard = \"[0-9]+\\.[0-9]+\\.[0-9]+\"", replace = "crypt_guard = \"{{version}}\"", exactly = 1 },
+  { file = "README.md", search = "crypt_guard = \\{ version = \"[0-9]+\\.[0-9]+\\.[0-9]+\"", replace = "crypt_guard = { version = \"{{version}}\"", min = 0 },
+  { file = "src/lib.rs", search = "^//! # CryptGuard v[0-9]+\\.[0-9]+\\.[0-9]+", replace = "//! # CryptGuard v{{version}}", exactly = 1 },
+  { file = "CHANGELOG.md", search = "## \\[Unreleased\\]", replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}", exactly = 1 },
+]
 
 # `crypt_guard` is the public facade. The cryptography lives in
 # `crypt_guard_core`; the optional service and transport layers are separate
@@ -42,9 +71,9 @@ service = ["dep:crypt_guard_service"]
 hyper = ["service", "dep:crypt_guard_hyper"]
 
 [dependencies]
-crypt_guard_core    = { path = "crates/core", version = "3.1.0", default-features = false }
-crypt_guard_service = { path = "crates/service", version = "3.1.0", optional = true }
-crypt_guard_hyper   = { path = "crates/hyper", version = "3.1.0", optional = true }
+crypt_guard_core    = { workspace = true }
+crypt_guard_service = { workspace = true, optional = true }
+crypt_guard_hyper   = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex = "0.4.3"

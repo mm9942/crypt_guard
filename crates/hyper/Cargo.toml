@@ -1,13 +1,13 @@
 [package]
 name = "crypt_guard_hyper"
-version = "3.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Hyper/HTTP adapter for the CryptGuard crypto service: bounded bodies, error mapping and the TowerToHyperService bridge. Use it through the `crypt_guard` facade with `--features hyper`."
-license = "MIT"
-repository = "https://github.com/mm9942/crypt_guard"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-crypt_guard_service = { path = "../service", version = "3.1.0", features = ["buffer"] }
+crypt_guard_service = { workspace = true, features = ["buffer"] }
 bytes = "1.9"
 http = "1"
 http-body = "1"

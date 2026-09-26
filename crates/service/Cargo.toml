@@ -1,10 +1,10 @@
 [package]
 name = "crypt_guard_service"
-version = "3.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Typed, ownership-preserving Tower crypto/KMS service layer for CryptGuard (no HTTP). Use it through the `crypt_guard` facade with `--features service`."
-license = "MIT"
-repository = "https://github.com/mm9942/crypt_guard"
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = []
@@ -18,7 +18,7 @@ ml-dsa = ["crypt_guard_core/ml-dsa-backend"]
 [dependencies]
 # The facade decides which core features are enabled; the service layer only
 # needs the always-on `pq_hpke` surface.
-crypt_guard_core = { path = "../core", version = "3.1.0", default-features = false }
+crypt_guard_core = { workspace = true }
 tower-service = "0.3.3"
 zeroize = "1.8.1"
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit"], optional = true }
