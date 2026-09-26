@@ -4,10 +4,11 @@ use core::task::{Context, Poll};
 
 use tower::ServiceExt;
 
+use crypt_guard_core::error::CryptError;
 use crypt_guard_core::pq_hpke::{EnvelopeError, Error as HpkeError};
 use crypt_guard_service::{
     CryptoContext, CryptoOperation, CryptoProvider, CryptoRequest, CryptoResponse, CryptoService,
-    CryptoServiceError, DescribeKey, Encrypt, KeyId, KeyNamespace, KeyRef, NullProvider,
+    CryptoServiceError, DescribeKey, Encrypt, ErrorKind, KeyId, KeyNamespace, KeyRef, NullProvider,
     PublicBlob, RequestId, SecretBytes,
 };
 
@@ -139,4 +140,114 @@ fn key_names_are_validated() {
         );
     }
     assert_eq!(key().to_string(), "app/k1");
+}
+
+#[test]
+fn error_kind_maps_onto_service_error_classes() {
+    assert_eq!(
+        CryptoServiceError::from(ErrorKind::Authentication),
+        CryptoServiceError::AuthenticationFailed
+    );
+    for kind in [
+        ErrorKind::InvalidInput,
+        ErrorKind::InvalidKey,
+        ErrorKind::Encoding,
+    ] {
+        assert_eq!(
+            CryptoServiceError::from(kind),
+            CryptoServiceError::Malformed,
+            "{kind:?}"
+        );
+    }
+    assert_eq!(
+        CryptoServiceError::from(ErrorKind::Unsupported),
+        CryptoServiceError::Unsupported
+    );
+    for kind in [ErrorKind::Io, ErrorKind::Randomness] {
+        assert_eq!(
+            CryptoServiceError::from(kind),
+            CryptoServiceError::Unavailable,
+            "{kind:?}"
+        );
+    }
+    for kind in [ErrorKind::Limit, ErrorKind::Internal] {
+        assert_eq!(
+            CryptoServiceError::from(kind),
+            CryptoServiceError::Internal,
+            "{kind:?}"
+        );
+    }
+}
+
+#[test]
+fn crypt_error_maps_via_its_kind() {
+    // Authentication-class core error -> opaque AuthenticationFailed.
+    assert_eq!(
+        CryptoServiceError::from(CryptError::AuthenticationFailed),
+        CryptoServiceError::AuthenticationFailed
+    );
+    // I/O-class core error -> Unavailable (transient, not the caller's fault).
+    assert_eq!(
+        CryptoServiceError::from(CryptError::FileNotFound),
+        CryptoServiceError::Unavailable
+    );
+    // Malformed-input-class core error -> Malformed.
+    assert_eq!(
+        CryptoServiceError::from(CryptError::InvalidKemPublicKey),
+        CryptoServiceError::Malformed
+    );
+    // Unsupported-class core error -> Unsupported.
+    assert_eq!(
+        CryptoServiceError::from(CryptError::UnsupportedAlgorithm),
+        CryptoServiceError::Unsupported
+    );
+}
+
+#[test]
+fn is_retryable_is_true_only_for_transient_conditions() {
+    assert!(CryptoServiceError::Unavailable.is_retryable());
+    assert!(CryptoServiceError::Overloaded.is_retryable());
+    for err in [
+        CryptoServiceError::Unsupported,
+        CryptoServiceError::Unauthenticated,
+        CryptoServiceError::NotFound,
+        CryptoServiceError::Forbidden,
+        CryptoServiceError::Conflict,
+        CryptoServiceError::Malformed,
+        CryptoServiceError::AuthenticationFailed,
+        CryptoServiceError::Internal,
+    ] {
+        assert!(!err.is_retryable(), "{err:?} must not be retryable");
+    }
+}
+
+#[test]
+fn crypto_kind_is_some_only_for_crypto_derived_classes() {
+    assert_eq!(
+        CryptoServiceError::AuthenticationFailed.crypto_kind(),
+        Some(ErrorKind::Authentication)
+    );
+    assert_eq!(
+        CryptoServiceError::Malformed.crypto_kind(),
+        Some(ErrorKind::InvalidInput)
+    );
+    assert_eq!(
+        CryptoServiceError::Unsupported.crypto_kind(),
+        Some(ErrorKind::Unsupported)
+    );
+    assert_eq!(
+        CryptoServiceError::Internal.crypto_kind(),
+        Some(ErrorKind::Internal)
+    );
+    // Authorization/lifecycle/transport classes are not crypto failures.
+    for err in [
+        CryptoServiceError::Unauthenticated,
+        CryptoServiceError::NotFound,
+        CryptoServiceError::Forbidden,
+        CryptoServiceError::Conflict,
+        CryptoServiceError::Unavailable,
+        CryptoServiceError::Overloaded,
+    ] {
+        assert_eq!(err.crypto_kind(), None, "{err:?}");
+    }
 }

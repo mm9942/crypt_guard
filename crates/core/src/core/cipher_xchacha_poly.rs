@@ -1,3 +1,44 @@
+//! Legacy `CipherChaChaPoly` symmetric cipher: XChaCha20-Poly1305 AEAD with an
+//! outer HMAC-SHA512 tag.
+//!
+//! [`CipherChaChaPoly`](crate::cryptography::CipherChaChaPoly) wraps the
+//! `chacha20poly1305` crate's XChaCha20-Poly1305 implementation. Its `new`,
+//! `encryption`/`decryption` helpers and nonce generation are unconditionally
+//! compiled (see `crates/core/src/core/mod.rs`), while the
+//! [`CryptographicFunctions`] impl that binds it to a Kyber KEM shared secret
+//! is gated behind the `legacy-pqclean` feature. This is part of the pre-v3 /
+//! CGv2 legacy API surface; new code should use
+//! [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Security
+//! XChaCha20-Poly1305 is itself an AEAD construction. This module additionally
+//! prepends an HMAC-SHA512 tag (keyed with the caller's passphrase) to the
+//! plaintext before encryption and verifies it after decryption, so integrity
+//! is checked twice: once by Poly1305 over the ciphertext, once by the
+//! passphrase-keyed HMAC over the plaintext.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherChaChaPoly, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::XChaCha20Poly1305,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherChaChaPoly::new(infos, None);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! ```
 //use crypt_guard_proc::{*, log_actnonceity, write_log};
 #[cfg(feature = "legacy-pqclean")]
 use crate::core::{CryptographicFunctions, KeyControlVariant};

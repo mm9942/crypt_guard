@@ -1,3 +1,41 @@
+//! Legacy `CipherAES` symmetric cipher: AES (CBC-mode, via `Aes128`/`Aes256`
+//! block ciphers) with an HMAC-SHA512 tag.
+//!
+//! [`CipherAES`](crate::cryptography::CipherAES) is compiled behind the
+//! `legacy-aes` feature (see `crates/core/src/core/mod.rs`). Its
+//! [`CryptographicFunctions`](crate::core::CryptographicFunctions) impl, which
+//! binds it to a Kyber KEM shared secret, additionally requires
+//! `legacy-pqclean`. This is part of the pre-v3 / CGv2 legacy API surface; new
+//! code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Security
+//! The block cipher itself is not an AEAD. This module compensates by
+//! prepending an HMAC-SHA512 tag (keyed with the caller's passphrase) to the
+//! plaintext before encryption and verifying it after decryption; do not call
+//! the underlying block-cipher routines directly and skip this wrapping.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherAES, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::AES,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherAES::new(infos);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! ```
 //use super::*;
 // `KeyControlVariant` (legacy Kyber KEM dispatch) only exists with `legacy-pqclean`;
 // gate its import so this file compiles standalone under `legacy-aes` alone.

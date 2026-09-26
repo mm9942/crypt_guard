@@ -15,7 +15,7 @@
 //! All functions are pure (no shared state). `Send + Sync` trivially.
 //!
 //! # Errors
-//! Returns [`CryptError::CustomError`] if the HKDF output length is invalid (>255 * HashLen).
+//! Returns [`CryptError::InvalidDataLength`] if the HKDF output length is invalid (>255 * HashLen).
 //! In practice this never occurs because the output is always 32 bytes.
 //!
 //! # Examples
@@ -28,6 +28,9 @@
 //! let session_key = derive_session_key(&shared_secret, &salt, LABEL_XCHACHA20POLY1305).unwrap();
 //! assert_eq!(session_key.as_ref().len(), 32);
 //! ```
+
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 use crate::error::CryptError;
 use crate::kdf::types::{HkdfSalt, SessionKey};
@@ -74,7 +77,7 @@ pub const LABEL_GENERIC: &[u8] = b"crypt_guard:v2:aead:generic";
 /// `Ok(SessionKey)` — a 32-byte zeroizing session key.
 ///
 /// # Errors
-/// - [`CryptError::CustomError`]: HKDF output length was invalid. Cannot occur in practice
+/// - [`CryptError::InvalidDataLength`]: HKDF output length was invalid. Cannot occur in practice
 ///   because the output length is always 32 bytes.
 ///
 /// # Concurrency
@@ -97,9 +100,8 @@ pub fn derive_session_key(
 ) -> Result<SessionKey, CryptError> {
     let hk = Hkdf::<Sha256>::new(Some(salt.as_ref()), shared_secret);
     let mut okm = [0u8; 32];
-    hk.expand(label, &mut okm).map_err(|_| {
-        CryptError::CustomError("HKDF expand failed: invalid output length".to_owned())
-    })?;
+    hk.expand(label, &mut okm)
+        .map_err(|_| CryptError::InvalidDataLength)?;
     // `[u8; 32]` is `Copy`, so passing `okm` by value into `SessionKey::from_bytes`
     // copies its bytes rather than moving them out; the local `okm` stays valid and
     // must be wiped explicitly once the copy has been made.
@@ -124,7 +126,7 @@ pub fn derive_session_key(
 /// `Ok(SessionKey)` — a 32-byte zeroizing session key.
 ///
 /// # Errors
-/// - [`CryptError::CustomError`]: HKDF output length was invalid.
+/// - [`CryptError::InvalidDataLength`]: HKDF output length was invalid.
 ///
 /// # Concurrency
 /// Pure function; no shared state. Safe to call concurrently.
@@ -146,9 +148,8 @@ pub fn derive_session_key_sha512(
 ) -> Result<SessionKey, CryptError> {
     let hk = Hkdf::<Sha512>::new(Some(salt.as_ref()), shared_secret);
     let mut okm = [0u8; 32];
-    hk.expand(label, &mut okm).map_err(|_| {
-        CryptError::CustomError("HKDF-SHA512 expand failed: invalid output length".to_owned())
-    })?;
+    hk.expand(label, &mut okm)
+        .map_err(|_| CryptError::InvalidDataLength)?;
     // See the comment in `derive_session_key`: `okm` survives the by-value move
     // into `SessionKey::from_bytes` because `[u8; 32]` is `Copy`, so it must be
     // wiped explicitly here too.

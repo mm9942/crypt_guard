@@ -13,7 +13,12 @@
 //! The module does **not** expose a nonce API: contexts own and advance the
 //! RFC 9180 sequence state exactly once after successful `seal`/`open`.
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use std::{error::Error, fmt};
+
+use crate::error::ErrorKind;
 
 use aes_gcm::{
     aead::{Aead as AesAead, KeyInit as AesKeyInit, Payload as AesPayload},
@@ -111,6 +116,31 @@ impl fmt::Display for Rfc9180Error {
 }
 
 impl Error for Rfc9180Error {}
+
+impl Rfc9180Error {
+    /// Coarse [`ErrorKind`] classification for this error.
+    ///
+    /// `DecapsulationFailed` maps to [`ErrorKind::InvalidKey`] rather than
+    /// [`ErrorKind::Authentication`]: DHKEM decapsulation failure indicates
+    /// invalid key or ciphertext material, not an AEAD authentication-tag
+    /// mismatch. Every AEAD authentication failure still maps to
+    /// [`ErrorKind::Authentication`] and nothing finer.
+    pub const fn kind(&self) -> ErrorKind {
+        match self {
+            Self::KemMismatch { .. } => ErrorKind::InvalidInput,
+            Self::InvalidKemEncoding { .. } => ErrorKind::InvalidKey,
+            Self::InvalidPskInputs { .. } => ErrorKind::InvalidInput,
+            Self::ExportOnlyAead => ErrorKind::Unsupported,
+            Self::EncapsulationFailed => ErrorKind::Internal,
+            Self::DecapsulationFailed => ErrorKind::InvalidKey,
+            Self::InvalidDhSharedSecret => ErrorKind::InvalidKey,
+            Self::AuthenticationFailed => ErrorKind::Authentication,
+            Self::MessageLimitReached => ErrorKind::Limit,
+            Self::ExportLengthTooLarge => ErrorKind::Limit,
+            Self::SealFailed => ErrorKind::Internal,
+        }
+    }
+}
 
 /// A validated RFC 9180 DHKEM public key.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1623,6 +1653,22 @@ mod tests {
             x448_dh(&bob_private, &alice_public).unwrap(),
             shared_secret,
             "Bob's RFC 7748 X448 shared secret"
+        );
+    }
+
+    #[test]
+    fn authentication_failed_kind_is_authentication() {
+        assert_eq!(
+            Rfc9180Error::AuthenticationFailed.kind(),
+            crate::error::ErrorKind::Authentication
+        );
+    }
+
+    #[test]
+    fn authentication_failed_display_carries_no_variable_data() {
+        assert_eq!(
+            Rfc9180Error::AuthenticationFailed.to_string(),
+            "HPKE ciphertext authentication failed"
         );
     }
 }

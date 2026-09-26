@@ -74,7 +74,10 @@ impl InMemoryProvider {
         })
     }
 
-    fn dispatch(&mut self, operation: CryptoOperation) -> Result<CryptoResponse, CryptoServiceError> {
+    fn dispatch(
+        &mut self,
+        operation: CryptoOperation,
+    ) -> Result<CryptoResponse, CryptoServiceError> {
         let store = &mut self.store;
         match operation {
             CryptoOperation::Generate(op) => {

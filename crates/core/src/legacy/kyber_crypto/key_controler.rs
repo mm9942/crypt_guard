@@ -1,3 +1,20 @@
+//! Legacy pqcrypto-backed Kyber KEM key management (`KyberKeyFunctions`,
+//! `KeyControKyber512`/`768`/`1024`, and the generic `KeyControl<T>`).
+//!
+//! Provides key-pair generation, encapsulation and decapsulation for the legacy
+//! Kyber-r3 KEM, plus zeroize-on-drop key containers used by the sibling
+//! `kyber_crypto_*` cipher modules. It is part of the `legacy-pqclean` migration path
+//! described in `crates/core/src/legacy/mod.rs`: the underlying `pqcrypto-kyber` /
+//! `pqcrypto-traits` crates wrap PQClean, which is unmaintained and being archived (see
+//! `SECURITY.md`). New code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke)
+//! instead of this module.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! ```
 use crate::{error::CryptError, log_activity, FileMetadata, FileState, FileTypes, Key, KeyTypes};
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use std::{
@@ -288,9 +305,13 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
     }
 
     /// Retrieves a specified key based on `KeyTypes`.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`],
+    /// which does not name a retrievable key.
     pub fn get_key(&self, key: KeyTypes) -> Result<Key, CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
             KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
             KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
@@ -300,20 +321,30 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
     }
 
     /// Saves a specified key to a file at the given base path.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`]
+    /// or [`KeyTypes::SharedSecret`]; neither is a key type this method can save
+    /// to a file.
     pub fn save(&self, key: KeyTypes, base_path: PathBuf) -> Result<(), CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
             KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
             KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
-            KeyTypes::SharedSecret => unimplemented!(),
+            KeyTypes::SharedSecret => return Err(CryptError::UnsupportedOperation),
         };
         key.save(base_path)
     }
     /// Loads a specified key from a file.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`]
+    /// or [`KeyTypes::SharedSecret`]; neither is a key type this method can load
+    /// from a file. Also returns an error if the underlying file load fails.
     pub fn load(&self, key: KeyTypes, path: &Path) -> Result<Vec<u8>, CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => {
                 FileMetadata::from(PathBuf::from(path), FileTypes::PublicKey, FileState::Other)
             }
@@ -323,9 +354,9 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
             KeyTypes::Ciphertext => {
                 FileMetadata::from(PathBuf::from(path), FileTypes::Ciphertext, FileState::Other)
             }
-            KeyTypes::SharedSecret => unimplemented!(),
+            KeyTypes::SharedSecret => return Err(CryptError::UnsupportedOperation),
         };
-        Ok(key.load().unwrap())
+        key.load()
     }
 
     /// Getter methods for public_key, secret_key, ciphertext, and shared_secret.

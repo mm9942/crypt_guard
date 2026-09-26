@@ -27,6 +27,9 @@
 //! }
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use crate::error::CryptError;
 use zeroize::ZeroizeOnDrop;
 

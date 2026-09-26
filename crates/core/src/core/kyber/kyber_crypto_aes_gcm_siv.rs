@@ -1,13 +1,49 @@
+//! Legacy Kyber + AES-256-GCM-SIV cipher glue for the pqcrypto-backed `Kyber`
+//! typestate.
+//!
+//! This implements the crate-local `KyberFunctions` trait for
+//! `Kyber<Encryption, KyberSize, ContentStatus, AesGcmSiv>` and its
+//! `Decryption` counterpart, wiring the legacy Kyber KEM key material into
+//! [`CipherAesGcmSiv`](crate::cryptography::CipherAesGcmSiv) for messages,
+//! in-memory data and files. New code should use
+//! [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead, since
+//! AES-256-GCM-SIV is a crypt_guard private extension there and is only
+//! reachable through [`pq_hpke::HpkeEnvelope`](crate::pq_hpke::HpkeEnvelope).
+//!
+//! Note: this file is not currently declared as a `mod` anywhere in the crate,
+//! so it is dead code, not part of any compiled build. The active, wired-up
+//! implementation of this same glue lives at
+//! `crates/core/src/legacy/kyber_crypto/kyber_crypto_aes_gcm_siv.rs`, gated
+//! behind the `legacy-pqclean` feature.
+//!
+//! # Security
+//! AES-256-GCM-SIV is itself an AEAD construction, nonce-misuse-resistant by
+//! design, so this glue does not need to add its own authentication on top.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let mut encryptor =
+//!     Kyber::<Encryption, Kyber1024, Data, AesGcmSiv>::new(public_key, None)?;
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), "Test Passphrase")?;
+//!
+//! let nonce = encryptor.get_nonce();
+//! let decryptor =
+//!     Kyber::<Decryption, Kyber1024, Data, AesGcmSiv>::new(secret_key, Some(nonce?.to_string()))?;
+//! let decrypt_message = decryptor.decrypt_data(encrypt_message, "Test Passphrase", cipher)?;
+//! ```
 // removed unused kem imports per clippy
 use crate::{
-    *,
-    cryptography::*, 
-    error::CryptError, 
+    core::CryptographicFunctions,
+    cryptography::*,
+    error::CryptError,
+    FileMetadata,
+    FileState,
     //hmac_sign::*,
     FileTypes,
-    FileState,
-    FileMetadata,
-    core::CryptographicFunctions,
+    *,
 };
 use std::{
     path::{Path, PathBuf},
@@ -15,27 +51,26 @@ use std::{
 };
 
 /// Provides Kyber encryption functions for AES-GCM-SIV algorithm.
-impl<KyberSize, ContentStatus> KyberFunctions for Kyber<Encryption, KyberSize, ContentStatus, AesGcmSiv>
+impl<KyberSize, ContentStatus> KyberFunctions
+    for Kyber<Encryption, KyberSize, ContentStatus, AesGcmSiv>
 where
     KyberSize: KyberSizeVariant,
-{   
+{
     /// Encrypts a file with AES-GCM-SIV algorithm, given a path and a passphrase.
     /// Returns the encrypted data and cipher.
-     fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(
+        &mut self,
+        path: PathBuf,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         if !Path::new(&path).exists() {
             return Err(CryptError::FileNotFound);
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -65,17 +100,15 @@ where
 
     /// Encrypts a message with AES-GCM-SIV algorithm, given the message and a passphrase.
     /// Returns the encrypted data and cipher.
-    fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(
+        &mut self,
+        message: &str,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -102,20 +135,17 @@ where
         Ok((data, cipher))
     }
 
-
     /// Encrypts data with AES-GCM-SIV algorithm, given the data and a passphrase.
     /// Returns the encrypted data and cipher.
-    fn encrypt_data(&mut self, data: Vec<u8>, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(
+        &mut self,
+        data: Vec<u8>,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -142,52 +172,79 @@ where
     }
 
     /// Placeholder for decrypt_file, indicating operation not allowed in encryption mode.
-    fn decrypt_file(&self, _path: PathBuf, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(
+        &self,
+        _path: PathBuf,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for decrypt_msg, indicating operation not allowed in encryption mode.
-    fn decrypt_msg(&self, _message: Vec<u8>, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(
+        &self,
+        _message: Vec<u8>,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for decrypt_data, indicating operation not allowed in encryption mode.
-    fn decrypt_data(&self, _data: Vec<u8>, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(
+        &self,
+        _data: Vec<u8>,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of data isn't allowed!"))
     }
 }
-impl<KyberSize, ContentStatus> KyberFunctions for Kyber<Decryption, KyberSize, ContentStatus, AesGcmSiv>
+impl<KyberSize, ContentStatus> KyberFunctions
+    for Kyber<Decryption, KyberSize, ContentStatus, AesGcmSiv>
 where
     KyberSize: KyberSizeVariant,
-{   
+{
     /// Placeholder for encrypt_file, indicating operation not allowed in decryption mode.
-    fn encrypt_file(&mut self, _path: PathBuf, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(
+        &mut self,
+        _path: PathBuf,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for encrypt_msg, indicating operation not allowed in decryption mode.
-    fn encrypt_msg(&mut self, _message: &str, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(
+        &mut self,
+        _message: &str,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for encrypt_data, indicating operation not allowed in decryption mode.
-    fn encrypt_data(&mut self, _data: Vec<u8>, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(
+        &mut self,
+        _data: Vec<u8>,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
 
     /// Decrypts a file with AES-GCM-SIV algorithm, given a path, passphrase, and cipherteGCM-SIV
     /// Returns the decrypted data.
-    fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(
+        &self,
+        path: PathBuf,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         if !Path::new(&path).exists() {
             return Err(CryptError::FileNotFound);
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -207,7 +264,8 @@ where
             location: Some(file),
         };
 
-        let mut aes_gcm_siv = CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv =
+            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         println!("{:?}", &data);
@@ -216,17 +274,16 @@ where
 
     /// Decrypts a message with AES-GCM-SIV algorithm, given the message, passphrase, and cipherteGCM-SIV
     /// Returns the decrypted data.
-    fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(
+        &self,
+        message: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -244,7 +301,8 @@ where
             location: None,
         };
 
-        let mut aes_gcm_siv = CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv =
+            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         println!("{:?}", &data);
@@ -253,17 +311,16 @@ where
 
     /// Decrypts data with AES-GCM-SIV algorithm, given the data, passphrase, and ciphertext.
     /// Returns the decrypted data.
-    fn decrypt_data(&self, data: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(
+        &self,
+        data: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -281,7 +338,8 @@ where
             location: None,
         };
 
-        let mut aes_gcm_siv = CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv =
+            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         println!("{:?}", &data);

@@ -88,6 +88,11 @@ impl Harness {
             response.headers().get(header::CACHE_CONTROL).unwrap(),
             "no-store"
         );
+        // Every response, success or error, carries a request id.
+        assert!(
+            response.headers().get("x-request-id").is_some(),
+            "response missing x-request-id header"
+        );
         let status = response.status();
         let body = response.into_body().collect().await.unwrap().to_bytes();
         (status, body)

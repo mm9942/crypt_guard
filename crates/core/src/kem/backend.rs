@@ -21,6 +21,9 @@
 //! use crypt_guard_core::kem::backend::{KemBackend, KemId};
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use crate::error::CryptError;
 use crate::kem::KemSize;
 
@@ -194,6 +197,9 @@ pub struct OsRng;
 /// failure — long-running services, code invoked from a context where
 /// unwinding/aborting is unacceptable — should use [`TryOsRng`] instead, which
 /// surfaces `getrandom::Error` as an ordinary `Result` rather than panicking.
+// Deliberate: see the `# Panics` section above — `Error = Infallible` leaves
+// panicking as the only way to surface an OS entropy failure here.
+#[allow(clippy::expect_used)]
 impl rand_core_010::TryRng for OsRng {
     type Error = core::convert::Infallible;
     /// Returns a random `u32` drawn from OS entropy.

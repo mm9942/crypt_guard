@@ -1,3 +1,33 @@
+//! Legacy Kyber + AES-XTS (disk-sector-style, unauthenticated) cipher glue for the
+//! pqcrypto-backed `Kyber` typestate.
+//!
+//! This implements the crate-local `KyberFunctions` trait for
+//! `Kyber<Encryption, KyberSize, ContentStatus, AesXts>`, wiring the legacy Kyber KEM key
+//! material into [`CipherAesXts`](crate::cryptography::CipherAesXts) for messages,
+//! in-memory data and files. It is part of the `legacy-pqclean` migration path described
+//! in `crates/core/src/legacy/mod.rs`: the underlying `pqcrypto-kyber` / `pqcrypto-traits`
+//! crates wrap PQClean, which is unmaintained and being archived (see `SECURITY.md`).
+//! New code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead of this
+//! module.
+//!
+//! # Security
+//! AES-XTS is designed for fixed-size storage blocks (e.g. disk sectors) and is not an AEAD mode.
+//! The legacy cipher wrapper adds an HMAC-SHA512 tag over the plaintext before
+//! encrypting and verifies it after decrypting (MAC-then-encrypt). That gives
+//! integrity checking, but it is a non-standard construction; do not use it for
+//! new designs, use `crypt_guard_core::pq_hpke` instead.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesXts>::new(public_key, None)?;
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), "Test Passphrase")?;
+//!
+//! let decryptor = Kyber::<Decryption, Kyber1024, Data, AesXts>::new(secret_key, None)?;
+//! let decrypt_message = decryptor.decrypt_data(encrypt_message, "Test Passphrase", cipher)?;
+//! ```
 // removed unused kem imports per clippy
 use crate::{
     core::CryptographicFunctions,

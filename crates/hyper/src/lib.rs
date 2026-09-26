@@ -37,6 +37,7 @@
 //! bounded and collected into zeroizing memory ([`collect_secret`]).
 
 #![forbid(unsafe_code)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![warn(missing_docs)]
 
 pub mod auth;
@@ -50,7 +51,7 @@ mod service;
 pub use auth::{Anonymous, Authenticator, BearerTokens};
 pub use body::{collect_secret, BodyError, SecretBody};
 pub use config::{BodyLimits, HttpConfig};
-pub use error::{error_response, status_for};
+pub use error::{error_response, status_for, AdapterError, Result};
 pub use hyper_util::service::TowerToHyperService;
 pub use service::{CryptoHttpService, ResponseBody};
 

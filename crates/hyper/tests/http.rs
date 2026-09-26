@@ -78,12 +78,27 @@ async fn roundtrip<P: CryptoProvider>(
     tokio::spawn(connection);
 
     let mut results = Vec::new();
+    let mut previous_request_id: Option<http::HeaderValue> = None;
     for request in requests {
         let response = sender.send_request(request).await.unwrap();
         assert_eq!(
             response.headers().get(header::CACHE_CONTROL).unwrap(),
             "no-store"
         );
+        // Every response carries a request id, and consecutive requests on
+        // the same connection get distinct ids.
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .expect("x-request-id header present")
+            .clone();
+        if let Some(previous) = &previous_request_id {
+            assert_ne!(
+                previous, &request_id,
+                "consecutive responses must carry different request ids"
+            );
+        }
+        previous_request_id = Some(request_id);
         let status = response.status();
         let body = response.into_body().collect().await.unwrap().to_bytes();
         results.push((status, body));
@@ -171,15 +186,52 @@ async fn errors_are_opaque() {
             StatusCode::SERVICE_UNAVAILABLE,
         ),
     ] {
-        let results = roundtrip(
-            FailingProvider(err),
-            vec![req(Method::GET, "/v1/keys/app/k1", b"")],
-        )
-        .await;
-        assert_eq!(results[0].0, status, "{err:?}");
+        let handle = network_handle(
+            CryptoService::new(FailingProvider(err)),
+            StackConfig::default(),
+        );
+        let service = into_hyper(CryptoHttpService::new(handle, config()));
+
+        let (client_io, server_io) = tokio::io::duplex(64 * 1024);
+        let server = tokio::spawn(async move {
+            hyper::server::conn::http1::Builder::new()
+                .serve_connection(TokioIo::new(server_io), service)
+                .await
+        });
+
+        let (mut sender, connection) =
+            hyper::client::conn::http1::handshake(TokioIo::new(client_io))
+                .await
+                .unwrap();
+        tokio::spawn(connection);
+
+        let response = sender
+            .send_request(req(Method::GET, "/v1/keys/app/k1", b""))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), status, "{err:?}");
+        // Retryable errors (transient provider/transport conditions) carry a
+        // `Retry-After` hint; non-retryable ones must not, so a caller cannot
+        // be misled into retrying a request that will never succeed.
+        if err.is_retryable() {
+            assert_eq!(
+                response.headers().get(header::RETRY_AFTER).unwrap(),
+                "1",
+                "{err:?}"
+            );
+        } else {
+            assert!(
+                response.headers().get(header::RETRY_AFTER).is_none(),
+                "{err:?} must not carry Retry-After"
+            );
+        }
+        let body = response.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(
-            results[0].1,
+            body,
             Bytes::from_static(status.canonical_reason().unwrap().as_bytes())
         );
+
+        drop(sender);
+        server.await.unwrap().unwrap();
     }
 }

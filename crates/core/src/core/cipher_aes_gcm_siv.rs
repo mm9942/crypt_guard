@@ -1,3 +1,45 @@
+//! Legacy `CipherAesGcmSiv` symmetric cipher: AES-256-GCM-SIV AEAD with an
+//! outer HMAC-SHA512 tag.
+//!
+//! [`CipherAesGcmSiv`](crate::cryptography::CipherAesGcmSiv) is compiled when
+//! `aes-gcm-siv-cipher` or `legacy-pqclean` is active (see
+//! `crates/core/src/core/mod.rs`). Its
+//! [`CryptographicFunctions`](crate::core::CryptographicFunctions) impl, which
+//! binds it to a Kyber KEM shared secret, additionally requires
+//! `legacy-pqclean`. This is part of the pre-v3 / CGv2 legacy API surface; new
+//! code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead,
+//! since AES-256-GCM-SIV is a crypt_guard private extension there and is only
+//! reachable through [`pq_hpke::HpkeEnvelope`](crate::pq_hpke::HpkeEnvelope).
+//!
+//! # Security
+//! AES-256-GCM-SIV is itself an AEAD construction, nonce-misuse-resistant by
+//! design. This module additionally prepends an HMAC-SHA512 tag (keyed with
+//! the caller's passphrase) to the plaintext before encryption and verifies
+//! it after decryption.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherAesGcmSiv, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::AesGcmSiv,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherAesGcmSiv::new(infos, None);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! let iv = cipher.iv();
+//! ```
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};

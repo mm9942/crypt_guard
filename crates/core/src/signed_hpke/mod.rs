@@ -23,10 +23,13 @@
 //! uses fixed-width, big-endian length prefixes to avoid concatenation
 //! ambiguity.
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use std::{error::Error, fmt, marker::PhantomData};
 
 use crate::{
-    error::CryptError,
+    error::{CryptError, ErrorKind},
     hpke::{HpkeSuite, Mode},
     sign::SignAlgorithm,
 };
@@ -126,6 +129,23 @@ impl Error for SignedHpkeError {
         match self {
             Self::Signing(error) | Self::SignatureVerification(error) => Some(error),
             Self::UnsupportedVersion { .. } | Self::FieldTooLong { .. } => None,
+        }
+    }
+}
+
+impl SignedHpkeError {
+    /// Coarse [`ErrorKind`] classification for this error.
+    ///
+    /// `SignatureVerification` always maps to [`ErrorKind::Authentication`],
+    /// regardless of the wrapped [`CryptError`]'s own classification: a failed
+    /// signature check is an authentication failure, and this boundary must
+    /// not leak the inner error's more specific classification.
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::UnsupportedVersion { .. } => ErrorKind::Encoding,
+            Self::FieldTooLong { .. } => ErrorKind::InvalidInput,
+            Self::Signing(inner) => inner.kind(),
+            Self::SignatureVerification(_) => ErrorKind::Authentication,
         }
     }
 }
@@ -340,4 +360,34 @@ fn append_field(
     transcript.extend_from_slice(&length.to_be_bytes());
     transcript.extend_from_slice(value);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signature_verification_kind_is_always_authentication() {
+        // Regardless of the wrapped `CryptError`'s own classification, a
+        // failed signature check must classify as `Authentication` and must
+        // not leak the inner error's more specific kind.
+        let wrapped = SignedHpkeError::SignatureVerification(CryptError::InvalidParameters);
+        assert_eq!(wrapped.kind(), ErrorKind::Authentication);
+
+        let wrapped_auth =
+            SignedHpkeError::SignatureVerification(CryptError::SignatureVerificationFailed);
+        assert_eq!(wrapped_auth.kind(), ErrorKind::Authentication);
+    }
+
+    #[test]
+    fn signature_verification_display_carries_no_variable_data() {
+        // The `Display` of the outer `SignedHpkeError::SignatureVerification`
+        // variant embeds the inner error's `Display`, so this only holds when
+        // the inner `CryptError` itself carries no variable data.
+        let error = SignedHpkeError::SignatureVerification(CryptError::SignatureVerificationFailed);
+        assert_eq!(
+            error.to_string(),
+            "Signed-HPKE signature verification failed: signature verification failed"
+        );
+    }
 }

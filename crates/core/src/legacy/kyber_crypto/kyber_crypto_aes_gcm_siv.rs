@@ -1,3 +1,33 @@
+//! Legacy Kyber + AES-GCM-SIV (AEAD) cipher glue for the pqcrypto-backed `Kyber`
+//! typestate.
+//!
+//! This implements the crate-local `KyberFunctions` trait for
+//! `Kyber<Encryption, KyberSize, ContentStatus, AesGcmSiv>`, wiring the legacy Kyber KEM
+//! key material into [`CipherAesGcmSiv`](crate::cryptography::CipherAesGcmSiv) for
+//! messages, in-memory data and files. It is part of the `legacy-pqclean` migration path
+//! described in `crates/core/src/legacy/mod.rs`: the underlying `pqcrypto-kyber` /
+//! `pqcrypto-traits` crates wrap PQClean, which is unmaintained and being archived (see
+//! `SECURITY.md`). New code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke)
+//! instead of this module.
+//!
+//! # Security
+//! Unlike the plain-AES/CTR/XTS/XChaCha20 variants in this module tree, this cipher is
+//! an authenticated (AEAD, misuse-resistant) construction, so it does not have the
+//! missing-integrity caveat those modes carry.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesGcmSiv>::new(public_key, None)?;
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), "Test Passphrase")?;
+//!
+//! let nonce = encryptor.get_nonce();
+//! let decryptor =
+//!     Kyber::<Decryption, Kyber1024, Data, AesGcmSiv>::new(secret_key, Some(nonce?.to_string()))?;
+//! let decrypt_message = decryptor.decrypt_data(encrypt_message, "Test Passphrase", cipher)?;
+//! ```
 // removed unused kem imports per clippy
 use crate::{
     core::CryptographicFunctions,

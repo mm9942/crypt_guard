@@ -97,9 +97,10 @@ fn ml_kem_512_supports_every_rfc_9180_encryption_aead_without_suite_substitution
 
 #[test]
 fn ml_kem_512_official_base_vectors_validate_fips_seed_decapsulation_and_hpke_context() {
-    let all: Vec<Vector> =
-        serde_json::from_str(include_str!("../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"))
-            .expect("vendored draft corpus is JSON");
+    let all: Vec<Vector> = serde_json::from_str(include_str!(
+        "../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"
+    ))
+    .expect("vendored draft corpus is JSON");
     let vectors: Vec<_> = all
         .iter()
         .filter(|vector| vector.kem_id == ML_KEM_512_ID)
@@ -148,9 +149,10 @@ fn ml_kem_512_official_base_vectors_validate_fips_seed_decapsulation_and_hpke_co
 
 #[test]
 fn ml_kem_512_fixed_size_encapsulation_tampering_is_only_an_aead_failure() {
-    let vectors: Vec<Vector> =
-        serde_json::from_str(include_str!("../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"))
-            .expect("vendored draft corpus is JSON");
+    let vectors: Vec<Vector> = serde_json::from_str(include_str!(
+        "../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"
+    ))
+    .expect("vendored draft corpus is JSON");
     let vector = vectors
         .iter()
         .find(|vector| vector.kem_id == ML_KEM_512_ID)

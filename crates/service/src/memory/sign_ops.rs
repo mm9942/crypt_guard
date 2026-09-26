@@ -41,13 +41,13 @@ fn keypair_for(
     let mut rng = OsRng;
     match algorithm {
         SignatureAlgorithm::MlDsa44 => {
-            MlDsa44Impl::keypair(&mut rng).map_err(|_| CryptoServiceError::Internal)
+            MlDsa44Impl::keypair(&mut rng).map_err(CryptoServiceError::from)
         }
         SignatureAlgorithm::MlDsa65 => {
-            MlDsa65Impl::keypair(&mut rng).map_err(|_| CryptoServiceError::Internal)
+            MlDsa65Impl::keypair(&mut rng).map_err(CryptoServiceError::from)
         }
         SignatureAlgorithm::MlDsa87 => {
-            MlDsa87Impl::keypair(&mut rng).map_err(|_| CryptoServiceError::Internal)
+            MlDsa87Impl::keypair(&mut rng).map_err(CryptoServiceError::from)
         }
     }
 }
@@ -60,13 +60,13 @@ fn sign_for(
 ) -> Result<MlDsaSignature, CryptoServiceError> {
     match algorithm {
         SignatureAlgorithm::MlDsa44 => {
-            MlDsa44Impl::sign(sk, message).map_err(|_| CryptoServiceError::Internal)
+            MlDsa44Impl::sign(sk, message).map_err(CryptoServiceError::from)
         }
         SignatureAlgorithm::MlDsa65 => {
-            MlDsa65Impl::sign(sk, message).map_err(|_| CryptoServiceError::Internal)
+            MlDsa65Impl::sign(sk, message).map_err(CryptoServiceError::from)
         }
         SignatureAlgorithm::MlDsa87 => {
-            MlDsa87Impl::sign(sk, message).map_err(|_| CryptoServiceError::Internal)
+            MlDsa87Impl::sign(sk, message).map_err(CryptoServiceError::from)
         }
     }
 }

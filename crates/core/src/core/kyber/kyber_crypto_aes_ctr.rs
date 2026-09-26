@@ -1,9 +1,45 @@
+//! Legacy Kyber + AES-CTR (stream mode, unauthenticated) cipher glue for the
+//! pqcrypto-backed `Kyber` typestate.
+//!
+//! This implements the crate-local `KyberFunctions` trait for
+//! `Kyber<Encryption, KyberSize, ContentStatus, AesCtr>` and its `Decryption`
+//! counterpart, wiring the legacy Kyber KEM key material into
+//! [`CipherAesCtr`](crate::cryptography::CipherAesCtr) for messages, in-memory
+//! data and files. New code should use
+//! [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! Note: this file is not currently declared as a `mod` anywhere in the crate,
+//! so it is dead code, not part of any compiled build. The active, wired-up
+//! implementation of this same glue lives at
+//! `crates/core/src/legacy/kyber_crypto/kyber_crypto_aes_ctr.rs`, gated behind
+//! the `legacy-pqclean` feature.
+//!
+//! # Security
+//! AES-CTR is not an AEAD mode: it provides confidentiality only, with no
+//! built-in integrity or authentication, and reusing an IV/counter with the
+//! same key breaks confidentiality. Do not use it for new designs.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesCtr>::new(public_key, None)?;
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), "Test Passphrase")?;
+//!
+//! let nonce = encryptor.get_nonce();
+//! let decryptor = Kyber::<Decryption, Kyber1024, Data, AesCtr>::new(secret_key, Some(nonce?.to_string()))?;
+//! let decrypt_message = decryptor.decrypt_data(encrypt_message, "Test Passphrase", cipher)?;
+//! ```
 use crate::{
-    *,
-    cryptography::{CipherAesCtr, CryptographicInformation, CryptographicMetadata, ContentType, Process, CryptographicMechanism, KeyEncapMechanism},
-    error::CryptError,
     core::CryptographicFunctions,
+    cryptography::{
+        CipherAesCtr, ContentType, CryptographicInformation, CryptographicMechanism,
+        CryptographicMetadata, KeyEncapMechanism, Process,
+    },
+    error::CryptError,
     key_control::FileMetadata,
+    *,
 };
 use std::{
     path::{Path, PathBuf},
@@ -11,27 +47,26 @@ use std::{
 };
 
 /// Provides Kyber encryption functions for AES-CTR algorithm.
-impl<KyberSize, ContentStatus> KyberFunctions for Kyber<Encryption, KyberSize, ContentStatus, AesCtr>
+impl<KyberSize, ContentStatus> KyberFunctions
+    for Kyber<Encryption, KyberSize, ContentStatus, AesCtr>
 where
     KyberSize: KyberSizeVariant,
-{   
+{
     /// Encrypts a file with AES-CTR algorithm, given a path and a passphrase.
     /// Returns the encrypted data and cipher.
-     fn encrypt_file(&mut self, path: PathBuf, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(
+        &mut self,
+        path: PathBuf,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         if !Path::new(&path).exists() {
             return Err(CryptError::FileNotFound);
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -61,17 +96,15 @@ where
 
     /// Encrypts a message with AES-CTR algorithm, given the message and a passphrase.
     /// Returns the encrypted data and cipher.
-    fn encrypt_msg(&mut self, message: &str, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(
+        &mut self,
+        message: &str,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -98,20 +131,17 @@ where
         Ok((data, cipher))
     }
 
-
     /// Encrypts data with AES-CTR algorithm, given the data and a passphrase.
     /// Returns the encrypted data and cipher.
-    fn encrypt_data(&mut self, data: Vec<u8>, passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(
+        &mut self,
+        data: Vec<u8>,
+        passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -138,52 +168,79 @@ where
     }
 
     /// Placeholder for decrypt_file, indicating operation not allowed in encryption mode.
-    fn decrypt_file(&self, _path: PathBuf, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(
+        &self,
+        _path: PathBuf,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for decrypt_msg, indicating operation not allowed in encryption mode.
-    fn decrypt_msg(&self, _message: Vec<u8>, _passphrase: &str, _ciphertext:Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(
+        &self,
+        _message: Vec<u8>,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for decrypt_data, indicating operation not allowed in encryption mode.
-    fn decrypt_data(&self, _data: Vec<u8>, _passphrase: &str, _ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(
+        &self,
+        _data: Vec<u8>,
+        _passphrase: &str,
+        _ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of data isn't allowed!"))
     }
 }
-impl<KyberSize, ContentStatus> KyberFunctions for Kyber<Decryption, KyberSize, ContentStatus, AesCtr>
+impl<KyberSize, ContentStatus> KyberFunctions
+    for Kyber<Decryption, KyberSize, ContentStatus, AesCtr>
 where
     KyberSize: KyberSizeVariant,
-{   
+{
     /// Placeholder for encrypt_file, indicating operation not allowed in decryption mode.
-    fn encrypt_file(&mut self, _path: PathBuf, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_file(
+        &mut self,
+        _path: PathBuf,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of files isn't allowed!"))
     }
     /// Placeholder for encrypt_msg, indicating operation not allowed in decryption mode.
-    fn encrypt_msg(&mut self, _message: &str, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_msg(
+        &mut self,
+        _message: &str,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
     /// Placeholder for encrypt_data, indicating operation not allowed in decryption mode.
-    fn encrypt_data(&mut self, _data: Vec<u8>, _passphrase: &str) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
+    fn encrypt_data(
+        &mut self,
+        _data: Vec<u8>,
+        _passphrase: &str,
+    ) -> Result<(Vec<u8>, Vec<u8>), CryptError> {
         Err(CryptError::new("You're currently in the process state of encryption. Decryption of messanges isn't allowed!"))
     }
 
     /// Decrypts a file with AES-CBC algorithm, given a path, passphrase, and cipherteGCM-SIV
     /// Returns the decrypted data.
-    fn decrypt_file(&self, path: PathBuf, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_file(
+        &self,
+        path: PathBuf,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         if !Path::new(&path).exists() {
             return Err(CryptError::FileNotFound);
         }
 
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -212,17 +269,16 @@ where
 
     /// Decrypts a message with AES-CBC algorithm, given the message, passphrase, and cipherteGCM-SIV
     /// Returns the decrypted data.
-    fn decrypt_msg(&self, message: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_msg(
+        &self,
+        message: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {
@@ -249,17 +305,16 @@ where
 
     /// Decrypts data with AES-CTR algorithm, given the data, passphrase, and ciphertext.
     /// Returns the decrypted data.
-    fn decrypt_data(&self, data: Vec<u8>, passphrase: &str, ciphertext: Vec<u8>) -> Result<Vec<u8>, CryptError> {
+    fn decrypt_data(
+        &self,
+        data: Vec<u8>,
+        passphrase: &str,
+        ciphertext: Vec<u8>,
+    ) -> Result<Vec<u8>, CryptError> {
         let (key_encap_mechanism, _kybersize) = match KyberSize::variant() {
-            KyberVariant::Kyber512 => {        
-                (KeyEncapMechanism::kyber512(), 512 as usize)
-            },
-            KyberVariant::Kyber768 => {        
-                (KeyEncapMechanism::kyber768(), 768 as usize)
-            },
-            KyberVariant::Kyber1024 => {        
-                (KeyEncapMechanism::kyber1024(), 1024 as usize)
-            },
+            KyberVariant::Kyber512 => (KeyEncapMechanism::kyber512(), 512 as usize),
+            KyberVariant::Kyber768 => (KeyEncapMechanism::kyber768(), 768 as usize),
+            KyberVariant::Kyber1024 => (KeyEncapMechanism::kyber1024(), 1024 as usize),
         };
 
         let crypt_metadata = CryptographicMetadata {

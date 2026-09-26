@@ -1,3 +1,34 @@
+//! Legacy Kyber + AES-CTR (stream mode, unauthenticated) cipher glue for the
+//! pqcrypto-backed `Kyber` typestate.
+//!
+//! This implements the crate-local `KyberFunctions` trait for
+//! `Kyber<Encryption, KyberSize, ContentStatus, AesCtr>`, wiring the legacy Kyber KEM key
+//! material into [`CipherAesCtr`](crate::cryptography::CipherAesCtr) for messages,
+//! in-memory data and files. It is part of the `legacy-pqclean` migration path described
+//! in `crates/core/src/legacy/mod.rs`: the underlying `pqcrypto-kyber` / `pqcrypto-traits`
+//! crates wrap PQClean, which is unmaintained and being archived (see `SECURITY.md`).
+//! New code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead of this
+//! module.
+//!
+//! # Security
+//! AES-CTR itself is not an AEAD mode, and reusing an IV/counter with the same key breaks confidentiality.
+//! The legacy cipher wrapper adds an HMAC-SHA512 tag over the plaintext before
+//! encrypting and verifies it after decrypting (MAC-then-encrypt). That gives
+//! integrity checking, but it is a non-standard construction; do not use it for
+//! new designs, use `crypt_guard_core::pq_hpke` instead.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::*;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let mut encryptor = Kyber::<Encryption, Kyber1024, Data, AesCtr>::new(public_key, None)?;
+//! let (encrypt_message, cipher) = encryptor.encrypt_data(message.clone(), "Test Passphrase")?;
+//!
+//! let nonce = encryptor.get_nonce();
+//! let decryptor = Kyber::<Decryption, Kyber1024, Data, AesCtr>::new(secret_key, Some(nonce?.to_string()))?;
+//! let decrypt_message = decryptor.decrypt_data(encrypt_message, "Test Passphrase", cipher)?;
+//! ```
 use crate::{
     core::CryptographicFunctions,
     cryptography::{

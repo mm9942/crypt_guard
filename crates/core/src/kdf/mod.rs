@@ -16,7 +16,7 @@
 //! All functions are pure; no shared mutable state.
 //!
 //! # Errors
-//! See [`crate::error::CryptError`]: `CustomError` if HKDF output length is invalid
+//! See [`crate::error::CryptError`]: `InvalidDataLength` if HKDF output length is invalid
 //! (cannot occur in practice with 32-byte output).
 //!
 //! # Examples
@@ -25,6 +25,9 @@
 //! let key = derive_session_key(&[0u8; 32], &HkdfSalt::zero(32), LABEL_XCHACHA20POLY1305).unwrap();
 //! assert_eq!(key.as_ref().len(), 32);
 //! ```
+
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod hkdf;
 pub mod types;

@@ -6,7 +6,12 @@
 //! AuthPSK modes. The lower-level key-schedule/core types remain available for
 //! callers that need their explicit state boundaries.
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use std::{error::Error, fmt};
+
+use crate::error::ErrorKind;
 
 use aes_gcm::{
     aead::{Aead as AesAead, KeyInit as AesKeyInit, Payload as AesPayload},
@@ -141,6 +146,29 @@ impl fmt::Display for HpkeError {
 }
 
 impl Error for HpkeError {}
+
+impl HpkeError {
+    /// Coarse [`ErrorKind`] classification for this error.
+    ///
+    /// Every authentication failure maps to [`ErrorKind::Authentication`] and
+    /// nothing finer; see the crate-wide [`ErrorKind`] documentation for the
+    /// no-oracle rationale.
+    pub const fn kind(&self) -> ErrorKind {
+        match self {
+            Self::OutputLengthTooLarge { .. } => ErrorKind::Limit,
+            Self::InvalidPseudorandomKeyLength { .. } => ErrorKind::InvalidInput,
+            Self::HkdfOutputLengthTooLarge { .. } => ErrorKind::Limit,
+            Self::InvalidPskInputs { .. } => ErrorKind::InvalidInput,
+            Self::UnsupportedKeyScheduleMode { .. } => ErrorKind::Unsupported,
+            Self::MessageLimitReached => ErrorKind::Limit,
+            Self::ExportOnlyAead => ErrorKind::Unsupported,
+            Self::UnsupportedAead { .. } => ErrorKind::Unsupported,
+            Self::InvalidAeadKeyLength { .. } => ErrorKind::InvalidInput,
+            Self::InvalidAeadNonceLength { .. } => ErrorKind::InvalidInput,
+            Self::AuthenticationFailed => ErrorKind::Authentication,
+        }
+    }
+}
 
 /// IANA HPKE KEM identifiers registered by RFC 9180 §7.1.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1398,6 +1426,22 @@ mod tests {
         assert_eq!(
             via_try.seal(b"aad", b"pt").unwrap(),
             via_plain.seal(b"aad", b"pt").unwrap()
+        );
+    }
+
+    #[test]
+    fn authentication_failed_kind_is_authentication() {
+        assert_eq!(
+            HpkeError::AuthenticationFailed.kind(),
+            crate::error::ErrorKind::Authentication
+        );
+    }
+
+    #[test]
+    fn authentication_failed_display_carries_no_variable_data() {
+        assert_eq!(
+            HpkeError::AuthenticationFailed.to_string(),
+            "HPKE AEAD authentication failed"
         );
     }
 }

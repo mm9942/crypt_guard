@@ -24,6 +24,10 @@
 //! println!("{}", e);
 //! ```
 
+// Deny `unwrap`/`expect` in non-test code: every error path in this file must be
+// handled explicitly rather than risking a panic while constructing an error.
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -31,6 +35,14 @@ use std::{
     sync::Arc,
 };
 pub use zeroize::Zeroize;
+
+/// Result type of the cryptographic core; the error defaults to [`CryptError`].
+///
+/// # Note
+/// This crate also has a `core` module (`crate::core`), so the standard
+/// library's `Result` is qualified with a leading `::` here (`::core::result::Result`)
+/// to avoid resolving `core` to that module instead of the `core` crate.
+pub type Result<T, E = CryptError> = ::core::result::Result<T, E>;
 
 /// Primary error type for all crypt_guard operations.
 ///
@@ -44,7 +56,6 @@ pub use zeroize::Zeroize;
 ///
 /// # Concurrency
 /// `Clone + Send + Sync`.
-#[derive(Debug)]
 pub enum CryptError {
     // ── I/O ──────────────────────────────────────────────────────────────────
     /// An I/O operation failed; the original `io::Error` is preserved for `source()`.
@@ -153,6 +164,17 @@ pub enum CryptError {
     ///
     /// Prefer adding a typed variant over using `CustomError` in new code.
     CustomError(String),
+}
+
+// R081: Debug delegates to Display rather than deriving, so the printed form
+// never leaks secret content that a derived, field-by-field Debug would show
+// (there is none here — every variant is either unit or wraps non-secret
+// metadata — but delegating keeps that guarantee independent of future
+// variants).
+impl fmt::Debug for CryptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CryptError({self})")
+    }
 }
 
 impl fmt::Display for CryptError {
@@ -276,8 +298,109 @@ impl CryptError {
     ///
     /// # Panics
     /// Never panics.
+    ///
+    /// # Deprecation notice (non-binding)
+    /// New code should prefer adding or reusing a typed variant over calling this
+    /// constructor: [`kind`](CryptError::kind) has no finer classification available
+    /// for `CustomError` than [`ErrorKind::Internal`], so information that a typed
+    /// variant would carry (which key, which operation, which subsystem) is lost to
+    /// callers that only look at `kind()`. This constructor is kept, unchanged, for
+    /// existing callers.
     pub fn new(msg: &str) -> Self {
         CryptError::CustomError(msg.to_owned())
+    }
+
+    /// Classify this error into a coarse, stable [`ErrorKind`].
+    ///
+    /// # Description
+    /// Maps every variant onto one of the [`ErrorKind`] values so callers can react
+    /// to the *class* of a failure (is it worth retrying? is it a caller bug? is it
+    /// an authentication failure?) without matching on all ~40 variants. The mapping
+    /// is exhaustive and intentionally has no wildcard arm, so adding a new
+    /// `CryptError` variant is a compile error here until this table is updated.
+    ///
+    /// [`CryptError::Signing`] delegates to the wrapped [`SigningErr::kind`] so the
+    /// classification of a signing failure is decided in one place.
+    ///
+    /// # Classification table
+    ///
+    /// | `ErrorKind`      | Variants                                                           |
+    /// |------------------|---------------------------------------------------------------------|
+    /// | `Authentication` | `AuthenticationFailed`, `DecryptionFailed`, `HmacVerificationError`, `SignatureVerificationFailed`, `InvalidSignature`, `Signing(e)` (delegates to `e.kind()`) |
+    /// | `InvalidKey`     | `InvalidKemPublicKey`, `InvalidKemSecretKey`, `InvalidKemCiphertext`, `InvalidKeyType`, `MissingSecretKey`, `MissingPublicKey`, `MissingCiphertext`, `MissingSharedSecret`, `HmacKeyErr` |
+    /// | `InvalidInput`   | `InvalidParameters`, `InvalidDataLength`, `InvalidNonce`, `InvalidSignatureLength`, `MissingData`, `HmacShortData`, `MessageExtractionError`, `Utf8Error`, `HexError`, `HexDecodingError` |
+    /// | `Encoding`       | `InvalidEnvelope`, `UnsupportedEnvelopeVersion`, `InvalidMessageFormat` |
+    /// | `Unsupported`    | `UnsupportedAlgorithm`, `UnsupportedOperation` |
+    /// | `Io`             | `IOError`, `WriteError`, `FileNotFound`, `PathError`, `UniqueFilenameFailed` |
+    /// | `Internal`       | `EncapsulationError`, `DecapsulationError`, `EncryptionFailed`, `SigningFailed`, `CustomError` |
+    ///
+    /// No variant currently maps to [`ErrorKind::Randomness`] or [`ErrorKind::Limit`];
+    /// those are reserved for other error types in the crate (see the [`ErrorKind`]
+    /// docs) and for future `CryptError` variants.
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            // ── Authentication ──────────────────────────────────────────────
+            CryptError::AuthenticationFailed => ErrorKind::Authentication,
+            CryptError::DecryptionFailed => ErrorKind::Authentication,
+            CryptError::HmacVerificationError => ErrorKind::Authentication,
+            CryptError::SignatureVerificationFailed => ErrorKind::Authentication,
+            CryptError::InvalidSignature => ErrorKind::Authentication,
+            CryptError::Signing(e) => e.kind(),
+
+            // ── InvalidKey ───────────────────────────────────────────────────
+            CryptError::InvalidKemPublicKey => ErrorKind::InvalidKey,
+            CryptError::InvalidKemSecretKey => ErrorKind::InvalidKey,
+            CryptError::InvalidKemCiphertext => ErrorKind::InvalidKey,
+            CryptError::InvalidKeyType => ErrorKind::InvalidKey,
+            CryptError::MissingSecretKey => ErrorKind::InvalidKey,
+            CryptError::MissingPublicKey => ErrorKind::InvalidKey,
+            CryptError::MissingCiphertext => ErrorKind::InvalidKey,
+            CryptError::MissingSharedSecret => ErrorKind::InvalidKey,
+            CryptError::HmacKeyErr => ErrorKind::InvalidKey,
+
+            // ── InvalidInput ─────────────────────────────────────────────────
+            CryptError::InvalidParameters => ErrorKind::InvalidInput,
+            CryptError::InvalidDataLength => ErrorKind::InvalidInput,
+            CryptError::InvalidNonce => ErrorKind::InvalidInput,
+            CryptError::InvalidSignatureLength => ErrorKind::InvalidInput,
+            CryptError::MissingData => ErrorKind::InvalidInput,
+            CryptError::HmacShortData => ErrorKind::InvalidInput,
+            CryptError::MessageExtractionError => ErrorKind::InvalidInput,
+            CryptError::Utf8Error => ErrorKind::InvalidInput,
+            CryptError::HexError(_) => ErrorKind::InvalidInput,
+            CryptError::HexDecodingError(_) => ErrorKind::InvalidInput,
+
+            // ── Encoding ─────────────────────────────────────────────────────
+            CryptError::InvalidEnvelope => ErrorKind::Encoding,
+            CryptError::UnsupportedEnvelopeVersion => ErrorKind::Encoding,
+            CryptError::InvalidMessageFormat => ErrorKind::Encoding,
+
+            // ── Unsupported ──────────────────────────────────────────────────
+            CryptError::UnsupportedAlgorithm => ErrorKind::Unsupported,
+            CryptError::UnsupportedOperation => ErrorKind::Unsupported,
+
+            // ── Io ───────────────────────────────────────────────────────────
+            CryptError::IOError(_) => ErrorKind::Io,
+            CryptError::WriteError => ErrorKind::Io,
+            CryptError::FileNotFound => ErrorKind::Io,
+            CryptError::PathError => ErrorKind::Io,
+            CryptError::UniqueFilenameFailed => ErrorKind::Io,
+
+            // ── Internal ─────────────────────────────────────────────────────
+            CryptError::EncapsulationError => ErrorKind::Internal,
+            CryptError::DecapsulationError => ErrorKind::Internal,
+            CryptError::EncryptionFailed => ErrorKind::Internal,
+            CryptError::SigningFailed => ErrorKind::Internal,
+            CryptError::CustomError(_) => ErrorKind::Internal,
+        }
+    }
+
+    /// Whether retrying the same operation unchanged could plausibly succeed.
+    ///
+    /// # Description
+    /// Shorthand for `self.kind().is_transient()`. See [`ErrorKind::is_transient`].
+    pub fn is_transient(&self) -> bool {
+        self.kind().is_transient()
     }
 }
 
@@ -535,7 +658,6 @@ fn err_to_internal_message(err: &crate::hpke_pq::draft_ietf_hpke_pq_05_full::Err
 ///
 /// # Concurrency
 /// `Clone + Send + Sync` — `io::Error` wrapped in `Arc`.
-#[derive(Debug)]
 pub enum SigningErr {
     /// The secret (signing) key is missing.
     SecretKeyMissing,
@@ -569,6 +691,53 @@ impl SigningErr {
     /// A new `SigningErr::CustomError`.
     pub fn new(msg: &str) -> Self {
         SigningErr::CustomError(msg.to_owned())
+    }
+
+    /// Classify this error into a coarse, stable [`ErrorKind`].
+    ///
+    /// # Description
+    /// Exhaustive mapping (no wildcard arm), mirroring [`CryptError::kind`]:
+    ///
+    /// | `ErrorKind`      | Variants                                                |
+    /// |------------------|----------------------------------------------------------|
+    /// | `Authentication` | `SignatureVerificationFailed`                            |
+    /// | `InvalidKey`     | `SecretKeyMissing`, `PublicKeyMissing`, `SignatureMissing` |
+    /// | `Unsupported`    | `UnsupportedFileType`                                    |
+    /// | `Io`             | `FileCreationFailed`, `FileWriteFailed`, `IOError`        |
+    /// | `Internal`       | `SigningMessageFailed`, `CustomError`                    |
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            SigningErr::SignatureVerificationFailed => ErrorKind::Authentication,
+
+            SigningErr::SecretKeyMissing => ErrorKind::InvalidKey,
+            SigningErr::PublicKeyMissing => ErrorKind::InvalidKey,
+            SigningErr::SignatureMissing => ErrorKind::InvalidKey,
+
+            SigningErr::UnsupportedFileType(_) => ErrorKind::Unsupported,
+
+            SigningErr::FileCreationFailed => ErrorKind::Io,
+            SigningErr::FileWriteFailed => ErrorKind::Io,
+            SigningErr::IOError(_) => ErrorKind::Io,
+
+            SigningErr::SigningMessageFailed => ErrorKind::Internal,
+            SigningErr::CustomError(_) => ErrorKind::Internal,
+        }
+    }
+
+    /// Whether retrying the same operation unchanged could plausibly succeed.
+    ///
+    /// # Description
+    /// Shorthand for `self.kind().is_transient()`. See [`ErrorKind::is_transient`].
+    pub fn is_transient(&self) -> bool {
+        self.kind().is_transient()
+    }
+}
+
+// R081: Debug delegates to Display rather than deriving; see the equivalent
+// note on `CryptError`'s `Debug` impl above.
+impl fmt::Debug for SigningErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "SigningErr({self})")
     }
 }
 
@@ -650,7 +819,8 @@ impl From<pqcrypto_traits::Error> for SigningErr {
 
 #[cfg(test)]
 mod tests {
-    use super::CryptError;
+    use super::{CryptError, ErrorKind, SigningErr};
+    use std::{io, sync::Arc};
 
     // ── `draft_ietf_hpke_pq_05_full::Error` (== `pq_hpke::Error`) ──────────────
 
@@ -898,5 +1068,199 @@ mod tests {
                 err
             );
         }
+    }
+
+    // ── `ErrorKind` classification ─────────────────────────────────────────────
+
+    #[test]
+    fn every_authentication_class_variant_maps_to_authentication_kind() {
+        let variants = [
+            CryptError::AuthenticationFailed,
+            CryptError::DecryptionFailed,
+            CryptError::HmacVerificationError,
+            CryptError::SignatureVerificationFailed,
+            CryptError::InvalidSignature,
+        ];
+        for v in variants {
+            assert_eq!(
+                v.kind(),
+                ErrorKind::Authentication,
+                "expected Authentication for {:?}",
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn signing_signature_verification_failed_delegates_to_authentication() {
+        let err = CryptError::Signing(std::sync::Arc::new(SigningErr::SignatureVerificationFailed));
+        assert_eq!(err.kind(), ErrorKind::Authentication);
+        assert_eq!(
+            SigningErr::SignatureVerificationFailed.kind(),
+            ErrorKind::Authentication
+        );
+    }
+
+    #[test]
+    fn representative_kinds() {
+        assert_eq!(CryptError::MissingSecretKey.kind(), ErrorKind::InvalidKey);
+        assert_eq!(
+            CryptError::InvalidKemPublicKey.kind(),
+            ErrorKind::InvalidKey
+        );
+        assert_eq!(
+            CryptError::InvalidParameters.kind(),
+            ErrorKind::InvalidInput
+        );
+        assert_eq!(CryptError::InvalidNonce.kind(), ErrorKind::InvalidInput);
+        assert_eq!(CryptError::InvalidEnvelope.kind(), ErrorKind::Encoding);
+        assert_eq!(
+            CryptError::UnsupportedEnvelopeVersion.kind(),
+            ErrorKind::Encoding
+        );
+        assert_eq!(
+            CryptError::UnsupportedAlgorithm.kind(),
+            ErrorKind::Unsupported
+        );
+        assert_eq!(
+            CryptError::IOError(Arc::new(io::Error::other("x"))).kind(),
+            ErrorKind::Io
+        );
+        assert_eq!(CryptError::FileNotFound.kind(), ErrorKind::Io);
+        assert_eq!(CryptError::EncapsulationError.kind(), ErrorKind::Internal);
+        assert_eq!(
+            CryptError::CustomError("x".into()).kind(),
+            ErrorKind::Internal
+        );
+
+        assert_eq!(SigningErr::SecretKeyMissing.kind(), ErrorKind::InvalidKey);
+        assert_eq!(
+            SigningErr::UnsupportedFileType("bin".into()).kind(),
+            ErrorKind::Unsupported
+        );
+        assert_eq!(SigningErr::FileCreationFailed.kind(), ErrorKind::Io);
+        assert_eq!(SigningErr::SigningMessageFailed.kind(), ErrorKind::Internal);
+    }
+
+    #[test]
+    fn is_transient_true_only_for_io_and_randomness_classes() {
+        // Io-class CryptError values are transient.
+        assert!(CryptError::FileNotFound.is_transient());
+        assert!(CryptError::WriteError.is_transient());
+        assert!(CryptError::IOError(Arc::new(io::Error::other("x"))).is_transient());
+
+        // Non-Io/Randomness classes are never transient.
+        assert!(!CryptError::AuthenticationFailed.is_transient());
+        assert!(!CryptError::InvalidParameters.is_transient());
+        assert!(!CryptError::InvalidEnvelope.is_transient());
+        assert!(!CryptError::UnsupportedAlgorithm.is_transient());
+        assert!(!CryptError::EncapsulationError.is_transient());
+        assert!(!CryptError::CustomError("x".into()).is_transient());
+
+        // Every ErrorKind variant: transient iff Io or Randomness.
+        for kind in [
+            ErrorKind::Authentication,
+            ErrorKind::InvalidInput,
+            ErrorKind::InvalidKey,
+            ErrorKind::Unsupported,
+            ErrorKind::Encoding,
+            ErrorKind::Io,
+            ErrorKind::Randomness,
+            ErrorKind::Limit,
+            ErrorKind::Internal,
+        ] {
+            let expected = matches!(kind, ErrorKind::Io | ErrorKind::Randomness);
+            assert_eq!(kind.is_transient(), expected, "mismatch for {:?}", kind);
+        }
+    }
+
+    #[test]
+    fn error_kind_name_round_trip_is_stable() {
+        let pairs = [
+            (ErrorKind::Authentication, "authentication"),
+            (ErrorKind::InvalidInput, "invalid_input"),
+            (ErrorKind::InvalidKey, "invalid_key"),
+            (ErrorKind::Unsupported, "unsupported"),
+            (ErrorKind::Encoding, "encoding"),
+            (ErrorKind::Io, "io"),
+            (ErrorKind::Randomness, "randomness"),
+            (ErrorKind::Limit, "limit"),
+            (ErrorKind::Internal, "internal"),
+        ];
+        for (kind, expected) in pairs {
+            assert_eq!(kind.name(), expected);
+            assert_eq!(kind.to_string(), expected);
+        }
+    }
+}
+
+// ── Error classification ───────────────────────────────────────────────────────
+
+/// Coarse classification shared by every error type in CryptGuard.
+///
+/// Each error enum in the crate (`CryptError`, `SigningErr`, `pq_hpke::Error`,
+/// `pq_hpke::EnvelopeError`, `hpke::HpkeError`, `hpke::rfc9180::Rfc9180Error`,
+/// `signed_hpke::SignedHpkeError`, …) exposes a `kind()` method returning one
+/// of these values, so callers can react to the *class* of a failure without
+/// matching on every enum. Service layers map `ErrorKind` to their own opaque
+/// error and to HTTP status codes.
+///
+/// Every authentication failure of every primitive maps to
+/// [`ErrorKind::Authentication`] and nothing finer: the class deliberately
+/// carries no information about *why* a ciphertext was rejected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// A ciphertext, tag, signature or MAC did not verify. Opaque by design.
+    Authentication,
+    /// Caller-supplied parameters are malformed, inconsistent or out of range
+    /// (lengths, labels, PSK inputs, mismatched suites).
+    InvalidInput,
+    /// A public key, private key, seed, encapsulation or ciphertext has an
+    /// invalid encoding or failed validation.
+    InvalidKey,
+    /// The requested algorithm, mode, suite or operation is not available in
+    /// this build or for this object.
+    Unsupported,
+    /// A serialized record (envelope, frame, key file) could not be decoded.
+    Encoding,
+    /// A file or I/O operation failed.
+    Io,
+    /// The operating-system CSPRNG failed.
+    Randomness,
+    /// A protocol or resource limit was reached (message sequence exhausted,
+    /// output length too large).
+    Limit,
+    /// An internal invariant failed. Report it as a bug.
+    Internal,
+}
+
+impl ErrorKind {
+    /// Stable, non-secret snake_case name for logs and metrics.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Authentication => "authentication",
+            Self::InvalidInput => "invalid_input",
+            Self::InvalidKey => "invalid_key",
+            Self::Unsupported => "unsupported",
+            Self::Encoding => "encoding",
+            Self::Io => "io",
+            Self::Randomness => "randomness",
+            Self::Limit => "limit",
+            Self::Internal => "internal",
+        }
+    }
+
+    /// Whether retrying the same operation unchanged can succeed. Only
+    /// transient causes qualify; an authentication or input failure never
+    /// does.
+    pub const fn is_transient(self) -> bool {
+        matches!(self, Self::Io | Self::Randomness)
+    }
+}
+
+impl fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
     }
 }

@@ -1,3 +1,44 @@
+//! Legacy `CipherChaCha` symmetric cipher: raw XChaCha20 stream cipher with an
+//! HMAC-SHA512 tag.
+//!
+//! [`CipherChaCha`](crate::cryptography::CipherChaCha) wraps the `chacha20`
+//! crate's `XChaCha20` stream cipher. Its `new`, `encryption`/`decryption`
+//! helpers and nonce generation are unconditionally compiled (see
+//! `crates/core/src/core/mod.rs`), while the
+//! [`CryptographicFunctions`](crate::core::CryptographicFunctions) impl that
+//! binds it to a Kyber KEM shared secret is gated behind the `legacy-pqclean`
+//! feature. This is part of the pre-v3 / CGv2 legacy API surface; new code
+//! should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Security
+//! XChaCha20 alone is a stream cipher with no built-in authentication: it
+//! provides confidentiality only, and reusing a nonce with the same key
+//! breaks that confidentiality. This module compensates by prepending an
+//! HMAC-SHA512 tag (keyed with the caller's passphrase) to the plaintext
+//! before encryption and verifying it after decryption.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherChaCha, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::XChaCha20,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherChaCha::new(infos, None);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! ```
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};

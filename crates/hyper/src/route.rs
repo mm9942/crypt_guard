@@ -96,7 +96,7 @@ pub struct Route {
 }
 
 /// Why a request did not match a route.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum RouteError {
     /// No such route.
     NotFound,
@@ -105,6 +105,24 @@ pub enum RouteError {
     /// The path matched but the key name or version is invalid.
     InvalidKey,
 }
+
+impl core::fmt::Display for RouteError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            Self::NotFound => "no such route",
+            Self::MethodNotAllowed => "method not allowed",
+            Self::InvalidKey => "invalid key",
+        })
+    }
+}
+
+impl core::fmt::Debug for RouteError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "RouteError({self})")
+    }
+}
+
+impl std::error::Error for RouteError {}
 
 const PREFIX: &str = "/v1/keys";
 

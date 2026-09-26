@@ -23,6 +23,9 @@
 //! let key = Key::new_public_key(vec![0u8; 32]);
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use crate::error::CryptError;
 use crate::key_control::*;
 use std::fmt;

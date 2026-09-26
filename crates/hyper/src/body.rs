@@ -51,13 +51,30 @@ impl fmt::Debug for SecretBody {
 }
 
 /// Why a body could not be collected.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BodyError {
     /// The body exceeded the limit (checked before any copy is made).
     TooLarge,
     /// The transport reported an error while streaming the body.
     Invalid,
 }
+
+impl fmt::Display for BodyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::TooLarge => "request body too large",
+            Self::Invalid => "invalid request body",
+        })
+    }
+}
+
+impl fmt::Debug for BodyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BodyError({self})")
+    }
+}
+
+impl std::error::Error for BodyError {}
 
 /// Collect `body` into a [`SecretBody`], rejecting it as soon as the
 /// accumulated length exceeds `limit`.

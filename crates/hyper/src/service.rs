@@ -10,7 +10,7 @@ use core::{
 use std::sync::Arc;
 
 use bytes::Bytes;
-use http::{header, HeaderValue, Request, Response, StatusCode};
+use http::{header, HeaderValue, Request, Response};
 use http_body::Body;
 use http_body_util::Full;
 use tower_service::Service;
@@ -21,11 +21,11 @@ use crypt_guard_service::{
 
 use crate::{
     auth::{Anonymous, Authenticator},
-    body::{collect_secret, BodyError},
+    body::collect_secret,
     codec::{decode_request, encode_response},
     config::HttpConfig,
-    error::{error_response, status_response},
-    route::{self, RouteError},
+    error::AdapterError,
+    route,
 };
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -73,7 +73,10 @@ impl<S> CryptoHttpService<S, Anonymous> {
 
 impl<S, A> CryptoHttpService<S, A> {
     /// Replace the authenticator.
-    pub fn with_authenticator<A2: Authenticator>(self, authenticator: A2) -> CryptoHttpService<S, A2> {
+    pub fn with_authenticator<A2: Authenticator>(
+        self,
+        authenticator: A2,
+    ) -> CryptoHttpService<S, A2> {
         CryptoHttpService {
             inner: self.inner,
             config: self.config,
@@ -123,13 +126,13 @@ where
         ));
         Box::pin(async move {
             let response = handle(inner, &config, &*authenticator, request_id, request).await;
-            Ok(finalize(response))
+            Ok(finalize(response, request_id))
         })
     }
 }
 
 async fn handle<S, A, B>(
-    mut inner: S,
+    inner: S,
     config: &HttpConfig,
     authenticator: &A,
     request_id: RequestId,
@@ -141,57 +144,89 @@ where
     A: Authenticator,
     B: Body<Data = Bytes>,
 {
+    try_handle(inner, config, authenticator, request_id, request)
+        .await
+        .unwrap_or_else(|err| err.into_response(config))
+}
+
+/// The fallible core of [`handle`].
+///
+/// Every failure mode reports through [`AdapterError`] via `?`, and
+/// [`handle`] turns whichever one comes back into a response with
+/// [`AdapterError::into_response`]. This must stay behaviorally identical to
+/// the error handling `handle` used to do inline: same ordering
+/// (authenticate before reading the body), same `drop(body)` right after
+/// decoding, and the same mapping from a `poll_ready`/`call` failure through
+/// [`service_error`] into [`AdapterError::Service`].
+///
+/// # Errors
+///
+/// Returns [`AdapterError::Route`] when the request does not match a route,
+/// [`AdapterError::Body`] when the request body cannot be collected,
+/// [`AdapterError::Codec`] when the body cannot be decoded into an
+/// operation, and [`AdapterError::Service`] when authentication or the
+/// crypto service itself reports an error.
+async fn try_handle<S, A, B>(
+    mut inner: S,
+    config: &HttpConfig,
+    authenticator: &A,
+    request_id: RequestId,
+    request: Request<B>,
+) -> Result<Response<ResponseBody>, AdapterError>
+where
+    S: Service<CryptoRequest, Response = CryptoResponse>,
+    S::Error: Into<BoxError>,
+    A: Authenticator,
+    B: Body<Data = Bytes>,
+{
     let (parts, body) = request.into_parts();
 
-    let route = match route::parse(&parts.method, parts.uri.path()) {
-        Ok(route) => route,
-        Err(RouteError::NotFound) => return status_response(StatusCode::NOT_FOUND),
-        Err(RouteError::MethodNotAllowed) => {
-            return status_response(StatusCode::METHOD_NOT_ALLOWED)
-        }
-        Err(RouteError::InvalidKey) => return status_response(StatusCode::BAD_REQUEST),
-    };
+    let route = route::parse(&parts.method, parts.uri.path())?;
 
     // Authenticate before reading the body, so unauthenticated callers cannot
     // make the server buffer (and copy) request payloads.
-    let principal = match authenticator.authenticate(&parts) {
-        Ok(principal) => principal,
-        Err(err) => return error_response(err, config),
-    };
+    let principal = authenticator.authenticate(&parts)?;
 
     let limit = route.op.body_limit(&config.max_body);
-    let body = match collect_secret(body, limit).await {
-        Ok(body) => body,
-        Err(BodyError::TooLarge) => return status_response(StatusCode::PAYLOAD_TOO_LARGE),
-        Err(BodyError::Invalid) => return status_response(StatusCode::BAD_REQUEST),
-    };
+    let body = collect_secret(body, limit).await?;
 
     // The body (possibly plaintext) is dropped, zeroized, right after
     // decoding; secret fields have been copied into their own `SecretBytes`.
-    let operation = match decode_request(route.op, route.key, &body) {
-        Ok(operation) => operation,
-        Err(_) => return status_response(StatusCode::BAD_REQUEST),
-    };
+    let operation = decode_request(route.op, route.key, &body)?;
     drop(body);
 
     let context = RequestContext {
         request_id,
         principal,
     };
-    if let Err(err) = poll_fn(|cx| inner.poll_ready(cx)).await {
-        return error_response(service_error(err.into()), config);
-    }
-    match inner.call(CryptoRequest::with_context(context, operation)).await {
-        Ok(response) => encode_response(response),
-        Err(err) => error_response(service_error(err.into()), config),
-    }
+    poll_fn(|cx| inner.poll_ready(cx))
+        .await
+        .map_err(|err| service_error(err.into()))?;
+    let response = inner
+        .call(CryptoRequest::with_context(context, operation))
+        .await
+        .map_err(|err| service_error(err.into()))?;
+    Ok(encode_response(response))
 }
 
-fn finalize(mut response: Response<ResponseBody>) -> Response<ResponseBody> {
+/// The name of the request-id header attached to every response.
+const REQUEST_ID_HEADER: &str = "x-request-id";
+
+fn finalize(mut response: Response<ResponseBody>, request_id: RequestId) -> Response<ResponseBody> {
     // KMS responses (including public keys and errors) must never be cached
     // by intermediaries.
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+
+    // Every response, success or error, carries the id of the request that
+    // produced it: lowercase hex, no padding. This lets a caller correlate a
+    // logged failure with a specific request without exposing any backend or
+    // cryptographic detail.
+    if let Ok(name) = header::HeaderName::from_bytes(REQUEST_ID_HEADER.as_bytes()) {
+        if let Ok(value) = HeaderValue::from_str(&format!("{:x}", request_id.0)) {
+            response.headers_mut().insert(name, value);
+        }
+    }
     response
 }

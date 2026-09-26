@@ -32,6 +32,9 @@
 //! }
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use crate::error::CryptError;
 use crate::kem::backend::{rand_core_010, KemBackend, KemId};
 use crate::kem::types::{KemCiphertext, KemSharedSecret, KemSize, MlKemPublicKey, MlKemSecretKey};

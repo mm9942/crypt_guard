@@ -29,6 +29,9 @@
 //! }
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use ml_dsa::{
     Generate, KeyExport, KeyInit, MlDsa44, MlDsa65, MlDsa87, Signature, SignatureEncoding, Signer,
     SigningKey, Verifier, VerifyingKey,

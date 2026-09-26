@@ -11,6 +11,9 @@
 //! `info` and message AAD are deliberately caller inputs and are never put in
 //! the envelope plaintext.
 
+// Panic-freedom contract for the v3 transport: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use core::convert::TryInto;
 use std::{error::Error as StdError, fmt};
 
@@ -103,6 +106,19 @@ impl fmt::Display for EnvelopeError {
 }
 
 impl StdError for EnvelopeError {}
+
+impl EnvelopeError {
+    /// Coarse error classification; see [`crate::error::ErrorKind`].
+    pub fn kind(&self) -> crate::error::ErrorKind {
+        use crate::error::ErrorKind;
+        match self {
+            Self::InvalidMagic => ErrorKind::Encoding,
+            Self::UnsupportedVersion { .. } => ErrorKind::Encoding,
+            Self::UnsupportedSuite { .. } => ErrorKind::Unsupported,
+            Self::InvalidEncoding => ErrorKind::Encoding,
+        }
+    }
+}
 
 /// Set up an interoperable raw Base-mode sender context.
 ///
@@ -404,6 +420,18 @@ impl fmt::Display for EnvelopeOpenError {
 
 impl StdError for EnvelopeOpenError {}
 
+impl EnvelopeOpenError {
+    /// Coarse error classification; see [`crate::error::ErrorKind`].
+    ///
+    /// Delegates to the inner error's own `kind()`.
+    pub fn kind(&self) -> crate::error::ErrorKind {
+        match self {
+            Self::Envelope(e) => e.kind(),
+            Self::Hpke(e) => e.kind(),
+        }
+    }
+}
+
 impl From<EnvelopeError> for EnvelopeOpenError {
     fn from(err: EnvelopeError) -> Self {
         Self::Envelope(err)
@@ -527,6 +555,7 @@ mod tests {
     /// independent of any consistency between the declared lengths and the
     /// actual payload length -- used to craft malformed/truncated/oversized
     /// records for negative tests.
+    #[allow(clippy::too_many_arguments)]
     fn craft_bytes_raw(
         magic: [u8; 4],
         version: u16,
@@ -783,5 +812,46 @@ mod tests {
                 let _ = HpkeEnvelope::from_bytes(&prefixed[..prefixed.len().min(24)]);
             }
         }
+    }
+
+    #[test]
+    fn envelope_error_kind_mappings() {
+        use crate::error::ErrorKind;
+
+        assert_eq!(EnvelopeError::InvalidMagic.kind(), ErrorKind::Encoding);
+        assert_eq!(
+            EnvelopeError::UnsupportedSuite {
+                kem: 1,
+                kdf: 1,
+                aead: 1
+            }
+            .kind(),
+            ErrorKind::Unsupported
+        );
+        assert_eq!(
+            EnvelopeError::UnsupportedVersion { actual: 99 }.kind(),
+            ErrorKind::Encoding
+        );
+        assert_eq!(EnvelopeError::InvalidEncoding.kind(), ErrorKind::Encoding);
+    }
+
+    #[test]
+    fn envelope_open_error_kind_delegates_to_inner() {
+        let envelope_err = EnvelopeOpenError::Envelope(EnvelopeError::InvalidMagic);
+        assert_eq!(envelope_err.kind(), EnvelopeError::InvalidMagic.kind());
+
+        let hpke_err = EnvelopeOpenError::Hpke(Error::AuthenticationFailed);
+        assert_eq!(hpke_err.kind(), Error::AuthenticationFailed.kind());
+    }
+
+    #[test]
+    fn authentication_failed_kind_and_no_variable_display_data() {
+        assert_eq!(
+            Error::AuthenticationFailed.kind(),
+            crate::error::ErrorKind::Authentication
+        );
+        let a = format!("{}", Error::AuthenticationFailed);
+        let b = format!("{}", Error::AuthenticationFailed);
+        assert_eq!(a, b);
     }
 }

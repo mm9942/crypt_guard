@@ -1,3 +1,25 @@
+//! Legacy pqcrypto-backed Falcon and Dilithium signature key types.
+//!
+//! Compiled behind the `legacy-pqclean` feature (see
+//! `crates/core/src/core/mod.rs`). [`Falcon512`]/[`Falcon1024`] wrap
+//! `pqcrypto-falcon`, and `Dilithium2`/`Dilithium3`/`Dilithium5` (defined
+//! further down in this file) wrap `pqcrypto-dilithium`, each implementing
+//! [`SignatureFunctions`] (sign/verify) and [`KeyOperations`] (keypair
+//! generation and file persistence). These wrap PQClean via the unmaintained
+//! `pqcrypto-*` FFI crates; new code should use the FIPS 204/206-aligned
+//! signature APIs in [`crypt_guard_core::pq_hpke`](crate::pq_hpke) or the
+//! `ml-dsa-backend`/`sign-slhdsa` features instead.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::{falcon_keypair, kdf::*, signature, verify};
+//!
+//! let data = b"hey, how are you?".to_vec();
+//! let (public_key, secret_key) = falcon_keypair!(1024);
+//! let sign = signature!(Falcon, secret_key, 1024, data.clone(), Message)?;
+//! let verified = verify!(Falcon, public_key, 1024, sign, Message)?;
+//! assert_eq!(data, verified);
+//! ```
 // removed unused import per clippy
 
 use crate::log_activity;

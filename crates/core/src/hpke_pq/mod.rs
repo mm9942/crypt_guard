@@ -21,6 +21,8 @@
 // added below, so an application cannot accidentally mistake this active-draft
 // mapping for an RFC 9180-registered PQ profile.
 #![allow(dead_code)]
+// Panic-freedom contract for the v3 transport: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 use core::convert::TryFrom;
 use std::{error::Error, fmt};
@@ -1332,6 +1334,80 @@ pub mod draft_ietf_hpke_pq_05 {
 
     impl std::error::Error for Error {}
 
+    impl Error {
+        /// Coarse error classification shared across the crate; see
+        /// [`crate::error::ErrorKind`].
+        ///
+        /// # Note on randomness
+        /// This version has no dedicated RNG-failure variant (adding one
+        /// would be a breaking change), so an underlying CSPRNG failure is
+        /// not distinguishable here: it currently surfaces as
+        /// [`Self::InternalFailure`], which maps to
+        /// [`crate::error::ErrorKind::Internal`] rather than
+        /// [`crate::error::ErrorKind::Randomness`].
+        pub fn kind(&self) -> crate::error::ErrorKind {
+            use crate::error::ErrorKind;
+            match self {
+                Self::InvalidRecipientPublicKey => ErrorKind::InvalidKey,
+                Self::InvalidRecipientPrivateKey => ErrorKind::InvalidKey,
+                Self::InvalidEncapsulation => ErrorKind::InvalidKey,
+                Self::ProfileMismatch { .. } => ErrorKind::InvalidInput,
+                Self::AuthenticationFailed => ErrorKind::Authentication,
+                Self::OutputLengthTooLarge { .. } => ErrorKind::Limit,
+                Self::MessageLimitReached => ErrorKind::Limit,
+                Self::InternalFailure => ErrorKind::Internal,
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod error_kind_tests {
+        use super::*;
+        use crate::error::ErrorKind;
+
+        #[test]
+        fn authentication_failed_maps_to_authentication_kind() {
+            assert_eq!(
+                Error::AuthenticationFailed.kind(),
+                ErrorKind::Authentication
+            );
+        }
+
+        #[test]
+        fn display_carries_no_variable_data_for_authentication_failed() {
+            let a = format!("{}", Error::AuthenticationFailed);
+            let b = format!("{}", Error::AuthenticationFailed);
+            assert_eq!(a, b);
+        }
+
+        #[test]
+        fn kind_is_exhaustive_and_stable_for_representative_variants() {
+            assert_eq!(
+                Error::InvalidRecipientPublicKey.kind(),
+                ErrorKind::InvalidKey
+            );
+            assert_eq!(
+                Error::InvalidRecipientPrivateKey.kind(),
+                ErrorKind::InvalidKey
+            );
+            assert_eq!(Error::InvalidEncapsulation.kind(), ErrorKind::InvalidKey);
+            assert_eq!(
+                Error::ProfileMismatch {
+                    expected: Profile::MlKem768HkdfSha256Aes128Gcm,
+                    actual: Profile::MlKem1024HkdfSha384Aes256Gcm,
+                }
+                .kind(),
+                ErrorKind::InvalidInput
+            );
+            assert_eq!(
+                Error::OutputLengthTooLarge { requested: 1 << 20 }.kind(),
+                ErrorKind::Limit
+            );
+            assert_eq!(Error::MessageLimitReached.kind(), ErrorKind::Limit);
+            assert_eq!(Error::InternalFailure.kind(), ErrorKind::Internal);
+        }
+    }
+
     /// A validated, serializable recipient public key for one exact profile.
     #[derive(Clone, Eq, PartialEq)]
     pub struct RecipientPublicKey {
@@ -2084,6 +2160,36 @@ pub mod draft_ietf_hpke_pq_05_full {
     }
 
     impl std::error::Error for Error {}
+
+    impl Error {
+        /// Coarse error classification shared across the crate; see
+        /// [`crate::error::ErrorKind`].
+        ///
+        /// # Note on randomness
+        /// This version has no dedicated RNG-failure variant (adding one
+        /// would be a breaking change), so an underlying CSPRNG failure is
+        /// not distinguishable here: it currently surfaces as
+        /// [`Self::InternalInvariant`], which maps to
+        /// [`crate::error::ErrorKind::Internal`] rather than
+        /// [`crate::error::ErrorKind::Randomness`].
+        pub fn kind(&self) -> crate::error::ErrorKind {
+            use crate::error::ErrorKind;
+            match self {
+                Self::UnavailableCapability { .. } => ErrorKind::Unsupported,
+                Self::KemMismatch { .. } => ErrorKind::InvalidInput,
+                Self::InvalidRecipientPublicKey => ErrorKind::InvalidKey,
+                Self::InvalidRecipientPrivateKey => ErrorKind::InvalidKey,
+                Self::InvalidEncapsulation => ErrorKind::InvalidKey,
+                Self::InvalidPskInputs { .. } => ErrorKind::InvalidInput,
+                Self::OutputLengthTooLarge { .. } => ErrorKind::Limit,
+                Self::InputLengthTooLarge { .. } => ErrorKind::InvalidInput,
+                Self::ExportOnlyAead => ErrorKind::Unsupported,
+                Self::AuthenticationFailed => ErrorKind::Authentication,
+                Self::MessageLimitReached => ErrorKind::Limit,
+                Self::InternalInvariant => ErrorKind::Internal,
+            }
+        }
+    }
 
     // The draft names concrete hybrid KEM identifiers, but this crate does
     // not yet have an audited, interoperable implementation of their exact
@@ -3761,6 +3867,75 @@ pub mod draft_ietf_hpke_pq_05_full {
             _ => return Err(Error::InternalInvariant),
         }
         Ok(output)
+    }
+
+    #[cfg(test)]
+    mod error_kind_tests {
+        use super::*;
+        use crate::error::ErrorKind;
+
+        #[test]
+        fn authentication_failed_maps_to_authentication_kind() {
+            assert_eq!(
+                Error::AuthenticationFailed.kind(),
+                ErrorKind::Authentication
+            );
+        }
+
+        #[test]
+        fn display_carries_no_variable_data_for_authentication_failed() {
+            let a = format!("{}", Error::AuthenticationFailed);
+            let b = format!("{}", Error::AuthenticationFailed);
+            assert_eq!(a, b);
+        }
+
+        #[test]
+        fn kind_is_exhaustive_and_stable_for_representative_variants() {
+            assert_eq!(
+                Error::UnavailableCapability {
+                    suite: Suite::new(Kem::MlKem1024P384, Kdf::Shake256, Aead::ChaCha20Poly1305),
+                    reason: "test",
+                }
+                .kind(),
+                ErrorKind::Unsupported
+            );
+            assert_eq!(
+                Error::KemMismatch {
+                    expected: Kem::MlKem1024,
+                    actual: Kem::MlKem768,
+                }
+                .kind(),
+                ErrorKind::InvalidInput
+            );
+            assert_eq!(
+                Error::InvalidRecipientPublicKey.kind(),
+                ErrorKind::InvalidKey
+            );
+            assert_eq!(
+                Error::InvalidRecipientPrivateKey.kind(),
+                ErrorKind::InvalidKey
+            );
+            assert_eq!(Error::InvalidEncapsulation.kind(), ErrorKind::InvalidKey);
+            assert_eq!(
+                Error::InvalidPskInputs {
+                    has_psk: true,
+                    has_psk_id: false,
+                }
+                .kind(),
+                ErrorKind::InvalidInput
+            );
+            assert_eq!(
+                Error::OutputLengthTooLarge { requested: 1 << 20 }.kind(),
+                ErrorKind::Limit
+            );
+            assert_eq!(
+                Error::InputLengthTooLarge { actual: 1 << 20 }.kind(),
+                ErrorKind::InvalidInput
+            );
+            assert_eq!(Error::ExportOnlyAead.kind(), ErrorKind::Unsupported);
+            assert_eq!(Error::MessageLimitReached.kind(), ErrorKind::Limit);
+            assert_eq!(Error::InternalInvariant.kind(), ErrorKind::Internal);
+        }
     }
 
     #[cfg(test)]

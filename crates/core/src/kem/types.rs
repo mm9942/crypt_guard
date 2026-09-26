@@ -24,6 +24,9 @@
 //! assert_eq!(ss.as_ref().len(), 32);
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use std::marker::PhantomData;
 use zeroize::ZeroizeOnDrop;
 

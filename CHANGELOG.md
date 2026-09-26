@@ -30,6 +30,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `TryOsRng`, `try_generate_recipient_key_pair`, `RecipientKeyPair::into_parts`,
   `Sign::try_hmac`, `From` conversions of all error types into `CryptError`.
 - `examples/pq_hpke.rs`.
+- Error layer: `crypt_guard_core::error::ErrorKind` (stable, non-exhaustive
+  classification) with `kind()` on every core error type,
+  `CryptError::is_transient`, `Result` aliases in core, service and hyper,
+  `CryptoServiceError::{crypto_kind, is_retryable}`, `From<CryptError>` for
+  `CryptoServiceError`, and a central `AdapterError` in `crypt_guard_hyper`.
+  Authentication failures always classify as `ErrorKind::Authentication`
+  and carry no variable data.
+- HTTP: every response carries `x-request-id`; `503` responses carry
+  `Retry-After`.
+- CI: `clippy -D warnings` job; non-test code of the v3 modules, service and
+  hyper denies `unwrap`/`expect`.
 
 ### Changed
 - `legacy-pqclean` is documented as depending on the unmaintained PQClean
@@ -51,6 +62,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Single-feature builds (`aes-ctr`, `aes-xts`, `legacy-aes`,
   `aes-gcm-siv-cipher`, `zip`).
 - Panics on crafted key files and in RFC 9180 KEM dispatch.
+- Legacy `KeyControl::{get_key, save, load}` returned via `unimplemented!()`
+  for unsupported key types; they now return
+  `CryptError::UnsupportedOperation`.
 
 ## [3.0.2]
 

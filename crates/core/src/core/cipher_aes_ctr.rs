@@ -1,3 +1,43 @@
+//! Legacy `CipherAesCtr` symmetric cipher: AES-256-CTR (via `ctr::Ctr64LE`)
+//! with an HMAC-SHA512 tag.
+//!
+//! [`CipherAesCtr`](crate::cryptography::CipherAesCtr) is compiled behind the
+//! `aes-ctr` feature (see `crates/core/src/core/mod.rs`). Its
+//! [`CryptographicFunctions`](crate::core::CryptographicFunctions) impl, which
+//! binds it to a Kyber KEM shared secret, additionally requires
+//! `legacy-pqclean`. This is part of the pre-v3 / CGv2 legacy API surface; new
+//! code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Security
+//! CTR mode alone provides confidentiality only, with no built-in integrity
+//! or authentication, and reusing an IV/counter with the same key breaks
+//! confidentiality. This module compensates by prepending an HMAC-SHA512 tag
+//! (keyed with the caller's passphrase) to the plaintext before encryption
+//! and verifying it after decryption.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherAesCtr, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::AesCtr,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherAesCtr::new(infos, None);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! let iv = cipher.iv();
+//! ```
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};

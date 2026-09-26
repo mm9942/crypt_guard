@@ -26,6 +26,7 @@
 //! [`Authorizer`] such as [`NamespacePolicy`] to enforce per-caller grants.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![warn(missing_docs)]
 
 mod blob;
@@ -41,18 +42,18 @@ mod service;
 mod stack;
 
 pub use blob::{CiphertextBlob, MessageBlob, PublicBlob, SignatureBlob};
-pub use error::CryptoServiceError;
+pub use error::{CryptoServiceError, Result};
 pub use key::{
     KeyAlgorithm, KeyId, KeyMetadata, KeyNamespace, KeyRef, KeyState, KeyVersion,
     SignatureAlgorithm, MAX_NAME_LEN,
 };
+pub use memory::InMemoryProvider;
 pub use op::{
     CryptoContext, CryptoOperation, CryptoRequest, CryptoResponse, Decrypt, DescribeKey,
     DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey, OpKind, Principal,
     RequestContext, RequestId, RewrapKey, RotateKey, Sign, UnwrapKey, VerificationResult, Verify,
     WrapKey,
 };
-pub use memory::InMemoryProvider;
 pub use policy::{AllowAll, Authorizer, NamespacePolicy, OpSet, PolicyProvider};
 pub use provider::{CryptoProvider, NullProvider};
 pub use secret::{SecretBytes, SecretEgress};
@@ -63,6 +64,12 @@ pub use stack::{network_handle, service_error, NetworkHandle, StackConfig};
 /// Re-export of the core PQ HPKE module, whose `Suite` appears in
 /// [`KeyAlgorithm::Hpke`].
 pub use crypt_guard_core::pq_hpke;
+
+/// Re-export of the core error classification shared across `crypt_guard`
+/// crates. [`CryptoServiceError`] converts from it, and
+/// [`CryptoServiceError::crypto_kind`] converts back for crypto-derived
+/// error classes.
+pub use crypt_guard_core::error::ErrorKind;
 
 /// Re-export of the Tower service trait this crate implements.
 pub use tower_service::Service;

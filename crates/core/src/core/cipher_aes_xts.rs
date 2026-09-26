@@ -1,3 +1,44 @@
+//! Legacy `CipherAesXts` symmetric cipher: AES-256-XTS (via the `xts-mode`
+//! crate's `Xts128`) with an HMAC-SHA512 tag.
+//!
+//! [`CipherAesXts`](crate::cryptography::CipherAesXts) is compiled behind the
+//! `aes-xts` feature (see `crates/core/src/core/mod.rs`). Its
+//! [`CryptographicFunctions`](crate::core::CryptographicFunctions) impl, which
+//! binds it to a Kyber KEM shared secret, additionally requires
+//! `legacy-pqclean`. This is part of the pre-v3 / CGv2 legacy API surface; new
+//! code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Security
+//! XTS is a tweakable narrow-block mode designed for encrypting fixed-size
+//! blocks in place, such as disk sectors — it is a storage-encryption mode,
+//! not a general-purpose AEAD, and provides no authentication of its own.
+//! This module compensates by prepending an HMAC-SHA512 tag (keyed with the
+//! caller's passphrase) to the plaintext before encryption and verifying it
+//! after decryption. Prefer an AEAD cipher for new designs that are not
+//! constrained to fixed-size in-place storage blocks.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::cryptography::{
+//!     CipherAesXts, ContentType, CryptographicInformation, CryptographicMechanism,
+//!     CryptographicMetadata, KeyEncapMechanism, Process,
+//! };
+//!
+//! let infos = CryptographicInformation {
+//!     content: message.as_bytes().to_owned(),
+//!     passphrase: passphrase.as_bytes().to_vec(),
+//!     metadata: CryptographicMetadata {
+//!         process: Process::Encryption,
+//!         encryption_type: CryptographicMechanism::AesXts,
+//!         key_type: KeyEncapMechanism::kyber1024(),
+//!         content_type: ContentType::RawData,
+//!     },
+//!     safe: false,
+//!     location: None,
+//! };
+//! let mut cipher = CipherAesXts::new(infos);
+//! let (encrypted, ciphertext) = cipher.encrypt(public_key)?;
+//! ```
 //use super::*;
 
 //use crypt_guard_proc::{*, log_activity, write_log};

@@ -1,3 +1,23 @@
+//! Legacy pqcrypto-backed Kyber KEM key control: `KeyControKyber512/768/1024`.
+//!
+//! Compiled behind the `legacy-pqclean` feature (declared as `pub mod
+//! key_controler;` in `crates/core/src/core/kyber/mod.rs`, gated there). Each
+//! `KeyControKyber*` type implements [`KyberKeyFunctions`] (keypair
+//! generation, encapsulation and decapsulation) directly on top of the
+//! `pqcrypto-kyber` crate, which wraps PQClean's Kyber-r3 implementation.
+//! `KeyControlVariant` in `crate::core` dispatches across all three sizes at
+//! runtime. New code should use ML-KEM (FIPS 203) via
+//! [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
+//!
+//! # Examples
+//! ```ignore
+//! use crypt_guard_core::core::kyber::key_controler::KeyControKyber1024;
+//!
+//! let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+//! let (shared_secret, ciphertext) = KeyControKyber1024::encap(&public_key)?;
+//! let decapsulated = KeyControKyber1024::decap(&secret_key, &ciphertext)?;
+//! assert_eq!(shared_secret, decapsulated);
+//! ```
 use crate::{error::CryptError, log_activity, FileMetadata, FileState, FileTypes, Key, KeyTypes};
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use std::{
@@ -288,9 +308,13 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
     }
 
     /// Retrieves a specified key based on `KeyTypes`.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`],
+    /// which does not name a retrievable key.
     pub fn get_key(&self, key: KeyTypes) -> Result<Key, CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
             KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
             KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
@@ -300,20 +324,30 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
     }
 
     /// Saves a specified key to a file at the given base path.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`]
+    /// or [`KeyTypes::SharedSecret`]; neither is a key type this method can save
+    /// to a file.
     pub fn save(&self, key: KeyTypes, base_path: PathBuf) -> Result<(), CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => Key::new(KeyTypes::PublicKey, self.public_key.to_vec()),
             KeyTypes::SecretKey => Key::new(KeyTypes::SecretKey, self.secret_key.to_vec()),
             KeyTypes::Ciphertext => Key::new(KeyTypes::Ciphertext, self.ciphertext.to_vec()),
-            KeyTypes::SharedSecret => unimplemented!(),
+            KeyTypes::SharedSecret => return Err(CryptError::UnsupportedOperation),
         };
         key.save(base_path)
     }
     /// Loads a specified key from a file.
+    ///
+    /// # Errors
+    /// Returns [`CryptError::UnsupportedOperation`] if `key` is [`KeyTypes::None`]
+    /// or [`KeyTypes::SharedSecret`]; neither is a key type this method can load
+    /// from a file. Also returns an error if the underlying file load fails.
     pub fn load(&self, key: KeyTypes, path: &Path) -> Result<Vec<u8>, CryptError> {
         let key = match key {
-            KeyTypes::None => unimplemented!(),
+            KeyTypes::None => return Err(CryptError::UnsupportedOperation),
             KeyTypes::PublicKey => {
                 FileMetadata::from(PathBuf::from(path), FileTypes::PublicKey, FileState::Other)
             }
@@ -323,9 +357,9 @@ impl<T: KyberKeyFunctions> KeyControl<T> {
             KeyTypes::Ciphertext => {
                 FileMetadata::from(PathBuf::from(path), FileTypes::Ciphertext, FileState::Other)
             }
-            KeyTypes::SharedSecret => unimplemented!(),
+            KeyTypes::SharedSecret => return Err(CryptError::UnsupportedOperation),
         };
-        Ok(key.load().unwrap())
+        key.load()
     }
 
     /// Getter methods for public_key, secret_key, ciphertext, and shared_secret.

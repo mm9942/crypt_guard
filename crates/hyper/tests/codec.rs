@@ -512,7 +512,7 @@ fn decode_request_never_panics_on_arbitrary_input() {
     let key = Some(some_key());
 
     for _ in 0..20_000 {
-        let use_real_prefix = xorshift(&mut state) % 2 == 0;
+        let use_real_prefix = xorshift(&mut state).is_multiple_of(2);
         let len = (xorshift(&mut state) % 256) as usize;
 
         let mut bytes: Vec<u8> = Vec::with_capacity(len);

@@ -27,12 +27,11 @@
 //! meta.save(b"raw-bytes").unwrap();
 //! ```
 
+// Panic-freedom contract: see SECURITY.md
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
 use crate::error::CryptError;
-use std::{
-    fs,
-    io::Write,
-    path::PathBuf,
-};
+use std::{fs, io::Write, path::PathBuf};
 use zeroize::Zeroizing;
 
 #[cfg(unix)]
