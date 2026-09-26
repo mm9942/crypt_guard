@@ -88,7 +88,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = aes.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -122,7 +122,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = aes.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -156,7 +156,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let (data, cipher) = aes.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = aes.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -254,7 +254,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let data = aes.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = aes.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tDecryptio\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -288,7 +288,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let data = aes.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = aes.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -322,7 +322,7 @@ where
         let mut aes = CipherAES::new(infos);
         log_activity!("Creating a new cipher instance of AES.", "");
 
-        let data = aes.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = aes.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tAES,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();

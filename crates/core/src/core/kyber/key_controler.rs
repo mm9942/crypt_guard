@@ -69,7 +69,7 @@ impl KyberKeyFunctions for KeyControKyber1024 {
             format!("Kyber{}", 1024).as_str()
         );
 
-        let pk = PublicKey::from_bytes(public).unwrap();
+        let pk = PublicKey::from_bytes(public).map_err(|_| CryptError::InvalidKemPublicKey)?;
         let (ss, ct) = encapsulate(&pk);
 
         let ciphertext = ct.as_bytes().to_vec();
@@ -87,8 +87,8 @@ impl KyberKeyFunctions for KeyControKyber1024 {
         use pqcrypto_kyber::kyber1024::*;
         log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 1024).as_str());
 
-        let ct = Ciphertext::from_bytes(cipher).unwrap();
-        let sk = SecretKey::from_bytes(sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).map_err(|_| CryptError::InvalidKemCiphertext)?;
+        let sk = SecretKey::from_bytes(sec).map_err(|_| CryptError::InvalidKemSecretKey)?;
         let ss2 = decapsulate(&ct, &sk);
         let shared_secret = ss2.as_bytes().to_vec();
 
@@ -143,7 +143,7 @@ impl KyberKeyFunctions for KeyControKyber768 {
             format!("Kyber{}", 768).as_str()
         );
 
-        let pk = PublicKey::from_bytes(public).unwrap();
+        let pk = PublicKey::from_bytes(public).map_err(|_| CryptError::InvalidKemPublicKey)?;
         let (ss, ct) = encapsulate(&pk);
 
         let ciphertext = ct.as_bytes().to_vec();
@@ -161,8 +161,8 @@ impl KyberKeyFunctions for KeyControKyber768 {
         use pqcrypto_kyber::kyber768::*;
         log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 768).as_str());
 
-        let ct = Ciphertext::from_bytes(cipher).unwrap();
-        let sk = SecretKey::from_bytes(sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).map_err(|_| CryptError::InvalidKemCiphertext)?;
+        let sk = SecretKey::from_bytes(sec).map_err(|_| CryptError::InvalidKemSecretKey)?;
         let ss2 = decapsulate(&ct, &sk);
         let shared_secret = ss2.as_bytes().to_vec();
         log_activity!(
@@ -217,7 +217,7 @@ impl KyberKeyFunctions for KeyControKyber512 {
             format!("Kyber{}", 512).as_str()
         );
 
-        let pk = PublicKey::from_bytes(public).unwrap();
+        let pk = PublicKey::from_bytes(public).map_err(|_| CryptError::InvalidKemPublicKey)?;
         let (ss, ct) = encapsulate(&pk);
 
         let ciphertext = ct.as_bytes().to_vec();
@@ -235,8 +235,8 @@ impl KyberKeyFunctions for KeyControKyber512 {
         use pqcrypto_kyber::kyber512::*;
         log_activity!("Starting decapsulation of shared_secret using secret_key and ciphertext.\n\tThe used KEM: ", format!("Kyber{}", 512).as_str());
 
-        let ct = Ciphertext::from_bytes(cipher).unwrap();
-        let sk = SecretKey::from_bytes(sec).unwrap();
+        let ct = Ciphertext::from_bytes(cipher).map_err(|_| CryptError::InvalidKemCiphertext)?;
+        let sk = SecretKey::from_bytes(sec).map_err(|_| CryptError::InvalidKemSecretKey)?;
         let ss2 = decapsulate(&ct, &sk);
         let shared_secret = ss2.as_bytes().to_vec();
         log_activity!(

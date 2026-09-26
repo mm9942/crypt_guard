@@ -58,7 +58,24 @@ use aes::{cipher::generic_array::GenericArray, cipher::KeyInit, Aes256};
 use std::result::Result;
 use xts_mode::{get_tweak_default, Xts128};
 
-/// The main struct for handling cryptographic operations with ChaCha20 algorithm.
+/// XTS sector size used by the legacy cipher.
+#[cfg_attr(not(feature = "legacy-pqclean"), allow(dead_code))]
+const XTS_SECTOR_SIZE: usize = 0x200;
+
+/// `xts-mode` panics when the area is shorter than one AES block or its last
+/// (partial) sector is shorter than one block. Reject those lengths up front
+/// so neither encryption nor decryption of hostile input can panic.
+#[cfg_attr(not(feature = "legacy-pqclean"), allow(dead_code))]
+fn check_xts_area_len(len: usize) -> Result<(), CryptError> {
+    const BLOCK: usize = 16;
+    let tail = len % XTS_SECTOR_SIZE;
+    if len < BLOCK || (tail != 0 && tail < BLOCK) {
+        return Err(CryptError::InvalidDataLength);
+    }
+    Ok(())
+}
+
+/// Legacy AES-256-XTS cipher with an HMAC-SHA512 tag over the plaintext.
 /// It encapsulates the cryptographic information and shared secret required for encryption and decryption.
 impl CipherAesXts {
     /// Constructs a new CipherChaCha instance with specified cryptographic information.
@@ -106,12 +123,21 @@ impl CipherAesXts {
         Ok(&self.sharedsecret)
     }
 
+    /// Splits the 64-byte shared secret into the two AES-256 XTS keys.
+    fn xts_keys(&self) -> Result<(&[u8], &[u8]), CryptError> {
+        if self.sharedsecret.len() != 64 {
+            return Err(CryptError::InvalidDataLength);
+        }
+        Ok(self.sharedsecret.split_at(32))
+    }
+
     fn encryption(&self) -> Result<Vec<u8>, CryptError> {
         let plaintext = self.infos.content()?;
         let passphrase = self.infos.passphrase()?.to_vec();
 
-        let cipher_1 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[..32]));
-        let cipher_2 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[32..]));
+        let (key_1, key_2) = self.xts_keys()?;
+        let cipher_1 = Aes256::new(GenericArray::from_slice(key_1));
+        let cipher_2 = Aes256::new(GenericArray::from_slice(key_2));
 
         let cipher = Xts128::<Aes256>::new(cipher_1, cipher_2);
 
@@ -122,8 +148,9 @@ impl CipherAesXts {
             SignType::Sha512,
         );
         let mut data = hmac.try_hmac()?;
+        check_xts_area_len(data.len())?;
 
-        let sector_size = 0x200;
+        let sector_size = XTS_SECTOR_SIZE;
         let first_sector_index = 0;
 
         cipher.encrypt_area(
@@ -140,12 +167,14 @@ impl CipherAesXts {
         let mut buffer = self.infos.content()?.to_owned();
         let passphrase = self.infos.passphrase()?.to_vec();
 
-        let cipher_1 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[..32]));
-        let cipher_2 = Aes256::new(GenericArray::from_slice(&self.sharedsecret[32..]));
+        let (key_1, key_2) = self.xts_keys()?;
+        let cipher_1 = Aes256::new(GenericArray::from_slice(key_1));
+        let cipher_2 = Aes256::new(GenericArray::from_slice(key_2));
 
         let cipher = Xts128::<Aes256>::new(cipher_1, cipher_2);
 
-        let sector_size = 0x200;
+        check_xts_area_len(buffer.len())?;
+        let sector_size = XTS_SECTOR_SIZE;
         let first_sector_index = 0;
 
         cipher.decrypt_area(&mut buffer, sector_size, first_sector_index, get_tweak_default)/*.map_err(|e| CryptError::new(e.to_string().as_str()))?*/;

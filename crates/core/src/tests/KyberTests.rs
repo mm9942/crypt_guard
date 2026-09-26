@@ -1342,3 +1342,122 @@ fn encrypt_file_AES_XTS_Kyber1024() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+/// Legacy AES-XTS must never panic: `xts-mode` panics on a last sector
+/// shorter than one AES block, so such lengths are rejected with an error,
+/// and every other length round-trips.
+#[test]
+fn aes_xts_lengths_near_sector_boundary_never_panic() -> Result<(), Box<dyn std::error::Error>> {
+    let passphrase = "Test Passphrase";
+    let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+    let mut rejected = 0;
+    for len in 430..470usize {
+        let message = vec![0x5a; len];
+        let mut encryptor =
+            Kyber::<Encryption, Kyber1024, Data, AesXts>::new(public_key.clone(), None)?;
+        let Ok((encrypted, cipher)) = encryptor.encrypt_data(message.clone(), passphrase) else {
+            rejected += 1;
+            continue;
+        };
+        let nonce = encryptor.get_nonce()?.to_string();
+        let decryptor =
+            Kyber::<Decryption, Kyber1024, Data, AesXts>::new(secret_key.clone(), Some(nonce))?;
+        let decrypted = decryptor.decrypt_data(encrypted, passphrase, cipher)?;
+        assert_eq!(decrypted, message, "length {len}");
+    }
+    // Exactly the lengths whose last sector would be 1..=15 bytes are refused.
+    assert_eq!(rejected, 15);
+    Ok(())
+}
+
+/// Hostile ciphertext lengths are decrypted before the legacy HMAC check,
+/// so they must fail with an error rather than panic.
+#[test]
+fn aes_xts_hostile_ciphertext_lengths_error_without_panicking(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let passphrase = "Test Passphrase";
+    let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+    let mut encryptor =
+        Kyber::<Encryption, Kyber1024, Data, AesXts>::new(public_key.clone(), None)?;
+    let (_, cipher) = encryptor.encrypt_data(vec![1u8; 100], passphrase)?;
+    let nonce = encryptor.get_nonce()?.to_string();
+    for len in (0..40usize).chain(510..540) {
+        let decryptor = Kyber::<Decryption, Kyber1024, Data, AesXts>::new(
+            secret_key.clone(),
+            Some(nonce.clone()),
+        )?;
+        let result = decryptor.decrypt_data(vec![0xa5; len], passphrase, cipher.clone());
+        assert!(result.is_err(), "garbage of length {len} must not decrypt");
+    }
+    Ok(())
+}
+
+/// Every legacy Kyber cipher must report a wrong passphrase, a tampered or
+/// truncated ciphertext and a garbage KEM ciphertext as an error, never panic.
+macro_rules! legacy_hostile_input_test {
+    ($name:ident, $alg:ty) => {
+        #[test]
+        fn $name() -> Result<(), Box<dyn std::error::Error>> {
+            let passphrase = "Test Passphrase";
+            let message = vec![0x42u8; 300];
+            let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+            let mut encryptor =
+                Kyber::<Encryption, Kyber1024, Data, $alg>::new(public_key.clone(), None)?;
+            let (encrypted, cipher) = encryptor.encrypt_data(message.clone(), passphrase)?;
+            let nonce = encryptor.get_nonce()?.to_string();
+            let decryptor = || {
+                Kyber::<Decryption, Kyber1024, Data, $alg>::new(
+                    secret_key.clone(),
+                    Some(nonce.clone()),
+                )
+            };
+
+            assert!(decryptor()?
+                .decrypt_data(encrypted.clone(), "wrong passphrase", cipher.clone())
+                .is_err());
+
+            let mut tampered = encrypted.clone();
+            if let Some(byte) = tampered.last_mut() {
+                *byte ^= 1;
+            }
+            assert!(decryptor()?
+                .decrypt_data(tampered, passphrase, cipher.clone())
+                .is_err());
+
+            for len in [0usize, 1, 15, 16, 17, 63, 64, 65, 513] {
+                let _ = decryptor()?.decrypt_data(vec![0xa5; len], passphrase, cipher.clone());
+            }
+            assert!(decryptor()?
+                .decrypt_data(encrypted.clone(), passphrase, vec![0u8; 7])
+                .is_err());
+
+            assert_eq!(
+                decryptor()?.decrypt_data(encrypted, passphrase, cipher)?,
+                message
+            );
+            Ok(())
+        }
+    };
+}
+
+legacy_hostile_input_test!(legacy_aes_hostile_input_errors_without_panicking, AES);
+legacy_hostile_input_test!(
+    legacy_aes_ctr_hostile_input_errors_without_panicking,
+    AesCtr
+);
+legacy_hostile_input_test!(
+    legacy_aes_gcm_siv_hostile_input_errors_without_panicking,
+    AesGcmSiv
+);
+legacy_hostile_input_test!(
+    legacy_aes_xts_hostile_input_errors_without_panicking,
+    AesXts
+);
+legacy_hostile_input_test!(
+    legacy_xchacha20_hostile_input_errors_without_panicking,
+    XChaCha20
+);
+legacy_hostile_input_test!(
+    legacy_xchacha20poly1305_hostile_input_errors_without_panicking,
+    XChaCha20Poly1305
+);

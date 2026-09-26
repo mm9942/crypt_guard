@@ -62,6 +62,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Single-feature builds (`aes-ctr`, `aes-xts`, `legacy-aes`,
   `aes-gcm-siv-cipher`, `zip`).
 - Panics on crafted key files and in RFC 9180 KEM dispatch.
+- Legacy Kyber ciphers panicked instead of returning an error on a wrong
+  passphrase, a tampered ciphertext or a malformed KEM key/ciphertext
+  (`unwrap()` in the `Kyber` wrappers and the key controller).
+- Legacy AES-XTS panicked (inside `xts-mode`) on inputs whose last sector is
+  shorter than one AES block. Because it decrypts before checking the HMAC,
+  a crafted ciphertext length could crash the process. Such lengths, and a
+  shared secret that is not 64 bytes, are now rejected with
+  `CryptError::InvalidDataLength`; the wire format is unchanged. The cgv2
+  `AesXts` hub cipher was not affected (it pads to whole sectors and
+  verifies its MAC first).
 - Legacy `KeyControl::{get_key, save, load}` returned via `unimplemented!()`
   for unsupported key types; they now return
   `CryptError::UnsupportedOperation`.

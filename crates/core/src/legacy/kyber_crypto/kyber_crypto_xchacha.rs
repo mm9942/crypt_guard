@@ -89,7 +89,7 @@ where
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
 
-        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -125,7 +125,7 @@ where
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
 
-        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -161,7 +161,7 @@ where
 
         let _ = self.kyber_data.set_nonce(hex::encode(xchacha.nonce()));
 
-        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?).unwrap();
+        let (data, cipher) = xchacha.encrypt(self.kyber_data.key()?)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tEncryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -261,7 +261,7 @@ where
         let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
-        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tFile\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         write_log!();
@@ -296,7 +296,7 @@ where
         let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
-        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         // println!("data: {:?}", data);
@@ -332,7 +332,7 @@ where
         let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
-        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext).unwrap();
+        let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
         log_activity!("Finished:\n\t\tAlgorithm:\t\tXChaCha20,\n\t\tContent Type:\tMessage\n\t\tProcess:\t\tDecryption\n\t\tKEM:\t\t\t", format!("Kyber{}", kybersize).as_str());
 
         // println!("data: {:?}", data);
