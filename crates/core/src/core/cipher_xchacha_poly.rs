@@ -56,7 +56,7 @@ use chacha20poly1305::{
 };
 use hex;
 use hmac::{Hmac, Mac};
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
 use std::result::Result;
 
@@ -65,9 +65,7 @@ use std::result::Result;
 /// # Returns
 /// A 24-byte array filled with secure random bytes.
 pub fn generate_nonce() -> [u8; 24] {
-    let mut nonce = [0u8; 24];
-    OsRng.fill_bytes(&mut nonce);
-    nonce
+    OsRng.gen()
 }
 
 fn derive_legacy_xchacha_poly_key(

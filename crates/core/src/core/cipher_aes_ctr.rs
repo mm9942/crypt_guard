@@ -55,7 +55,7 @@ use crate::{
 };
 use aes::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher};
 use hex;
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng};
 use std::result::Result;
 
 /// Generates a 16-byte iv using OS-level randomness.
@@ -63,9 +63,7 @@ use std::result::Result;
 /// # Returns
 /// A 24-byte array filled with secure random bytes.
 pub fn generate_iv() -> [u8; 16] {
-    let mut iv = [0u8; 16];
-    OsRng.fill_bytes(&mut iv);
-    iv
+    OsRng.gen()
 }
 
 type Aes256Ctr64LE = ctr::Ctr64LE<aes::Aes256>;

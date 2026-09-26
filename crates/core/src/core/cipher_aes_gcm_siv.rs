@@ -62,7 +62,7 @@ use aes_gcm_siv::{
 };
 use hex;
 use hmac::{Hmac, Mac};
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
 use std::result::Result;
 
@@ -71,9 +71,7 @@ use std::result::Result;
 /// # Returns
 /// A 24-byte array filled with secure random bytes.
 pub fn generate_iv() -> [u8; 12] {
-    let mut iv = [0u8; 12];
-    OsRng.fill_bytes(&mut iv);
-    iv
+    OsRng.gen()
 }
 
 fn derive_legacy_aes_gcm_siv_key(sharedsecret: &[u8], iv: &[u8]) -> Result<[u8; 32], CryptError> {

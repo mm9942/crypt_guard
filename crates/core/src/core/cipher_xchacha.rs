@@ -57,7 +57,7 @@ use chacha20::{
     XChaCha20,
 };
 use hex;
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng};
 use std::{fs, result::Result};
 
 /// Generates a 24-byte nonce using OS-level randomness.
@@ -65,9 +65,7 @@ use std::{fs, result::Result};
 /// # Returns
 /// A 24-byte array filled with secure random bytes.
 pub fn generate_nonce() -> [u8; 24] {
-    let mut nonce = [0u8; 24];
-    OsRng.fill_bytes(&mut nonce);
-    nonce
+    OsRng.gen()
 }
 
 /// The main struct for handling cryptographic operations with ChaCha20 algorithm.
