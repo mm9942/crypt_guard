@@ -1,0 +1,24 @@
+[package]
+name = "crypt_guard_hyper"
+version = "3.1.0"
+edition = "2021"
+description = "Hyper/HTTP adapter for the CryptGuard crypto service: bounded bodies, error mapping and the TowerToHyperService bridge. Use it through the `crypt_guard` facade with `--features hyper`."
+license = "MIT"
+repository = "https://github.com/mm9942/crypt_guard"
+
+[dependencies]
+crypt_guard_service = { path = "../service", version = "3.1.0", features = ["buffer"] }
+bytes = "1.9"
+http = "1"
+http-body = "1"
+http-body-util = "0.1.2"
+hyper = { version = "1", default-features = false }
+# 0.1.20 already ships `TowerToHyperService`; newer patch releases raise the MSRV.
+hyper-util = { version = "0.1.20", default-features = false, features = ["service"] }
+tower-service = "0.3.3"
+
+[dev-dependencies]
+static_assertions = "1.1.0"
+tokio = { version = "1", features = ["macros", "rt", "io-util"] }
+hyper = { version = "1", features = ["client", "server", "http1"] }
+hyper-util = { version = "0.1.20", features = ["tokio"] }

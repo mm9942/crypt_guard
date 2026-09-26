@@ -1,0 +1,27 @@
+[package]
+name = "crypt_guard_service"
+version = "3.1.0"
+edition = "2021"
+description = "Typed, ownership-preserving Tower crypto/KMS service layer for CryptGuard (no HTTP). Use it through the `crypt_guard` facade with `--features service`."
+license = "MIT"
+repository = "https://github.com/mm9942/crypt_guard"
+
+[features]
+default = []
+# Bounded `tower::buffer::Buffer` + `ConcurrencyLimit` stack that turns the
+# non-Clone `CryptoService` into a cloneable network handle. Requires a Tokio
+# runtime at construction time.
+buffer = ["dep:tower"]
+
+[dependencies]
+# The facade decides which core features are enabled; the service layer only
+# needs the always-on `pq_hpke` surface.
+crypt_guard_core = { path = "../core", version = "3.1.0", default-features = false }
+tower-service = "0.3.3"
+zeroize = "1.8.1"
+tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit"], optional = true }
+
+[dev-dependencies]
+static_assertions = "1.1.0"
+tokio = { version = "1", features = ["macros", "rt"] }
+tower = { version = "0.5.2", default-features = false, features = ["util"] }

@@ -316,6 +316,31 @@ Dilithium path for explicitly managed legacy data. It is separate from
 | `zip` | no | ZIP helpers |
 | `aes-ctr` | no | Legacy AES-CTR support |
 | `aes-xts` | no | Legacy AES-XTS support |
+| `service` | no | `crypt_guard::service`: typed Tower crypto/KMS service (no HTTP) |
+| `hyper` | no | `crypt_guard::hyper`: Hyper adapter and `TowerToHyperService` bridge (implies `service`) |
+
+## Workspace layout
+
+`crypt_guard` is a facade crate. The cryptography lives in `crypt_guard_core`
+and is re-exported unchanged, so all `crypt_guard::…` paths keep working. The
+service and transport layers are separate crates that only enter the build
+through their features; the default build never depends on Tower, Hyper,
+`http-body`, `bytes` or Tokio (enforced in CI by `scripts/check_dep_gates.sh`).
+
+| Crate | Path | Role |
+|---|---|---|
+| `crypt_guard` | `.` | Public facade |
+| `crypt_guard_core` | `crates/core` | Cryptographic mechanisms and protocols |
+| `crypt_guard_proc` | `crypt_guard_proc` | Proc macros |
+| `crypt_guard_service` | `crates/service` | Typed KMS operations, `CryptoProvider`, non-`Clone` Tower `CryptoService` |
+| `crypt_guard_hyper` | `crates/hyper` | HTTP routing, bounded bodies, error mapping, Hyper bridge |
+
+Only the network element is cloneable: `CryptoService` owns all key state and
+is not `Clone`; a bounded `tower::buffer::Buffer` turns it into a cloneable
+channel handle, which is what Hyper's `TowerToHyperService` clones. Secret
+inputs and outputs travel as non-`Clone`, zeroize-on-drop `SecretBytes`.
+The service and Hyper crates are currently a skeleton: concrete providers and
+the request codecs follow.
 
 ## References
 
