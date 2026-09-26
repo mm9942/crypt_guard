@@ -72,7 +72,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::file(),
         );
@@ -109,7 +109,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::message(),
         );
@@ -145,7 +145,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::encryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::message(),
         );
@@ -246,7 +246,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::file(),
         );
@@ -258,7 +258,10 @@ where
             true,
             Some(file),
         );
-        let mut xchacha = CipherChaChaPoly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaChaPoly::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
@@ -282,7 +285,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::message(),
         );
@@ -293,7 +296,10 @@ where
             false,
             None,
         );
-        let mut xchacha = CipherChaChaPoly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaChaPoly::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
@@ -318,7 +324,7 @@ where
         };
         let crypt_metadata = CryptographicMetadata::from(
             Process::decryption(),
-            CryptographicMechanism::xchacha20(),
+            CryptographicMechanism::XChaCha20Poly1305,
             key_encap_mechanism,
             ContentType::message(),
         );
@@ -329,7 +335,10 @@ where
             false,
             None,
         );
-        let mut xchacha = CipherChaChaPoly::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaChaPoly::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20Poly1305.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;

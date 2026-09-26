@@ -1041,10 +1041,11 @@ fn suite_id(profile: Draft05Profile) -> [u8; 10] {
     ]
 }
 
-fn labeled_ikm(profile: Draft05Profile, label: &[u8], ikm: &[u8]) -> Vec<u8> {
+fn labeled_ikm(profile: Draft05Profile, label: &[u8], ikm: &[u8]) -> Zeroizing<Vec<u8>> {
     let suite = suite_id(profile);
-    let mut output =
-        Vec::with_capacity(HPKE_VERSION_LABEL.len() + suite.len() + label.len() + ikm.len());
+    let mut output = Zeroizing::new(Vec::with_capacity(
+        HPKE_VERSION_LABEL.len() + suite.len() + label.len() + ikm.len(),
+    ));
     output.extend_from_slice(HPKE_VERSION_LABEL);
     output.extend_from_slice(&suite);
     output.extend_from_slice(label);
@@ -1081,9 +1082,10 @@ fn labeled_extract_sha256(
     label: &[u8],
     ikm: &[u8],
 ) -> Vec<u8> {
-    Hkdf::<Sha256>::extract(Some(salt), &labeled_ikm(profile, label, ikm))
-        .0
-        .to_vec()
+    let mut prk = Hkdf::<Sha256>::extract(Some(salt), &labeled_ikm(profile, label, ikm)).0;
+    let value = prk.to_vec();
+    prk.as_mut_slice().zeroize();
+    value
 }
 
 fn labeled_extract_sha384(
@@ -1092,9 +1094,10 @@ fn labeled_extract_sha384(
     label: &[u8],
     ikm: &[u8],
 ) -> Vec<u8> {
-    Hkdf::<Sha384>::extract(Some(salt), &labeled_ikm(profile, label, ikm))
-        .0
-        .to_vec()
+    let mut prk = Hkdf::<Sha384>::extract(Some(salt), &labeled_ikm(profile, label, ikm)).0;
+    let value = prk.to_vec();
+    prk.as_mut_slice().zeroize();
+    value
 }
 
 fn labeled_expand_sha256(

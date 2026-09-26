@@ -145,7 +145,22 @@ pub fn initialize_logger(log_file: PathBuf) {
         log_file.file_name().and_then(|s| s.to_str()),
     ) {
         let _ = std::fs::create_dir_all(parent);
+        // Keep the log owner-only: create it with 0600 before the appender
+        // opens it, and tighten an existing file. Best-effort; logging still
+        // proceeds if this fails.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            let full_path = parent.join(file_name);
+            let _ = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .mode(0o600)
+                .open(&full_path);
+            let _ = std::fs::set_permissions(&full_path, std::fs::Permissions::from_mode(0o600));
+        }
         let appender = tracing_appender::rolling::never(parent, file_name);
+
         let subscriber = tracing_subscriber::registry().with(
             fmt::layer()
                 .with_ansi(false)

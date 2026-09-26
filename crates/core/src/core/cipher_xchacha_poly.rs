@@ -104,12 +104,12 @@ impl CipherChaChaPoly {
     /// A new CipherChaCha instance.
     pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
         let nonce: [u8; 24] = match nonce {
-            Some(nonce) => {
-                let mut array = [0u8; 24];
-                let decoded = hex::decode(nonce).expect("An error occurred while decoding hex!");
-                array.copy_from_slice(&decoded);
-                array
-            }
+            // A malformed nonce (not hex, wrong length) must not panic: fall back to a
+            // fresh random nonce, so decryption fails authentication with an error.
+            Some(nonce) => hex::decode(nonce)
+                .ok()
+                .and_then(|decoded| <[u8; 24]>::try_from(decoded).ok())
+                .unwrap_or_else(generate_nonce),
             None => generate_nonce(),
         };
         CipherChaChaPoly {
@@ -138,6 +138,8 @@ impl CipherChaChaPoly {
     /// # Returns
     /// A reference to the CipherChaCha instance to allow method chaining.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        use zeroize::Zeroize;
+        self.sharedsecret.zeroize();
         self.sharedsecret = sharedsecret;
         self
     }

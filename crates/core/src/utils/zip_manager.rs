@@ -232,6 +232,12 @@ impl ZipManager {
             let path = entry.path();
             // Ensure relative paths are correctly calculated
             let relative_path = path.strip_prefix(dir_path).unwrap_or(path);
+            // `WalkDir` yields `dir_path` itself as its first entry, whose
+            // relative path is empty; skip it so we don't emit a bogus
+            // top-level "/" directory entry into the archive.
+            if relative_path.as_os_str().is_empty() {
+                continue;
+            }
             let zip_path = relative_path.to_string_lossy().replace("\\", "/");
 
             if path.is_file() {

@@ -28,3 +28,19 @@ pub use key_controler::*;
 // These re-export the definitions from crate::core::kyber so that legacy call sites
 // using `Kyber512` etc. keep resolving to the same types already used in the hub.
 pub use crate::core::kyber::{Kyber1024, Kyber512, Kyber768};
+
+/// Validates a caller-supplied hex nonce/IV before a legacy cipher uses it.
+///
+/// The legacy ciphers take the nonce as a hex `String`. Plain XChaCha20 and
+/// AES-CTR do not authenticate the nonce, so a wrong one would decrypt to
+/// garbage instead of failing; reject anything that is not valid hex of the
+/// exact length up front.
+///
+/// # Errors
+/// [`CryptError::InvalidNonce`] if `nonce` is not hex or not `len` bytes long.
+pub(crate) fn checked_nonce(nonce: &str, len: usize) -> Result<String, crate::error::CryptError> {
+    match hex::decode(nonce) {
+        Ok(bytes) if bytes.len() == len => Ok(nonce.to_owned()),
+        _ => Err(crate::error::CryptError::InvalidNonce),
+    }
+}

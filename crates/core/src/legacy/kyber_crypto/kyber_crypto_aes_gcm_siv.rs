@@ -255,8 +255,10 @@ where
             location: Some(file),
         };
 
-        let mut aes_gcm_siv =
-            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv = CipherAesGcmSiv::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 12)?),
+        );
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         Ok(data)
@@ -291,8 +293,10 @@ where
             location: None,
         };
 
-        let mut aes_gcm_siv =
-            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv = CipherAesGcmSiv::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 12)?),
+        );
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         Ok(data)
@@ -327,8 +331,10 @@ where
             location: None,
         };
 
-        let mut aes_gcm_siv =
-            CipherAesGcmSiv::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut aes_gcm_siv = CipherAesGcmSiv::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 12)?),
+        );
 
         let data = aes_gcm_siv.decrypt(self.kyber_data.key()?, ciphertext)?;
         Ok(data)

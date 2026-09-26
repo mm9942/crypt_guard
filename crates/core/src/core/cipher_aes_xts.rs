@@ -111,6 +111,8 @@ impl CipherAesXts {
     /// # Returns
     /// A reference to the CipherChaCha instance to allow method chaining.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        use zeroize::Zeroize;
+        self.sharedsecret.zeroize();
         self.sharedsecret = sharedsecret;
         self
     }

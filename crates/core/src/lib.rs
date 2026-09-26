@@ -195,7 +195,7 @@ macro_rules! decrypt_open {
         let mut content = $content;
         let passphrase = $passphrase;
         let mut cipher = $cipher;
-        let out = (|| {
+        let result = (|| {
             let decryptor = Kyber::<Decryption, Kyber1024, Data, AES>::new(key.to_owned(), None)?;
             let data =
                 decryptor.decrypt_data(content.to_owned(), &passphrase, cipher.to_owned())?;
@@ -203,14 +203,16 @@ macro_rules! decrypt_open {
             signer
                 .open(data, sign.to_owned())
                 .map_err($crate::error::CryptError::from)
-        })()
-        .expect("decrypt_open failed");
+        })();
 
+        // Zeroize before `expect`: a failed decrypt/verify panics, and the
+        // unwind would otherwise skip the wipe.
         key.zeroize();
         sign.zeroize();
         content.zeroize();
         cipher.zeroize();
-        out
+
+        result.expect("decrypt_open failed")
     }};
 }
 

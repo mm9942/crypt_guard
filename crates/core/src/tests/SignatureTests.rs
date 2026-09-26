@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::{error::*, falcon_keypair, kdf::*, signature, verify};
+use crate::{dilithium_keypair, error::*, falcon_keypair, kdf::*, signature, verify};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -474,4 +474,41 @@ fn end2() {
     let _ = fs::remove_file("message.txt");
     let _ = fs::remove_file("message.txt.enc");
     let _ = fs::remove_dir_all("./crypt_tests");
+}
+
+/// A forged or truncated signed message must be a verification error, never a
+/// panic (the legacy `open` path used to `unwrap()` the PQClean result).
+#[test]
+fn legacy_signatures_reject_tampered_input_without_panicking(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = b"hey, how are you?".to_vec();
+
+    let (public_key, secret_key) = falcon_keypair!(1024);
+    let mut sign = signature!(
+        Falcon,
+        secret_key.to_owned(),
+        1024,
+        data.to_owned(),
+        Message
+    )?;
+    if let Some(byte) = sign.last_mut() {
+        *byte ^= 0x01;
+    }
+    assert!(verify!(Falcon, public_key.to_owned(), 1024, sign, Message).is_err());
+    assert!(verify!(Falcon, public_key.to_owned(), 1024, vec![0u8; 3], Message).is_err());
+    assert!(verify!(Falcon, vec![0u8; 5], 1024, vec![0u8; 3], Message).is_err());
+
+    let (public_key, secret_key) = dilithium_keypair!(5);
+    let mut sign = signature!(
+        Dilithium,
+        secret_key.to_owned(),
+        5,
+        data.to_owned(),
+        Message
+    )?;
+    if let Some(byte) = sign.first_mut() {
+        *byte ^= 0x01;
+    }
+    assert!(verify!(Dilithium, public_key.to_owned(), 5, sign, Message).is_err());
+    Ok(())
 }

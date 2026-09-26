@@ -887,6 +887,21 @@ pub struct SignBuilder {
     data: Option<Vec<u8>>,
 }
 
+/// Zeroizes the signing secret key and data held by the builder when it is dropped,
+/// so a partially configured or discarded builder does not leave key material or
+/// plaintext in freed heap memory.
+#[cfg(feature = "legacy-pqclean")]
+impl Drop for SignBuilder {
+    fn drop(&mut self) {
+        if let Some(key) = self.key.as_mut() {
+            key.zeroize();
+        }
+        if let Some(data) = self.data.as_mut() {
+            data.zeroize();
+        }
+    }
+}
+
 #[cfg(feature = "legacy-pqclean")]
 impl SignBuilder {
     /// Creates a new, empty [`SignBuilder`].
@@ -923,15 +938,21 @@ impl SignBuilder {
     /// # Errors
     /// - [`SigningErr`]: a required field (algorithm, mode, key, data) is missing or the
     ///   underlying signing macro fails.
-    pub fn sign(self) -> Result<Vec<u8>, SigningErr> {
+    pub fn sign(mut self) -> Result<Vec<u8>, SigningErr> {
         let alg = self
             .alg
             .ok_or_else(|| SigningErr::new("missing algorithm"))?;
         let mode = self
             .mode
             .ok_or_else(|| SigningErr::new("missing sign mode"))?;
-        let key = self.key.ok_or_else(|| SigningErr::new("missing key"))?;
-        let data = self.data.ok_or_else(|| SigningErr::new("missing data"))?;
+        let key = self
+            .key
+            .take()
+            .ok_or_else(|| SigningErr::new("missing key"))?;
+        let data = self
+            .data
+            .take()
+            .ok_or_else(|| SigningErr::new("missing data"))?;
 
         match (alg, mode) {
             (SignAlgorithm::Falcon1024, SignMode::Message) => {

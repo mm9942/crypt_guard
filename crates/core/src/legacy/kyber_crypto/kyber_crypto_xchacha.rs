@@ -258,7 +258,10 @@ where
             true,
             Some(file),
         );
-        let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
@@ -293,7 +296,10 @@ where
             false,
             None,
         );
-        let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;
@@ -329,7 +335,10 @@ where
             false,
             None,
         );
-        let mut xchacha = CipherChaCha::new(infos, Some(self.kyber_data.nonce()?.to_string()));
+        let mut xchacha = CipherChaCha::new(
+            infos,
+            Some(super::checked_nonce(self.kyber_data.nonce()?, 24)?),
+        );
         log_activity!("Creating a new cipher instance of XChaCha20.", "");
 
         let data = xchacha.decrypt(self.kyber_data.key()?, ciphertext)?;

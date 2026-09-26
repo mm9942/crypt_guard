@@ -403,12 +403,30 @@ impl KyberSizeVariant for MlKem1024 {
 /// optional hex-encoded nonce for nonce-bearing ciphers. The nonce is stored here only
 /// so that the legacy `KyberFunctions` path can retrieve it via `get_nonce()`; the new
 /// Phase 3 path stores the nonce inside the [`Envelope`] instead.
-#[derive(PartialEq, Debug, Clone)]
+///
+/// `key` may hold secret key bytes (decryption instances), so it is zeroized on drop
+/// and redacted from `Debug`, matching the legacy `core::kyber::KyberData`.
+#[derive(PartialEq, Clone)]
 pub struct KyberData {
     /// Key bytes (public key for encryption, secret key for decryption).
     key: Vec<u8>,
     /// Hex-encoded nonce string; empty if not set.
     nonce: String,
+}
+
+impl std::fmt::Debug for KyberData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KyberData")
+            .field("key", &format_args!("<redacted {} bytes>", self.key.len()))
+            .field("nonce", &self.nonce)
+            .finish()
+    }
+}
+
+impl Drop for KyberData {
+    fn drop(&mut self) {
+        self.key.zeroize();
+    }
 }
 
 impl KyberData {

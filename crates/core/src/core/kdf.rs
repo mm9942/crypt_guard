@@ -81,7 +81,8 @@ impl KeyOperations for Falcon1024 {
             FileTypes::public_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(public_key);
+        file.save(public_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
@@ -90,25 +91,31 @@ impl KeyOperations for Falcon1024 {
             FileTypes::secret_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(secret_key);
+        file.save(secret_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::public_key(),
                 FileState::not_encrypted(),
             ),
             Some("sec") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::secret_key(),
                 FileState::not_encrypted(),
             ),
             _ => FileMetadata::new(),
         };
         let key = file.load().map_err(|_e| {
-            SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string())
+            SigningErr::UnsupportedFileType(
+                path.extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
         })?;
         Ok(key)
     }
@@ -137,7 +144,8 @@ impl SignatureFunctions for Falcon1024 {
             "\nUsed key: Falcon1024"
         );
         let key = Zeroizing::new(key);
-        let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            falcon1024::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = falcon1024::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
         Ok(signature)
@@ -149,7 +157,8 @@ impl SignatureFunctions for Falcon1024 {
             "\nUsed key: Falcon1024"
         );
         let key = Zeroizing::new(key);
-        let key = falcon1024::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            falcon1024::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = falcon1024::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
         Ok(signature)
@@ -160,10 +169,12 @@ impl SignatureFunctions for Falcon1024 {
             "Starting with signing of the message.",
             "\nUsed key: Falcon1024"
         );
-        let key = falcon1024::PublicKey::from_bytes(&key).unwrap();
-        let signed_message = falcon1024::SignedMessage::from_bytes(&signed_data).unwrap();
+        let key =
+            falcon1024::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let signed_message = falcon1024::SignedMessage::from_bytes(&signed_data)
+            .map_err(|_| SigningErr::SignatureMissing)?;
         log_activity!("Completed signing the message.", "\nUsed key: Falcon1024");
-        Ok(falcon1024::open(&signed_message, &key).unwrap())
+        falcon1024::open(&signed_message, &key).map_err(|_| SigningErr::SignatureVerificationFailed)
     }
     /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
@@ -171,8 +182,10 @@ impl SignatureFunctions for Falcon1024 {
             "Starting verification of signed message.",
             "\nUsed key: Falcon1024"
         );
-        let key = falcon1024::PublicKey::from_bytes(&key).unwrap();
-        let ds = falcon1024::DetachedSignature::from_bytes(&signature).unwrap();
+        let key =
+            falcon1024::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let ds = falcon1024::DetachedSignature::from_bytes(&signature)
+            .map_err(|_| SigningErr::SignatureMissing)?;
 
         let data = falcon1024::verify_detached_signature(&ds, &data, &key)
             .map(|_| true)
@@ -204,7 +217,8 @@ impl KeyOperations for Falcon512 {
             FileTypes::public_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(public_key);
+        file.save(public_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
@@ -213,25 +227,31 @@ impl KeyOperations for Falcon512 {
             FileTypes::secret_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(secret_key);
+        file.save(secret_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::public_key(),
                 FileState::not_encrypted(),
             ),
             Some("sec") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::secret_key(),
                 FileState::not_encrypted(),
             ),
             _ => FileMetadata::new(),
         };
         let key = file.load().map_err(|_e| {
-            SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string())
+            SigningErr::UnsupportedFileType(
+                path.extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
         })?;
         Ok(key)
     }
@@ -260,7 +280,8 @@ impl SignatureFunctions for Falcon512 {
             "\nUsed key: Falcon512"
         );
         let key = Zeroizing::new(key);
-        let key = falcon512::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            falcon512::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = falcon512::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
         Ok(signature)
@@ -272,7 +293,8 @@ impl SignatureFunctions for Falcon512 {
             "\nUsed key: Falcon512"
         );
         let key = Zeroizing::new(key);
-        let key = falcon512::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            falcon512::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = falcon512::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Falcon512");
         Ok(signature)
@@ -283,13 +305,15 @@ impl SignatureFunctions for Falcon512 {
             "Starting with signing of the message.",
             "\nSelected KDF: Falcon512"
         );
-        let key = falcon512::PublicKey::from_bytes(&key).unwrap();
-        let signed_message = falcon512::SignedMessage::from_bytes(&signed_data).unwrap();
+        let key =
+            falcon512::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let signed_message = falcon512::SignedMessage::from_bytes(&signed_data)
+            .map_err(|_| SigningErr::SignatureMissing)?;
         log_activity!(
             "Completed signing the message.",
             "\nSelected KDF: Falcon512"
         );
-        Ok(falcon512::open(&signed_message, &key).unwrap())
+        falcon512::open(&signed_message, &key).map_err(|_| SigningErr::SignatureVerificationFailed)
     }
     /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
@@ -297,8 +321,10 @@ impl SignatureFunctions for Falcon512 {
             "Starting verification of signed message.",
             "\nSelected KDF: Falcon512"
         );
-        let key = falcon512::PublicKey::from_bytes(&key).unwrap();
-        let ds = falcon512::DetachedSignature::from_bytes(&signature).unwrap();
+        let key =
+            falcon512::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let ds = falcon512::DetachedSignature::from_bytes(&signature)
+            .map_err(|_| SigningErr::SignatureMissing)?;
 
         let data = falcon512::verify_detached_signature(&ds, &data, &key)
             .map(|_| true)
@@ -331,7 +357,8 @@ impl KeyOperations for Dilithium2 {
             FileTypes::public_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(public_key);
+        file.save(public_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
@@ -340,25 +367,31 @@ impl KeyOperations for Dilithium2 {
             FileTypes::secret_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(secret_key);
+        file.save(secret_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::public_key(),
                 FileState::not_encrypted(),
             ),
             Some("sec") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::secret_key(),
                 FileState::not_encrypted(),
             ),
             _ => FileMetadata::new(),
         };
         let key = file.load().map_err(|_e| {
-            SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string())
+            SigningErr::UnsupportedFileType(
+                path.extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
         })?;
         Ok(key)
     }
@@ -387,7 +420,8 @@ impl SignatureFunctions for Dilithium2 {
             "\nSelected KDF: Dilithium2"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium2::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium2::sign(&data, &key).as_bytes().to_owned();
         log_activity!(
             "Completed signing the message.",
@@ -402,7 +436,8 @@ impl SignatureFunctions for Dilithium2 {
             "\nSelected KDF: Dilithium2"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium2::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium2::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium2::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!(
             "Completed signing the message.",
@@ -416,13 +451,15 @@ impl SignatureFunctions for Dilithium2 {
             "Starting with signing of the message.",
             "\nSelected KDF: Dilithium2"
         );
-        let key = dilithium2::PublicKey::from_bytes(&key).unwrap();
-        let signed_message = dilithium2::SignedMessage::from_bytes(&signed_data).unwrap();
+        let key =
+            dilithium2::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let signed_message = dilithium2::SignedMessage::from_bytes(&signed_data)
+            .map_err(|_| SigningErr::SignatureMissing)?;
         log_activity!(
             "Completed signing the message.",
             "\nSelected KDF: Dilithium2"
         );
-        Ok(dilithium2::open(&signed_message, &key).unwrap())
+        dilithium2::open(&signed_message, &key).map_err(|_| SigningErr::SignatureVerificationFailed)
     }
     /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
@@ -430,8 +467,10 @@ impl SignatureFunctions for Dilithium2 {
             "Starting verification of signed message.",
             "\nSelected KDF: Dilithium2"
         );
-        let key = dilithium2::PublicKey::from_bytes(&key).unwrap();
-        let ds = dilithium2::DetachedSignature::from_bytes(&signature).unwrap();
+        let key =
+            dilithium2::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let ds = dilithium2::DetachedSignature::from_bytes(&signature)
+            .map_err(|_| SigningErr::SignatureMissing)?;
 
         let data = dilithium2::verify_detached_signature(&ds, &data, &key)
             .map(|_| true)
@@ -463,7 +502,8 @@ impl KeyOperations for Dilithium3 {
             FileTypes::public_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(public_key);
+        file.save(public_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
@@ -472,25 +512,31 @@ impl KeyOperations for Dilithium3 {
             FileTypes::secret_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(secret_key);
+        file.save(secret_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::public_key(),
                 FileState::not_encrypted(),
             ),
             Some("sec") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::secret_key(),
                 FileState::not_encrypted(),
             ),
             _ => FileMetadata::new(),
         };
         let key = file.load().map_err(|_e| {
-            SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string())
+            SigningErr::UnsupportedFileType(
+                path.extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
         })?;
         Ok(key)
     }
@@ -519,7 +565,8 @@ impl SignatureFunctions for Dilithium3 {
             "\nUsed key: Dilithium3"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium3::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium3::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
         Ok(signature)
@@ -531,7 +578,8 @@ impl SignatureFunctions for Dilithium3 {
             "\nUsed key: Dilithium3"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium3::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium3::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium3::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
         Ok(signature)
@@ -542,11 +590,13 @@ impl SignatureFunctions for Dilithium3 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium3"
         );
-        let key = dilithium3::PublicKey::from_bytes(&key).unwrap();
-        let signed_message = dilithium3::SignedMessage::from_bytes(&signed_data).unwrap();
+        let key =
+            dilithium3::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let signed_message = dilithium3::SignedMessage::from_bytes(&signed_data)
+            .map_err(|_| SigningErr::SignatureMissing)?;
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium3");
 
-        Ok(dilithium3::open(&signed_message, &key).unwrap())
+        dilithium3::open(&signed_message, &key).map_err(|_| SigningErr::SignatureVerificationFailed)
     }
     /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
@@ -554,8 +604,10 @@ impl SignatureFunctions for Dilithium3 {
             "Starting verification of signed message.",
             "\nUsed key: Dilithium3"
         );
-        let key = dilithium3::PublicKey::from_bytes(&key).unwrap();
-        let ds = dilithium3::DetachedSignature::from_bytes(&signature).unwrap();
+        let key =
+            dilithium3::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let ds = dilithium3::DetachedSignature::from_bytes(&signature)
+            .map_err(|_| SigningErr::SignatureMissing)?;
 
         let data = dilithium3::verify_detached_signature(&ds, &data, &key)
             .map(|_| true)
@@ -587,7 +639,8 @@ impl KeyOperations for Dilithium5 {
             FileTypes::public_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(public_key);
+        file.save(public_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn save_secret(secret_key: &[u8]) -> Result<(), SigningErr> {
@@ -596,25 +649,31 @@ impl KeyOperations for Dilithium5 {
             FileTypes::secret_key(),
             FileState::not_encrypted(),
         );
-        let _ = file.save(secret_key);
+        file.save(secret_key)
+            .map_err(|_| SigningErr::FileWriteFailed)?;
         Ok(())
     }
     fn load(path: &std::path::Path) -> Result<Vec<u8>, SigningErr> {
         let file = match path.extension().and_then(|s| s.to_str()) {
             Some("pub") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::public_key(),
                 FileState::not_encrypted(),
             ),
             Some("sec") => FileMetadata::from(
-                PathBuf::from(path.as_os_str().to_str().unwrap()),
+                path.to_path_buf(),
                 FileTypes::secret_key(),
                 FileState::not_encrypted(),
             ),
             _ => FileMetadata::new(),
         };
         let key = file.load().map_err(|_e| {
-            SigningErr::UnsupportedFileType(path.extension().unwrap().to_str().unwrap().to_string())
+            SigningErr::UnsupportedFileType(
+                path.extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
         })?;
         Ok(key)
     }
@@ -643,7 +702,8 @@ impl SignatureFunctions for Dilithium5 {
             "\nUsed key: Dilithium5"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium5::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium5::sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
         Ok(signature)
@@ -655,7 +715,8 @@ impl SignatureFunctions for Dilithium5 {
             "\nUsed key: Dilithium5"
         );
         let key = Zeroizing::new(key);
-        let key = dilithium5::SecretKey::from_bytes(&key).unwrap();
+        let key =
+            dilithium5::SecretKey::from_bytes(&key).map_err(|_| SigningErr::SecretKeyMissing)?;
         let signature = dilithium5::detached_sign(&data, &key).as_bytes().to_owned();
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
         Ok(signature)
@@ -666,10 +727,12 @@ impl SignatureFunctions for Dilithium5 {
             "Starting with signing of the message.",
             "\nUsed key: Dilithium5"
         );
-        let key = dilithium5::PublicKey::from_bytes(&key).unwrap();
-        let signed_message = dilithium5::SignedMessage::from_bytes(&signed_data).unwrap();
+        let key =
+            dilithium5::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let signed_message = dilithium5::SignedMessage::from_bytes(&signed_data)
+            .map_err(|_| SigningErr::SignatureMissing)?;
         log_activity!("Completed signing the message.", "\nUsed key: Dilithium5");
-        Ok(dilithium5::open(&signed_message, &key).unwrap())
+        dilithium5::open(&signed_message, &key).map_err(|_| SigningErr::SignatureVerificationFailed)
     }
     /// Verifies a signature against the provided data and key.
     fn verify(signature: Vec<u8>, data: Vec<u8>, key: Vec<u8>) -> Result<bool, SigningErr> {
@@ -677,8 +740,10 @@ impl SignatureFunctions for Dilithium5 {
             "Starting verification of signed message.",
             "\nUsed key: Dilithium5"
         );
-        let key = dilithium5::PublicKey::from_bytes(&key).unwrap();
-        let ds = dilithium5::DetachedSignature::from_bytes(&signature).unwrap();
+        let key =
+            dilithium5::PublicKey::from_bytes(&key).map_err(|_| SigningErr::PublicKeyMissing)?;
+        let ds = dilithium5::DetachedSignature::from_bytes(&signature)
+            .map_err(|_| SigningErr::SignatureMissing)?;
 
         let data = dilithium5::verify_detached_signature(&ds, &data, &key)
             .map(|_| true)

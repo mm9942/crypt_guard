@@ -1,5 +1,5 @@
-//! Legacy `CipherAES` symmetric cipher: AES (CBC-mode, via `Aes128`/`Aes256`
-//! block ciphers) with an HMAC-SHA512 tag.
+//! Legacy `CipherAES` symmetric cipher: AES-256 in **ECB mode** with an
+//! HMAC-SHA512 tag.
 //!
 //! [`CipherAES`](crate::cryptography::CipherAES) is compiled behind the
 //! `legacy-aes` feature (see `crates/core/src/core/mod.rs`). Its
@@ -9,10 +9,16 @@
 //! code should use [`crypt_guard_core::pq_hpke`](crate::pq_hpke) instead.
 //!
 //! # Security
-//! The block cipher itself is not an AEAD. This module compensates by
-//! prepending an HMAC-SHA512 tag (keyed with the caller's passphrase) to the
-//! plaintext before encryption and verifying it after decryption; do not call
-//! the underlying block-cipher routines directly and skip this wrapping.
+//! **Do not use this for new data.** `encryption()` encrypts every 16-byte
+//! block independently with the same key (ECB: no IV, no chaining), so equal
+//! plaintext blocks produce equal ciphertext blocks and the structure of the
+//! plaintext leaks. The format is kept only so existing ciphertexts can still
+//! be decrypted; re-encrypt them with [`crate::pq_hpke`].
+//!
+//! Integrity comes from an HMAC-SHA512 tag over the plaintext, keyed with the
+//! caller's passphrase (MAC-then-encrypt), so it is only as strong as that
+//! passphrase. A fresh Kyber encapsulation per message means the AES key is
+//! never reused across messages.
 //!
 //! # Examples
 //! ```ignore
@@ -100,6 +106,8 @@ impl CipherAES {
     /// # Returns
     /// A mutable reference to the `CipherAES` instance, allowing for chaining of operations.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        use zeroize::Zeroize;
+        self.sharedsecret.zeroize();
         self.sharedsecret = sharedsecret;
         self
     }
@@ -296,7 +304,11 @@ impl CipherAES {
         }
 
         if let Some(&padding_length) = decrypted_data.last() {
-            decrypted_data.truncate(decrypted_data.len() - padding_length as usize);
+            let padding_length = padding_length as usize;
+            if padding_length == 0 || padding_length > decrypted_data.len() {
+                return Err(CryptError::DecryptionFailed);
+            }
+            decrypted_data.truncate(decrypted_data.len() - padding_length);
         }
 
         Ok(decrypted_data)

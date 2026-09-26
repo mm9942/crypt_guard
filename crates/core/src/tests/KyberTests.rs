@@ -1432,3 +1432,44 @@ legacy_hostile_input_test!(
     legacy_xchacha20poly1305_hostile_input_errors_without_panicking,
     XChaCha20Poly1305
 );
+
+/// A malformed nonce/IV string (not hex, wrong length) must make decryption
+/// be rejected with an error: no panic in the cipher constructor and no
+/// garbage plaintext from an unauthenticated nonce.
+macro_rules! legacy_bad_nonce_test {
+    ($name:ident, $alg:ty) => {
+        #[test]
+        fn $name() -> Result<(), Box<dyn std::error::Error>> {
+            let passphrase = "Test Passphrase";
+            let (public_key, secret_key) = KeyControKyber1024::keypair()?;
+            let mut encryptor = Kyber::<Encryption, Kyber1024, Data, $alg>::new(public_key, None)?;
+            let (encrypted, cipher) = encryptor.encrypt_data(vec![7u8; 64], passphrase)?;
+            for bad in ["zz-not-hex", "abcd", ""] {
+                let decryptor = Kyber::<Decryption, Kyber1024, Data, $alg>::new(
+                    secret_key.clone(),
+                    Some(bad.to_string()),
+                )?;
+                // Plain XChaCha20 and AES-CTR do not authenticate the nonce, so
+                // without the up-front check this would return garbage.
+                assert!(decryptor
+                    .decrypt_data(encrypted.clone(), passphrase, cipher.clone())
+                    .is_err());
+            }
+            Ok(())
+        }
+    };
+}
+
+legacy_bad_nonce_test!(legacy_aes_ctr_bad_iv_errors_without_panicking, AesCtr);
+legacy_bad_nonce_test!(
+    legacy_aes_gcm_siv_bad_iv_errors_without_panicking,
+    AesGcmSiv
+);
+legacy_bad_nonce_test!(
+    legacy_xchacha20_bad_nonce_errors_without_panicking,
+    XChaCha20
+);
+legacy_bad_nonce_test!(
+    legacy_xchacha20poly1305_bad_nonce_errors_without_panicking,
+    XChaCha20Poly1305
+);

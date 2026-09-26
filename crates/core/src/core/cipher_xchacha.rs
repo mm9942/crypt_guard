@@ -83,10 +83,12 @@ impl CipherChaCha {
     /// A new `CipherChaCha` instance.
     pub fn new(infos: CryptographicInformation, nonce: Option<String>) -> Self {
         let nonce: [u8; 24] = match nonce {
+            // A malformed nonce (not hex, wrong length) must not panic: fall back to a
+            // fresh random nonce, so decryption fails authentication with an error.
             Some(nonce) => hex::decode(nonce)
-                .expect("An error occoured while decoding hex!")
-                .try_into()
-                .unwrap(),
+                .ok()
+                .and_then(|decoded| <[u8; 24]>::try_from(decoded).ok())
+                .unwrap_or_else(generate_nonce),
             None => generate_nonce(),
         };
         // println!("infos: {:?}", infos);
@@ -115,6 +117,8 @@ impl CipherChaCha {
     /// # Returns
     /// A reference to the `CipherChaCha` instance to allow method chaining.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        use zeroize::Zeroize;
+        self.sharedsecret.zeroize();
         self.sharedsecret = sharedsecret;
         self
     }
@@ -160,7 +164,7 @@ impl CipherChaCha {
         let file_contained = self.infos.contains_file()?;
 
         if file_contained && self.infos.metadata.content_type == ContentType::File {
-            let content = fs::read(self.infos.location()?).unwrap();
+            let content = fs::read(self.infos.location()?).map_err(|_| CryptError::FileNotFound)?;
             self.infos.set_data(&content)?;
         }
 

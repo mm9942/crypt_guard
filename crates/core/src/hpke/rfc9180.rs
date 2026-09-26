@@ -982,10 +982,19 @@ fn x448_extract_and_expand(dh: &[u8], kem_context: &[u8]) -> Result<Vec<u8>, Rfc
 }
 
 fn x448_dh(private_key: &[u8], public_key: &[u8]) -> Result<[u8; X448_KEY_LEN], Rfc9180Error> {
-    let private_key = as_x448_array(private_key, KemKeyKind::Private)?;
+    use zeroize::Zeroize;
+
+    let mut private_key = as_x448_array(private_key, KemKeyKind::Private)?;
     let public_key = as_x448_array(public_key, KemKeyKind::Public)?;
     let shared_secret = crrl::x448::x448(&public_key, &private_key);
-    if shared_secret.iter().all(|byte| *byte == 0) {
+    // Wipe the stack copy of the private scalar as soon as it has been
+    // consumed; only the (non-secret) DH output is returned.
+    private_key.zeroize();
+    // RFC 9180 §7.1.4 requires rejecting the all-zero shared secret. Fold
+    // over every byte (rather than a short-circuiting `all()`) so the check
+    // does not take a data-dependent number of steps on secret material.
+    let is_zero = shared_secret.iter().fold(0_u8, |acc, byte| acc | byte) == 0;
+    if is_zero {
         Err(Rfc9180Error::InvalidDhSharedSecret)
     } else {
         Ok(shared_secret)
@@ -1372,7 +1381,8 @@ fn setup_x448_sender(
     let ephemeral = generate_x448_key_pair()?;
     let encapsulated = as_x448_array(ephemeral.public_key.as_bytes(), KemKeyKind::Encapsulated)?;
     let mut dh = Zeroizing::new(Vec::with_capacity(2 * X448_KEY_LEN));
-    dh.extend_from_slice(&x448_dh(&ephemeral.private_key.bytes, &recipient_public)?);
+    let ephemeral_dh = Zeroizing::new(x448_dh(&ephemeral.private_key.bytes, &recipient_public)?);
+    dh.extend_from_slice(&ephemeral_dh[..]);
     let mut kem_context = Vec::with_capacity(X448_KEY_LEN * 3);
     kem_context.extend_from_slice(&encapsulated);
     kem_context.extend_from_slice(&recipient_public);
@@ -1381,8 +1391,10 @@ fn setup_x448_sender(
         SenderMode::Base => (Mode::Base, &[][..], &[][..]),
         SenderMode::Psk { psk, psk_id } => (Mode::Psk, psk, psk_id),
         SenderMode::Auth { private_key } => {
-            let sender_public =
-                crrl::x448::x448_base(&as_x448_array(&private_key.bytes, KemKeyKind::Private)?);
+            use zeroize::Zeroize;
+            let mut sender_private = as_x448_array(&private_key.bytes, KemKeyKind::Private)?;
+            let sender_public = crrl::x448::x448_base(&sender_private);
+            sender_private.zeroize();
             let static_dh = Zeroizing::new(x448_dh(&private_key.bytes, &recipient_public)?);
             dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
@@ -1393,8 +1405,10 @@ fn setup_x448_sender(
             psk,
             psk_id,
         } => {
-            let sender_public =
-                crrl::x448::x448_base(&as_x448_array(&private_key.bytes, KemKeyKind::Private)?);
+            use zeroize::Zeroize;
+            let mut sender_private = as_x448_array(&private_key.bytes, KemKeyKind::Private)?;
+            let sender_public = crrl::x448::x448_base(&sender_private);
+            sender_private.zeroize();
             let static_dh = Zeroizing::new(x448_dh(&private_key.bytes, &recipient_public)?);
             dh.extend_from_slice(&static_dh[..]);
             kem_context.extend_from_slice(&sender_public);
@@ -1430,7 +1444,8 @@ fn setup_x448_receiver(
     let recipient_public = crrl::x448::x448_base(&recipient_private);
     let encapsulated = as_x448_array(enc.as_bytes(), KemKeyKind::Encapsulated)?;
     let mut dh = Zeroizing::new(Vec::with_capacity(2 * X448_KEY_LEN));
-    dh.extend_from_slice(&x448_dh(&recipient_private[..], &encapsulated)?);
+    let base_dh = Zeroizing::new(x448_dh(&recipient_private[..], &encapsulated)?);
+    dh.extend_from_slice(&base_dh[..]);
     let mut kem_context = Vec::with_capacity(X448_KEY_LEN * 3);
     kem_context.extend_from_slice(&encapsulated);
     kem_context.extend_from_slice(&recipient_public);

@@ -83,7 +83,12 @@ impl CipherAesCtr {
     /// A new CipherAesCtr instance.
     pub fn new(infos: CryptographicInformation, iv: Option<String>) -> Self {
         let iv: Vec<u8> = match iv {
-            Some(iv) => hex::decode(iv).expect("An error occoured while decoding hex!"),
+            // A malformed IV (not hex, wrong length) must not panic: fall back to a
+            // fresh random IV, so decryption fails authentication with an error.
+            Some(iv) => match hex::decode(iv) {
+                Ok(iv) if iv.len() == 16 => iv,
+                _ => generate_iv().to_vec(),
+            },
             None => generate_iv().to_vec(),
         };
         // println!("infos: {:?}", infos);
@@ -112,6 +117,8 @@ impl CipherAesCtr {
     /// # Returns
     /// A reference to the CipherAesCtr instance to allow method chaining.
     pub fn set_shared_secret(&mut self, sharedsecret: Vec<u8>) -> &Self {
+        use zeroize::Zeroize;
+        self.sharedsecret.zeroize();
         self.sharedsecret = sharedsecret;
         self
     }

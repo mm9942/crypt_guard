@@ -62,6 +62,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Single-feature builds (`aes-ctr`, `aes-xts`, `legacy-aes`,
   `aes-gcm-siv-cipher`, `zip`).
 - Panics on crafted key files and in RFC 9180 KEM dispatch.
+- Legacy Falcon/Dilithium signing (`legacy-pqclean`): an invalid signature,
+  a malformed key or signed message panicked instead of returning
+  `SigningErr`; `save_public`/`save_secret` ignored write failures; `load`
+  panicked on paths without an extension or not valid UTF-8.
+- Legacy ciphers: a caller-supplied nonce/IV that is not hex or has the
+  wrong length panicked in the constructor. The Kyber wrappers now reject it
+  with `CryptError::InvalidNonce`. Plain XChaCha20 and AES-CTR do not
+  authenticate the nonce, so a wrong one used to decrypt to garbage.
+- `decrypt_open!` zeroizes the key, signature and buffers before it panics
+  on a failed decrypt (previously the unwind skipped the wipe).
+- Zeroization: `SignBuilder` (secret key, data), the cgv2 hub `KyberData`
+  (secret key; its `Debug` also printed the key), legacy cipher shared
+  secrets on `set_shared_secret`, and X448/HPKE-PQ key-schedule temporaries.
+- The log file is created owner-only (`0600`) on Unix.
+- Legacy AES decryption no longer underflows on an out-of-range padding byte.
+- `ZipManager::add_directory` no longer adds a bogus `/` entry.
+- Documentation: the legacy `AES` cipher uses ECB mode (not CBC as documented
+  before); `SECURITY.md` says never to encrypt new data with it.
 - Legacy Kyber AES-CTR and AES-GCM-SIV wrappers printed the ciphertext on
   encryption and the **decrypted plaintext** on decryption to stdout
   (`println!("{:?}", data)`); in a service this ends up in logs. Removed.

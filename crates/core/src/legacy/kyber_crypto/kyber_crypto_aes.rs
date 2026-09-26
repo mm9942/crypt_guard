@@ -1,4 +1,4 @@
-//! Legacy Kyber + AES (CBC-style, unauthenticated) cipher glue for the
+//! Legacy Kyber + AES (ECB mode, HMAC over the plaintext) cipher glue for the
 //! pqcrypto-backed `Kyber` typestate.
 //!
 //! This implements [`KyberFunctions`](crate::core::CryptographicFunctions) (via the
@@ -11,7 +11,10 @@
 //! instead of this module.
 //!
 //! # Security
-//! The AES mode itself is not an AEAD.
+//! **Do not use this for new data.** `CipherAES` encrypts in ECB mode: every
+//! 16-byte block is encrypted independently, so equal plaintext blocks give
+//! equal ciphertext blocks and the plaintext structure leaks. It exists only to
+//! decrypt old ciphertexts.
 //! The legacy cipher wrapper adds an HMAC-SHA512 tag over the plaintext before
 //! encrypting and verifies it after decrypting (MAC-then-encrypt). That gives
 //! integrity checking, but it is a non-standard construction; do not use it for
