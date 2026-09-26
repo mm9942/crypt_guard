@@ -195,14 +195,6 @@ impl CipherAES {
         Ok(encrypted_data)
     }
 
-    #[allow(dead_code)]
-    fn generate_cbc_iv(&mut self) -> Result<Vec<u8>, CryptError> {
-        let mut iv = vec![0u8; 16];
-        let mut rng = rand::thread_rng();
-        let _ = rng.try_fill(&mut iv[..]);
-        Ok(iv)
-    }
-
     /// Encrypts the provided data using AES-256 in CBC mode.
     /// This function securely generates an IV for each encryption operation.
     pub fn aes_cbc_encrypt(&mut self) -> Result<Vec<u8>, CryptError> {
