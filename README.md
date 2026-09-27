@@ -6,70 +6,128 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/mm9942/crypt_guard/rust.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/mm9942/crypt_guard/actions/workflows/rust.yml)
 [![GitHub Library](https://img.shields.io/badge/github-lib-black.svg?style=for-the-badge)](https://github.com/mm9942/crypt_guard)
 
-CryptGuard is a pure-Rust post-quantum cryptography library and, since 3.1,
-a substrate for building key-management services on top of it. Version 3
-uses a revision-pinned PQ HPKE protocol as its default encryption transport.
+CryptGuard is a pure-Rust post-quantum cryptography library. It encrypts data
+with **ML-KEM** (a NIST-standardized post-quantum key encapsulation mechanism,
+FIPS 203) wrapped in **HPKE** (Hybrid Public Key Encryption, RFC 9180 plus a
+post-quantum extension), and it signs data with **ML-DSA** and **SLH-DSA**
+(post-quantum signature schemes, FIPS 204/205). Since 3.1 it can also run as a
+key-management service (**KMS**: a component that generates and holds private
+keys for other services, so those services never touch raw key material).
+
+This guide is written for someone who has never used CryptGuard before. It
+tells you which API to reach for, how to add the crate, and gives a
+copy-pasteable example for every common task. Every example on this page is
+compiled and run automatically in CI, so it cannot silently go stale.
 
 ```text
 ML-KEM (FIPS 203) -> HPKE KEM and key schedule -> AEAD
 ```
 
 The default suite is ML-KEM-1024/P-384 with SHAKE256 and
-ChaCha20-Poly1305. It prioritizes conservative security and explicit protocol
-boundaries over compact ciphertexts.
-
-**What 3.1 adds**
-
-- Zeroizing variants of every API that returns plaintext or exporter output
-  (`open_zeroizing`, `export_zeroizing`, `open_bytes_zeroizing`), plus
-  zeroization of all intermediate secrets inside the KEM, KDF and key
-  schedule.
-- A seed-based key-management workflow: `generate_recipient_seed` and
-  `derive_recipient_key_pair` keep a 32-byte seed as the only long-lived
-  secret.
-- `crypt_guard_service` and `crypt_guard_hyper`: a typed, non-`Clone` Tower
-  KMS service with an in-memory provider, namespace policies and an HTTP
-  adapter, enabled with `--features service` / `--features hyper`.
-- Hardened legacy paths, no-panic parsers, fuzz targets, `cargo deny`,
-  Dependabot and a scripted release. See [`CHANGELOG.md`](CHANGELOG.md).
+ChaCha20-Poly1305 (**AEAD**: Authenticated Encryption with Associated Data —
+an encryption mode that also detects tampering). It prioritizes conservative
+security and explicit protocol boundaries over compact ciphertexts.
 
 ## Contents
 
-1. [Installation](#installation)
-2. [Quick start](#quick-start)
-3. [Key management with seeds](#key-management-with-seeds)
-4. [Choose a transport form](#choose-a-transport-form)
-5. [Raw Base-mode HPKE](#raw-base-mode-hpke)
-6. [PSK-mode HPKE](#psk-mode-hpke)
-7. [Suite selection](#suite-selection)
-8. [Private AEAD extensions](#private-aead-extensions)
-9. [Envelope format and metadata](#envelope-format-and-metadata)
-10. [Failure handling and security rules](#failure-handling-and-security-rules)
-11. [What the library guarantees](#what-the-library-guarantees)
-12. [Signatures](#signatures)
-13. [KMS service](#kms-service)
-14. [Workspace layout](#workspace-layout)
-15. [Feature flags](#feature-flags)
-16. [CGv2 migration and legacy support](#cgv2-migration-and-legacy-support)
-17. [Security process](#security-process)
-18. [Releasing](#releasing)
-19. [References](#references)
+1. [Which API do I need?](#which-api-do-i-need)
+2. [Installation and feature flags](#installation-and-feature-flags)
+3. [Quick start](#quick-start)
+4. [Recipes](#recipes)
+   - [Generate and store keys with a seed](#generate-and-store-keys-with-a-seed)
+   - [Encrypt bytes for storage](#encrypt-bytes-for-storage)
+   - [PSK-mode HPKE](#psk-mode-hpke)
+   - [Choosing a suite](#choosing-a-suite)
+   - [Signatures](#signatures)
+   - [Signed HPKE](#signed-hpke)
+   - [Error handling](#error-handling)
+5. [KMS for beginners](#kms-for-beginners)
+   - [In-process, with `service`](#in-process-with-service)
+   - [Over HTTP, with `hyper`](#over-http-with-hyper)
+   - [Security notes](#security-notes)
+6. [Legacy and macros](#legacy-and-macros)
+7. [Migrating from 3.0.x / CGv2](#migrating-from-30x--cgv2)
+8. [Common mistakes](#common-mistakes)
+9. [Workspace layout](#workspace-layout)
+10. [Security process](#security-process)
+11. [Releasing](#releasing)
+12. [References](#references)
 
-## Installation
+## Which API do I need?
+
+| Your situation | Use | Section |
+|---|---|---|
+| New code, encrypting data to a recipient | `pq_hpke` (this is the default transport) | [Quick start](#quick-start) |
+| You need to prove who wrote a message, not hide it | `sign` (ML-DSA, or SLH-DSA behind a feature) | [Signatures](#signatures) |
+| One service should hold keys for many other services | `crypt_guard_service` (in-process) or `crypt_guard_hyper` (over HTTP) | [KMS for beginners](#kms-for-beginners) |
+| You have data encrypted with CryptGuard ≤ 3.0 (CGv2) or the old Kyber/Falcon/Dilithium macros | `cgv2-compat` / `legacy-pqclean`, migration only | [Legacy and macros](#legacy-and-macros) |
+
+If none of this rings a bell yet: start with [Quick start](#quick-start).
+
+## Installation and feature flags
 
 ```toml
 [dependencies]
 crypt_guard = "3.1.0"
 ```
 
-The default feature set includes the FIPS ML-KEM and ML-DSA backends. No
-feature is necessary for the v3 `pq_hpke` API. The default build has no
-network, async or HTTP dependencies.
+The default features are `ml-kem-backend` and `ml-dsa-backend`: encryption
+(`pq_hpke`) and ML-DSA signatures work out of the box. The default build has
+no network, async or HTTP dependencies — the KMS layers only enter the build
+through their own feature flags.
+
+| Feature | Default | Adds | Extra dependencies |
+|---|:---:|---|---|
+| `ml-kem-backend` | yes | ML-KEM-512/768/1024 (`kem` module) | — |
+| `ml-dsa-backend` | yes | ML-DSA-44/65/87 signatures; also enables ML-DSA keys in the service | `ml-dsa` |
+| `sign-slhdsa` | no | SLH-DSA signatures (larger, hash-based, more conservative than ML-DSA) | `slh-dsa` |
+| `service` | no | `crypt_guard::service`: typed Tower KMS service, no HTTP | `tower-service`, `zeroize`; add `service`'s own `buffer` feature for a cloneable network handle (pulls `tower`) |
+| `hyper` | no | `crypt_guard::hyper`: HTTP adapter and the `TowerToHyperService` bridge (implies `service`) | `hyper`, `hyper-util`, `http`, `http-body`, `http-body-util`, `bytes`, plus everything `service`'s `buffer` feature pulls |
+| `cgv2-compat` | no | The CGv2 envelope, builders, and compatibility helpers (migration only) | — |
+| `legacy-pqclean` | no | Historical Kyber/Falcon/Dilithium path (enables all legacy cipher features below) | `pqcrypto-kyber`, `pqcrypto-falcon`, `pqcrypto-dilithium`, `pqcrypto-traits` |
+| `legacy-aes`, `aes-ctr`, `aes-xts`, `aes-gcm-siv-cipher`, `xchacha20poly1305-cipher` | no | Individual legacy symmetric cipher modes used by the macros below | `cbc`/`block-padding`, `ctr`, `xts-mode` (as needed) |
+| `archive`, `zip` | no | Archive/zip helpers (`archive!`/`extract!` macros) | `tar`, `xz2`, `flate2`, `zip`, `walkdir` |
+
+Every feature builds on its own; CI checks each one. `cargo run --example
+pq_hpke` needs no extra feature.
+
+Ready-to-copy snippets for common combinations:
+
+```toml
+# Default: pq_hpke encryption + ML-DSA signatures, nothing else.
+[dependencies]
+crypt_guard = { version = "3.1.0" }
+```
+
+```toml
+# KMS, in-process (no HTTP).
+[dependencies]
+crypt_guard = { version = "3.1.0", features = ["service"] }
+```
+
+```toml
+# KMS over HTTP.
+[dependencies]
+crypt_guard = { version = "3.1.0", features = ["hyper"] }
+```
+
+```toml
+# Signatures including the more conservative, larger SLH-DSA scheme.
+[dependencies]
+crypt_guard = { version = "3.1.0", features = ["sign-slhdsa"] }
+```
+
+```toml
+# Migrating stored data from CryptGuard <= 3.0 / the legacy Kyber macros.
+[dependencies]
+crypt_guard = { version = "3.1.0", features = ["cgv2-compat", "legacy-pqclean"] }
+```
 
 ## Quick start
 
 `HpkeEnvelope` is the normal v3 starting point: a self-describing `CGH3`
-record sealed under `DEFAULT_SUITE`.
+record sealed under `DEFAULT_SUITE`. "Seal" is HPKE's name for "encrypt to a
+public key"; "open" is its name for "decrypt with the matching private key".
 
 ```rust
 use crypt_guard::pq_hpke::{
@@ -77,11 +135,23 @@ use crypt_guard::pq_hpke::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Generate the seed once, keep it in your key-management boundary, and
-    // derive the key pair from it whenever it is needed.
+    // 1. Generate a 32-byte seed once, from the OS's random number generator,
+    //    and keep it in your key-management boundary (a KMS, an HSM, or at
+    //    least a secrets store). It lives in zeroizing memory: it is
+    //    overwritten with zeros as soon as it is dropped, and it is never
+    //    logged.
     let seed = generate_recipient_seed()?;
+
+    // 2. Derive the actual key pair from the seed whenever you need it. The
+    //    same seed always re-derives the same key pair, so you never need to
+    //    store the key pair itself, only the seed.
     let keys = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
 
+    // 3. `info` is the setup context (who/what this channel is for); it does
+    //    not change per message. `aad` (Associated Authenticated Data) is
+    //    per-message metadata that travels alongside the ciphertext and is
+    //    authenticated but not encrypted. Neither is ever written into the
+    //    envelope's plaintext, and both must match exactly on open.
     let info = b"service=payments;protocol=1";
     let aad = b"tenant=acme;record=42";
     let envelope = HpkeEnvelope::seal(
@@ -92,96 +162,99 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         b"approved transfer payload",
     )?;
 
+    // 4. Turn the envelope into bytes for storage or transport.
     let wire = envelope.try_to_bytes()?;
 
-    // The plaintext comes back in zeroizing memory and is wiped on drop.
-    let plaintext = HpkeEnvelope::open_bytes_zeroizing(&wire, keys.private_key(), info, aad)?;
+    // 5. On the receiving side: parse the bytes back into an envelope, then
+    //    open it. The plaintext comes back in zeroizing memory and is wiped
+    //    on drop.
+    let received = HpkeEnvelope::from_bytes(&wire)?;
+    let plaintext = received.open_zeroizing(keys.private_key(), info, aad)?;
     assert_eq!(plaintext.as_slice(), b"approved transfer payload");
     Ok(())
 }
 ```
 
-A sender gets a fresh encapsulation and a fresh HPKE context for every call
-to `seal`. `info` and AAD are never serialized; sender and receiver must share
-the same application contract for both (see
-[Failure handling](#failure-handling-and-security-rules)).
+A sender gets a fresh encapsulation and a fresh HPKE context on every call to
+`seal`; nothing here is reused across messages. Run the full version of this
+example with `cargo run --example pq_hpke`.
 
-Run the full example with `cargo run --example pq_hpke`.
+## Recipes
 
-## Key management with seeds
+### Generate and store keys with a seed
 
-The recommended long-lived secret is a 32-byte **provenance seed**, not a
-private key:
-
-| Function | Purpose |
-|---|---|
-| `generate_recipient_seed()` | Fresh seed from the OS CSPRNG, returned as `Zeroizing<[u8; 32]>` |
-| `derive_recipient_key_pair(kem, &seed)` | Deterministically derive the key pair (SHAKE256 under a v3 domain separator and the KEM id) |
-| `generate_recipient_key_pair(kem)` | Fresh key pair without a seed, for ephemeral use |
-| `RecipientKeyPair::into_parts()` | Split into public and private key for separate stores |
-
-Rules:
-
-- Persist the exact 32-byte seed. Do **not** persist
-  `RecipientPrivateKey::as_seed_bytes()` as provenance material; some KEMs use
-  a larger internal seed, and only the caller seed re-derives the pair.
-- Never build a seed by hand or from a password. If you must derive from a
-  password, use a memory-hard KDF and feed its output to
-  `derive_recipient_key_pair`.
-- Distribute only the public key (`RecipientPublicKey::as_bytes()`).
-- `RecipientPrivateKey` is not `Clone`; its `Debug` output is redacted.
-
-## Choose a transport form
-
-CryptGuard provides two deliberately separate transport forms.
-
-| Form | Use it when | Contents |
-|---|---|---|
-| Raw HPKE | The protocol already negotiates suite and `info` out of band | Separate `enc` and ciphertext |
-| `HpkeEnvelope` | You need a crypt_guard self-describing record | Protocol magic, version, suite, `enc`, ciphertext |
-
-Use raw transport only with RFC-style AEAD identifiers: AES-128-GCM,
-AES-256-GCM, and ChaCha20-Poly1305. Use `HpkeEnvelope` for either the
-standardized suites or CryptGuard private AEAD extensions.
-
-## Raw Base-mode HPKE
-
-Raw HPKE is appropriate when your protocol carries `enc` and ciphertext in
-separate fields. The suite and `info` are negotiated or persisted by that
-protocol, not guessed during decryption.
+Use this whenever you need a long-lived recipient key pair: store the seed,
+not the key pair.
 
 ```rust
-use crypt_guard::pq_hpke::{
-    generate_recipient_key_pair, setup_base_receiver, setup_base_sender,
-    Aead, Kdf, Kem, Suite,
-};
+use crypt_guard::pq_hpke::{derive_recipient_key_pair, generate_recipient_seed, DEFAULT_SUITE};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let suite = Suite::new(Kem::MlKem768, Kdf::HkdfSha256, Aead::Aes128Gcm);
-    let keys = generate_recipient_key_pair(suite.kem())?;
-    let info = b"application=mail;version=1";
-    let aad = b"recipient=alice@example.test";
+    let seed = generate_recipient_seed()?;
 
-    let (enc, mut sender) = setup_base_sender(suite, keys.public_key(), info)?;
-    let ciphertext = sender.seal(aad, b"raw HPKE payload")?;
+    // Store `seed.as_slice()` (32 bytes) in your secrets store. Whenever you
+    // need the key pair again, re-derive it from the same seed:
+    let keys = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
+    let restored = derive_recipient_key_pair(DEFAULT_SUITE.kem(), seed.as_slice())?;
+    assert_eq!(keys.public_key().as_bytes(), restored.public_key().as_bytes());
 
-    let mut receiver = setup_base_receiver(suite, keys.private_key(), &enc, info)?;
-    let plaintext = receiver.open_zeroizing(aad, &ciphertext)?;
-    assert_eq!(plaintext.as_slice(), b"raw HPKE payload");
+    // Distribute only the public key.
+    let public_bytes = keys.public_key().as_bytes().to_vec();
+    assert!(!public_bytes.is_empty());
+
+    // Splitting a key pair into its two halves, e.g. to store them
+    // separately:
+    let (public, private) = keys.into_parts();
+    let _ = (public, private);
     Ok(())
 }
 ```
 
-Sender and recipient contexts are stateful and intentionally not cloneable.
-Each successful `seal` or `open` advances the HPKE message sequence and derives
-the next nonce internally. Do not serialize a live context for later reuse.
-`export_zeroizing` returns exporter output in zeroizing memory.
+**Watch out:** persist the exact 32-byte seed from `generate_recipient_seed`.
+Do not persist `RecipientPrivateKey::as_seed_bytes()` as your provenance
+material — some KEMs use a larger internal seed, and only the seed you
+originally generated re-derives the same pair. Never build a seed by hand or
+from a password; if you must derive one from a password, run it through a
+memory-hard KDF (key derivation function) first and feed *that* output to
+`derive_recipient_key_pair`.
 
-## PSK-mode HPKE
+### Encrypt bytes for storage
 
-PSK mode binds an additional symmetric secret to HPKE setup. Both PSK bytes and
-their identifier are required. A PSK is not a replacement for recipient public
-key validation or authenticated application identity.
+`HpkeEnvelope` already round-trips to and from a single `Vec<u8>`, which is
+normally all you need to put a ciphertext in a database column or a file.
+
+```rust
+use crypt_guard::pq_hpke::{generate_recipient_key_pair, HpkeEnvelope, DEFAULT_SUITE};
+use zeroize::Zeroizing;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem())?;
+    let info = b"object-store";
+    let aad = b"object=reports/2026-09";
+
+    let envelope = HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), info, aad, b"payload")?;
+    let stored: Vec<u8> = envelope.try_to_bytes()?;
+
+    // `open_bytes_zeroizing` combines parsing and opening in one call, which
+    // is usually what you want when the bytes come straight out of storage.
+    let plaintext: Zeroizing<Vec<u8>> =
+        HpkeEnvelope::open_bytes_zeroizing(&stored, keys.private_key(), info, aad)?;
+    assert_eq!(plaintext.as_slice(), b"payload");
+    Ok(())
+}
+```
+
+**Watch out:** `try_to_bytes` reports an oversized envelope as an error
+instead of silently truncating a length field; prefer it over the
+non-fallible `to_bytes` for anything you did not just construct yourself in
+memory.
+
+### PSK-mode HPKE
+
+Use PSK (Pre-Shared Key) mode when you have an extra symmetric secret from a
+separate channel and want to bind it into the HPKE setup, on top of the
+recipient's public key. This is raw HPKE, so the encapsulation (`enc`) and
+ciphertext travel separately; your own protocol must carry both.
 
 ```rust
 use crypt_guard::pq_hpke::{
@@ -210,91 +283,142 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Base and PSK modes are supported. PQ authenticated KEM modes are deliberately
-not exposed by this API.
+**Watch out:** a PSK is not a substitute for validating the recipient's
+public key or for authenticating the application identity of the sender —
+it only adds a symmetric binding. Sender and receiver contexts are stateful
+and not `Clone`; do not serialize a live context for later reuse.
 
-## Suite selection
+### Choosing a suite
 
-Select a suite explicitly whenever the default profile does not match your
-deployment. Persist the selected KEM, KDF, and AEAD identifiers with raw
-transport records; `pq_hpke::suite_ids` and `pq_hpke::suite_from_ids` map a
-suite to and from its wire identifiers.
+Pick a suite explicitly whenever the default profile does not match your
+deployment (interoperating with a peer that expects a specific KEM, for
+example).
 
 ```rust
 use crypt_guard::pq_hpke::{Aead, Kdf, Kem, Suite, DEFAULT_SUITE};
 
 let default_suite = DEFAULT_SUITE;
 let pure_pq = Suite::new(Kem::MlKem1024, Kdf::Shake256, Aead::ChaCha20Poly1305);
-let hybrid_p256 = Suite::new(Kem::MlKem768P256, Kdf::HkdfSha256, Aead::Aes128Gcm);
 let hybrid_x25519 = Suite::new(
     Kem::MlKem768X25519,
     Kdf::HkdfSha256,
     Aead::ChaCha20Poly1305,
 );
-let hybrid_p384 = Suite::new(Kem::MlKem1024P384, Kdf::HkdfSha384, Aead::Aes256Gcm);
 
 assert_eq!(default_suite.kem(), Kem::MlKem1024P384);
 assert_eq!(pure_pq.aead(), Aead::ChaCha20Poly1305);
+assert_eq!(hybrid_x25519.kem(), Kem::MlKem768X25519);
 ```
 
-Supported KEM choices are ML-KEM-512, ML-KEM-768, ML-KEM-1024,
-ML-KEM-768/P-256, ML-KEM-768/X25519, and ML-KEM-1024/P-384. The ML-KEM and
-hybrid mappings are revision-pinned to `draft-ietf-hpke-pq-05` and are not
-final IANA assignments.
+Supported KEMs are ML-KEM-512, ML-KEM-768, ML-KEM-1024, ML-KEM-768/P-256,
+ML-KEM-768/X25519, and ML-KEM-1024/P-384. AES-256-GCM-SIV and
+XChaCha20-Poly1305 are CryptGuard-private AEAD extensions and only work
+through `HpkeEnvelope`, not raw transport (`pq_hpke::suite_ids` /
+`suite_from_ids` map a suite to and from its wire identifiers if you need to
+persist one alongside a raw-transport record).
 
-## Private AEAD extensions
+**Watch out:** the ML-KEM and hybrid mappings are revision-pinned to
+`draft-ietf-hpke-pq-05` and are not final IANA assignments; do not represent
+them as a standardized PQ HPKE registration to another implementation.
 
-AES-256-GCM-SIV and XChaCha20-Poly1305 are available only in the CryptGuard
-envelope namespace. They use private AEAD identifiers and must not be sent to
-an implementation expecting an RFC 9180 or IANA suite identifier.
+### Signatures
 
-```rust
-use crypt_guard::pq_hpke::{
-    generate_recipient_key_pair, Aead, HpkeEnvelope, Kdf, Kem, Suite,
+ML-DSA is in the default feature set; SLH-DSA is behind `sign-slhdsa`. Use
+signatures when you need to prove who produced a message, not to hide its
+contents. Both zeroize their signing keys on drop.
+
+```rust,no_run
+# #[cfg(feature = "ml-dsa-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::kem::backend::OsRng;
+use crypt_guard::sign::{ml_dsa::MlDsa65Impl, SignAlgorithm};
+
+let mut rng = OsRng;
+let (secret_key, public_key) = MlDsa65Impl::keypair(&mut rng)?;
+let signature = MlDsa65Impl::sign(&secret_key, b"signed payload")?;
+MlDsa65Impl::verify(&public_key, b"signed payload", &signature)?;
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
+```
+
+SLH-DSA (hash-based, larger signatures, more conservative security
+assumptions than ML-DSA) works the same way, with `SlhDsaShake128fImpl` (or
+one of its five siblings) in place of `MlDsa65Impl`:
+
+```rust,no_run
+# #[cfg(feature = "sign-slhdsa")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::kem::backend::OsRng;
+use crypt_guard::sign::{slh_dsa::SlhDsaShake128fImpl, SignAlgorithm};
+
+let mut rng = OsRng;
+let (secret_key, public_key) = SlhDsaShake128fImpl::keypair(&mut rng)?;
+let signature = SlhDsaShake128fImpl::sign(&secret_key, b"signed payload")?;
+SlhDsaShake128fImpl::verify(&public_key, b"signed payload", &signature)?;
+# Ok(())
+# }
+# #[cfg(not(feature = "sign-slhdsa"))] fn main() {}
+```
+
+**Watch out:** `SignAlgorithm` implementors here are not interchangeable with
+`pq_hpke` keys; a signing key pair and an HPKE key pair are always distinct
+objects, even for the same underlying algorithm family.
+
+### Signed HPKE
+
+`signed_hpke` adds an application-layer signature over the identifiers and
+bytes of an HPKE transport message (suite, mode, recipient key id, `info`,
+encapsulation, AAD, ciphertext). It is **not** RFC 9180 Auth mode — it is a
+separate protocol you must name as such to any peer. The envelope's fields
+stay private until `verify` succeeds, so you cannot accidentally consume
+attacker-controlled ciphertext before checking the signature.
+
+```rust,no_run
+# #[cfg(feature = "ml-dsa-backend")]
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use crypt_guard::hpke::{AeadId, HpkeSuite, KdfId, KemId, Mode};
+use crypt_guard::kem::backend::OsRng;
+use crypt_guard::sign::{ml_dsa::MlDsa65Impl, SignAlgorithm};
+use crypt_guard::signed_hpke::{SignedHpkeBinding, SignedHpkeEnvelope};
+
+let mut rng = OsRng;
+let (signing_key, verifying_key) = MlDsa65Impl::keypair(&mut rng)?;
+
+// In real use, `encapsulation` and `ciphertext` are the `enc` and ciphertext
+// bytes your HPKE sender context just produced, not literal strings.
+let binding = SignedHpkeBinding {
+    suite: HpkeSuite::new(KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha256, AeadId::ChaCha20Poly1305),
+    mode: Mode::Base,
+    recipient_key_id: b"recipient-42",
+    info: b"setup info",
+    encapsulation: b"encapsulation bytes go here",
+    aad: b"application aad",
+    ciphertext: b"ciphertext and tag go here",
 };
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let suite = Suite::new(Kem::MlKem768, Kdf::HkdfSha256, Aead::XChaCha20Poly1305);
-    assert!(suite.aead().is_private_extension());
-
-    let keys = generate_recipient_key_pair(suite.kem())?;
-    let envelope = HpkeEnvelope::seal(
-        suite, keys.public_key(), b"object-store", b"object=reports/2026", b"payload",
-    )?;
-    let plaintext = envelope.open_zeroizing(keys.private_key(), b"object-store", b"object=reports/2026")?;
-    assert_eq!(plaintext.as_slice(), b"payload");
-    Ok(())
-}
+let envelope = SignedHpkeEnvelope::<MlDsa65Impl>::sign(&signing_key, binding)?;
+let verified = envelope.verify(&verifying_key)?;
+// Only after `verify` succeeds are the signed fields readable.
+assert_eq!(verified.info(), b"setup info");
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
 ```
 
-| AEAD | Identifier | Raw transport | `HpkeEnvelope` |
-|---|---:|---:|---:|
-| AES-128-GCM | `0x0001` | yes | yes |
-| AES-256-GCM | `0x0002` | yes | yes |
-| ChaCha20-Poly1305 | `0x0003` | yes | yes |
-| AES-256-GCM-SIV | `0xff01` | no | yes |
-| XChaCha20-Poly1305 | `0xff02` | no | yes |
+**Watch out:** `binding.encapsulation` and `binding.ciphertext` must come from
+the same HPKE sender context — this layer signs whatever bytes you give it,
+it does not itself run HPKE.
 
-## Envelope format and metadata
+### Error handling
 
-`HpkeEnvelope` serializes a binary `CGH3` record with envelope version 1.
-It contains the protocol magic, version, KEM identifier, KDF identifier, AEAD
-identifier, encapsulation length, ciphertext length, encapsulation, and
-ciphertext. It does not contain plaintext, `info`, AAD, recipient private key
-material, or a shared secret.
-
-`HpkeEnvelope::from_bytes` validates framing and suite identifiers before a
-receiver context is constructed; it never panics on malformed input and
-rejects trailing bytes. Parsing a CGv2 record as a `CGH3` envelope fails
-before decryption. `try_to_bytes` reports an oversized envelope instead of
-silently truncating a length field.
-
-## Failure handling and security rules
-
-`open` and `open_zeroizing` return an opaque `Error::AuthenticationFailed`
-for wrong AAD, wrong `info`, modified ciphertext, and same-size modified
-encapsulations that reach ML-KEM implicit rejection. Do not branch application
-behavior on which of those conditions occurred.
+`open` and `open_zeroizing` return one opaque error,
+`Error::AuthenticationFailed`, for wrong AAD, wrong `info`, modified
+ciphertext, and same-size modified encapsulations that reach ML-KEM's
+implicit rejection. This is deliberate: if decryption told callers *why* it
+failed, an attacker could use that as an oracle to learn something about the
+key or the plaintext one bit at a time. Do not branch application behavior on
+which of those conditions occurred.
 
 ```rust
 use crypt_guard::pq_hpke::{Error, HpkeEnvelope, RecipientPrivateKey};
@@ -309,79 +433,155 @@ fn open_record(
 }
 ```
 
-`HpkeEnvelope::open_bytes_zeroizing` combines parsing and opening; its
-`EnvelopeOpenError` distinguishes only "not a valid envelope" from an HPKE
-error. Every error type converts into `crypt_guard::error::CryptError` via
-`From`, and every authentication failure maps to the single
-`CryptError::AuthenticationFailed`.
+Every error type in the crate — `CryptError`, `pq_hpke::Error`,
+`EnvelopeError`, `SignedHpkeError`, and more — exposes a `.kind()` method
+that classifies it into a small, stable `ErrorKind` (`Authentication`,
+`InvalidInput`, `InvalidKey`, `Unsupported`, `Encoding`, `Io`, `Randomness`,
+`Limit`, `Internal`), so you can react to the *class* of a failure without
+matching on every variant:
 
-Treat `info` as a stable setup context such as protocol version or service
-name. Treat AAD as authenticated but unencrypted metadata such as tenant,
-record type, object identifier, or sender routing data. Do not reuse a sender
-context after its sequence is exhausted. Do not put secrets in AAD.
+```rust
+use crypt_guard::error::{CryptError, ErrorKind};
 
-## What the library guarantees
+fn is_retryable(err: &CryptError) -> bool {
+    err.kind().is_transient()
+}
 
-- **Zeroization.** Private keys, seeds, shared secrets, key schedules,
-  exporter output and plaintext returned by the `*_zeroizing` APIs live in
-  zeroize-on-drop memory. The AEAD, KEM and signature backends are built with
-  their `zeroize` features, so expanded keys are wiped too. Plain `open` /
-  `export` remain for compatibility and return ordinary `Vec<u8>`.
-- **No accidental copies.** `RecipientPrivateKey`, HPKE contexts, signing
-  keys and the KMS `SecretBytes` are not `Clone`. Contexts are `Send + Sync`
-  and can move between tasks, but not be duplicated.
-- **Redacted `Debug`.** No secret-bearing type prints its bytes.
-- **Opaque failures.** Decryption reports one error for every cause.
-- **No panics on untrusted input.** Envelope, key and encapsulation parsers
-  are covered by exhaustive-length and random-input tests and by the fuzz
-  targets in `fuzz/`.
-- **Bit-identical cryptography.** The RFC 9180 and draft-ietf-hpke-pq-05
-  known-answer vectors (`crates/core/tests/vectors`, checksummed) run in
-  every CI lane.
-- **Fallible randomness.** `TryOsRng` reports an entropy failure instead of
-  panicking; `try_generate_recipient_key_pair` does the same for the older
-  profile API.
-
-## Signatures
-
-ML-DSA is in the default feature set; SLH-DSA is behind `sign-slhdsa`. Both
-zeroize their signing keys on drop.
-
-```rust,no_run
-use crypt_guard::kem::backend::OsRng;
-use crypt_guard::sign::{ml_dsa::MlDsa65Impl, SignAlgorithm};
-
-let mut rng = OsRng;
-let (secret_key, public_key) = MlDsa65Impl::keypair(&mut rng)?;
-let signature = MlDsa65Impl::sign(&secret_key, b"signed payload")?;
-MlDsa65Impl::verify(&public_key, b"signed payload", &signature)?;
-# Ok::<(), crypt_guard::error::CryptError>(())
+assert!(!is_retryable(&CryptError::AuthenticationFailed));
+assert_eq!(CryptError::AuthenticationFailed.kind(), ErrorKind::Authentication);
 ```
 
-`signed_hpke` adds an application-layer signature over an HPKE transcript;
-it is not RFC 9180 Auth mode.
+**Watch out:** never write a `match` that treats `AuthenticationFailed`
+differently based on timing, error text, or any other side channel — that
+recreates the oracle the opaque error was designed to remove.
 
-## KMS service
+## KMS for beginners
 
-`crypt_guard_service` and `crypt_guard_hyper` turn the library into a
-key-management service: key generation, lifecycle, PQ HPKE encrypt/decrypt,
-sign/verify and key wrap/unwrap/rewrap, addressed by namespace, key id and
-version.
+A KMS (Key Management Service) is a component that generates and holds
+private keys on behalf of other services, so those services can ask "encrypt
+this" or "decrypt that" without ever touching the raw key material. CryptGuard
+gives you a KMS in two layers: `crypt_guard_service` runs it in your own
+process (a Tower `Service`, no HTTP), and `crypt_guard_hyper` puts an HTTP
+server in front of it.
 
-```toml
-[dependencies]
-crypt_guard = { version = "3.1.0", features = ["hyper"] }   # or "service" for Tower only
+### In-process, with `service`
+
+Everything below runs synchronously against an `InMemoryProvider`, CryptGuard's
+reference key store (keys live only in memory and are lost when the process
+exits — swap in your own `CryptoProvider` for anything durable).
+
+```rust
+# #[cfg(feature = "service")]
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use crypt_guard::service::{
+    pq_hpke::DEFAULT_SUITE, CryptoContext, CryptoOperation, CryptoProvider, CryptoRequest,
+    CryptoResponse, Decrypt, Encrypt, GenerateKey, InMemoryProvider, KeyAlgorithm, KeyId,
+    KeyNamespace, RequestId, SecretBytes,
+};
+
+let mut provider = InMemoryProvider::new();
+let namespace = KeyNamespace::new("app")?;
+let id = KeyId::new("k1")?;
+
+// Generate a fresh HPKE key. The private half never leaves the provider.
+let generated = CryptoProvider::execute(
+    &mut provider,
+    CryptoRequest::new(
+        RequestId(1),
+        CryptoOperation::Generate(GenerateKey {
+            namespace,
+            id,
+            algorithm: KeyAlgorithm::Hpke { suite: DEFAULT_SUITE },
+        }),
+    ),
+)?;
+let key = match generated {
+    CryptoResponse::KeyCreated { key, .. } => key,
+    other => panic!("unexpected response: {other:?}"),
+};
+
+let context = CryptoContext {
+    info: Box::from(&b"service=payments"[..]),
+    aad: Box::from(&b"record=1"[..]),
+};
+
+let encrypted = CryptoProvider::execute(
+    &mut provider,
+    CryptoRequest::new(
+        RequestId(2),
+        CryptoOperation::Encrypt(Encrypt {
+            key: key.clone(),
+            plaintext: SecretBytes::copy_from_slice(b"card ending 4242"),
+            context: context.clone(),
+        }),
+    ),
+)?;
+let ciphertext = match encrypted {
+    CryptoResponse::Ciphertext(blob) => blob,
+    other => panic!("unexpected response: {other:?}"),
+};
+
+let decrypted = CryptoProvider::execute(
+    &mut provider,
+    CryptoRequest::new(
+        RequestId(3),
+        CryptoOperation::Decrypt(Decrypt { key, ciphertext, context }),
+    ),
+)?;
+let plaintext = match decrypted {
+    CryptoResponse::Plaintext(secret) => secret,
+    other => panic!("unexpected response: {other:?}"),
+};
+assert_eq!(plaintext.as_ref(), b"card ending 4242");
+# Ok(())
+# }
+# #[cfg(not(feature = "service"))] fn main() {}
 ```
 
+Add a `PolicyProvider` wrapping the same `InMemoryProvider` to enforce
+per-caller permissions (who may `encrypt`, who may also `decrypt`, scoped by
+namespace):
+
 ```rust,no_run
+# #[cfg(feature = "service")]
+# fn main() {
+use crypt_guard::service::{
+    InMemoryProvider, KeyNamespace, NamespacePolicy, OpSet, PolicyProvider, Principal,
+};
+
+let mut policy = NamespacePolicy::new();
+// Decrypt/unwrap need `SECRET_EGRESS` explicitly: encrypting is not enough
+// to also read secrets back out.
+policy.grant(
+    Principal::new("billing"),
+    KeyNamespace::new("billing").unwrap(),
+    OpSet::ENCRYPT.union(OpSet::SECRET_EGRESS),
+);
+let _provider = PolicyProvider::new(InMemoryProvider::new(), policy);
+# }
+# #[cfg(not(feature = "service"))] fn main() {}
+```
+
+**Watch out:** `NamespacePolicy` denies by default; a principal with no
+grant for a namespace can do nothing there, not "everything" — always add
+the grants you need explicitly.
+
+### Over HTTP, with `hyper`
+
+`crypt_guard_hyper` bridges the same `CryptoService` to real HTTP, behind a
+bounded `tower::buffer::Buffer` (so the non-`Clone` service can be shared
+across connections through a cloneable handle).
+
+```rust,no_run
+# #[cfg(feature = "hyper")]
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
 use crypt_guard::service::{
     network_handle, CryptoService, InMemoryProvider, KeyNamespace, NamespacePolicy, OpSet,
     PolicyProvider, Principal, SecretBytes, StackConfig,
 };
 use crypt_guard::hyper::{into_hyper, BearerTokens, CryptoHttpService, HttpConfig};
 
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
-// Who may do what, per namespace. Decrypt/unwrap need SECRET_EGRESS explicitly.
+// Who may do what, per namespace.
 let mut policy = NamespacePolicy::new();
 policy.grant(Principal::new("billing"), KeyNamespace::new("billing")?, OpSet::ENCRYPT.union(OpSet::SECRET_EGRESS));
 
@@ -396,7 +596,19 @@ let hyper_service = into_hyper(http); // serve with hyper::server::conn::http1
 # let _ = hyper_service;
 # Ok(())
 # }
+# #[cfg(not(feature = "hyper"))] fn main() {}
 ```
+
+The runnable reference server is `crates/hyper/examples/kms_server.rs`. It
+refuses to start without an explicit admin token and never generates or
+prints one itself:
+
+```sh
+CG_KMS_ADMIN_TOKEN=$(openssl rand -hex 32) \
+    cargo run -p crypt_guard_hyper --example kms_server
+```
+
+Route table (bodies are the `CGK1` frame described below, not JSON):
 
 | Route | Operation |
 |---|---|
@@ -405,40 +617,210 @@ let hyper_service = into_hyper(http); // serve with hyper::server::conn::http1
 | `GET /v1/keys/{ns}/{id}[@v]/public` | fetch public key |
 | `POST /v1/keys/{ns}/{id}[@v]:{op}` | `encrypt`, `decrypt`, `sign`, `verify`, `rotate`, `disable`, `enable`, `destroy`, `wrap`, `unwrap`, `rewrap` |
 
-Bodies use the length-prefixed `CGK1` frame documented in
-`crypt_guard_hyper::codec`.
+The client sends and receives one length-prefixed frame per request body
+(documented in full in `crypt_guard_hyper::codec`):
 
-Security properties:
-
-- All cryptographic state lives in a non-`Clone` `CryptoService`; only the
-  bounded `NetworkHandle` (a channel sender) is cloned per connection, which
-  is what Hyper's `TowerToHyperService` requires.
-- Secret material travels as zeroize-on-drop, non-`Clone` `SecretBytes` from
-  ingress (one copy out of the request body) to egress (an owner-backed
-  `Bytes` that is wiped when the last network clone drops).
-- Ciphertexts are bound to namespace, key id, version, suite and purpose, so
-  a blob cannot be replayed against another key, version or as a different
-  operation (encrypt vs. wrap).
-- Authorization is deny-by-default per principal and namespace. Decrypt and
-  unwrap need `SECRET_EGRESS`; rewrap cannot widen egress.
-- Every decryption failure returns the same opaque `422`. A caller denied by
-  policy sees `404`, identical to a missing key. Bodies are bounded per
-  operation class before they are buffered. Bearer tokens are compared in
-  constant time and never logged. Every response is `Cache-Control: no-store`.
-- Private keys never leave the provider: no export operation exists.
-
-Run the example server (it refuses to start without an explicit admin
-token and never generates or prints one):
-
-```sh
-CG_KMS_ADMIN_TOKEN=$(openssl rand -hex 32) \
-    cargo run -p crypt_guard_hyper --example kms_server
+```text
+magic "CGK1" (4 bytes) | version u8 = 1 | field...
+field = length u32, big-endian | that many bytes
 ```
 
-Limitations: `InMemoryProvider` keeps keys in memory only; there is no
-built-in TLS (front it with a reverse proxy or your own TLS acceptor);
-ML-DSA signing in the service requires the `ml-dsa` feature of
-`crypt_guard_service` (enabled by the facade's default `ml-dsa-backend`).
+For example, `encrypt` and `decrypt` both take three fields in this order:
+`info`, `aad`, then the opaque payload (plaintext or ciphertext).
+
+Behavior a client should expect:
+
+- Authentication is `Authorization: Bearer <token>`; a missing or wrong token
+  is `401 Unauthorized`.
+- Every response, success or failure, carries `Cache-Control: no-store` (so
+  nothing caches secret-bearing bodies) and an `x-request-id` header.
+- A caller denied by policy sees `404 Not Found` by default — identical to a
+  key that does not exist, so policy denial is not distinguishable from a
+  typo in the key name.
+- Every decryption failure (tampering, wrong `aad`, wrong `info`, a
+  destroyed key) is the same opaque `422 Unprocessable Entity`.
+- A transient `503 Service Unavailable` carries a `Retry-After` header;
+  `501 Not Implemented` means the operation or algorithm is not compiled in
+  (for example, requesting a signing key when `ml-dsa` is off).
+
+### Security notes
+
+- There is no built-in TLS. Put a reverse proxy or your own TLS acceptor in
+  front of the listener before exposing it beyond `localhost`.
+- Bearer tokens are compared in constant time and are never logged.
+- Ciphertexts are bound to namespace, key id, version, suite and purpose, so
+  a blob from one key, version, or operation (encrypt vs. wrap) cannot be
+  replayed against another.
+- Private keys never leave the provider: there is no export operation.
+- `InMemoryProvider` keeps everything in memory only; treat it as a reference
+  implementation, not a production key store.
+
+## Legacy and macros
+
+Before v3, CryptGuard's encryption API was a **typestate API**: the Rust type
+system encodes which step of a protocol you are in, so
+`Kyber<Encryption, Kyber1024, Data, AES>` is a distinct type from
+`Kyber<Decryption, Kyber1024, Data, AES>`, and the compiler refuses to let you
+call a decrypt method on an encryptor. That is a good property, but it means
+every call site needs several `use` imports (`Kyber`, the size marker
+`Kyber1024`/`768`/`512`, the mode marker `Data`/`Message`/`Files`, the
+direction marker `Encryption`/`Decryption`, and the cipher marker `AES`/…)
+and has to spell the full generic type out. The macros below exist purely to
+hide that boilerplate behind one line; they expand to exactly the same
+typestate calls. They are compiled only behind `legacy-pqclean` (all of them
+also zeroize their key/data arguments after the call) and exist for reading
+and migrating data that already used them — new code should use `pq_hpke`
+instead.
+
+```rust,no_run
+# #[cfg(feature = "legacy-pqclean")]
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+// The macros expand to typestate calls (`Kyber::<Encryption, Kyber1024, Data, AES>`
+// and friends), so these names must be in scope where you call them.
+use crypt_guard::{
+    decryption, encryption, error::Zeroize, kyber_keypair, Data, Decryption, Encryption,
+    KeyControKyber1024, KeyControKyber512, KeyControKyber768, Kyber, Kyber1024, KyberFunctions,
+    AES,
+};
+
+let (public_key, secret_key) = kyber_keypair!(1024);
+let message = b"legacy macro compatibility".to_vec();
+let passphrase = "correct horse battery staple";
+
+let (encrypted_payload, kem_ciphertext) =
+    encryption!(public_key, 1024, message.clone(), passphrase, AES)?;
+
+let decrypted = decryption!(
+    secret_key,
+    1024,
+    encrypted_payload,
+    passphrase,
+    kem_ciphertext,
+    AES
+)?;
+assert_eq!(decrypted, message);
+# Ok(())
+# }
+# #[cfg(not(feature = "legacy-pqclean"))] fn main() {}
+```
+
+The full macro family, each hiding the same kind of typestate call:
+
+| Macro | Hides a call to | Notes |
+|---|---|---|
+| `kyber_keypair!(1024 \| 768 \| 512)` | `KeyControKyber1024/768/512::keypair()` | Legacy Kyber KEM key generation |
+| `falcon_keypair!(1024 \| 512)` | `Falcon1024/512::keypair()` | Legacy Falcon signature key generation |
+| `dilithium_keypair!(5 \| 3 \| 2)` | `Dilithium5/3/2::keypair()` | Legacy Dilithium signature key generation |
+| `encryption!(key, size, data, passphrase, CIPHER)` | `Kyber::<Encryption, KyberN, Data, Cipher>::new(..).encrypt_data(..)` | `CIPHER` is one of `AES`, `AES_XTS`, `AES_CBC`, `AES_GCM_SIV`, `AES_CTR`, `XChaCha20`, `XChaCha20Poly1305`; returns a nonce for the modes that need one |
+| `decryption!(key, size, data, passphrase, cipher[, nonce], CIPHER)` | the matching `Decryption` call | Modes with a nonce (`AES_GCM_SIV`, `AES_CTR`, `XChaCha20`, `XChaCha20Poly1305`) take it as `Some(nonce)` |
+| `encrypt_file!(key, size, path, passphrase, CIPHER)` | `Kyber::<Encryption, ..>::encrypt_file(..)` | `AES` or `XChaCha20` |
+| `decrypt_file!(key, size, path, passphrase, cipher[, nonce], CIPHER)` | the matching file decrypt | Same nonce rule as `decryption!` |
+| `signature!(Falcon \| Dilithium, key, size, content, Message \| Detached)` | `Signature::<Alg, Mode>::new().signature(..)` | |
+| `verify!(Falcon \| Dilithium, key, size, [signature,] content, Message \| Detached)` | the matching `.open(..)` / `.verify(..)` | `Detached` mode takes the signature separately |
+| `encrypt_sign!(key, sign_key, content, passphrase)` | Kyber-1024 AES encryption plus a Falcon-1024 signature over the plaintext | Signing then encrypting in one call |
+| `decrypt_open!(key, sign_key, content, passphrase, cipher)` | the matching decrypt-then-verify | Panics (`.expect`) on failure — this one does not return a plain `Result` |
+| `archive!(path, delete_dir)` / `extract!(path, delete_archive)` / `archive_util!(..)` | `.tar.xz` archiving helpers | Behind `archive`, not `legacy-pqclean` |
+
+A file-based round trip, and a signature, so you can see the nonce and
+signature shapes:
+
+```rust,no_run
+# #[cfg(feature = "legacy-pqclean")]
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use crypt_guard::{
+    decrypt_file, decryption, dilithium_keypair, encrypt_file, encryption, error::Zeroize,
+    falcon_keypair, kdf::*, kyber_keypair, signature, verify, Data, Decryption, Encryption, Files,
+    KeyControKyber1024, KeyControKyber512, KeyControKyber768, Kyber, Kyber1024, KyberFunctions,
+    AES, XChaCha20,
+};
+use std::fs;
+
+// XChaCha20 needs a saved nonce: keep it (as hex, say) alongside the
+// ciphertext, or you cannot decrypt later.
+let (public_key, secret_key) = kyber_keypair!(1024);
+let (encrypted, cipher, nonce) =
+    encryption!(public_key, 1024, b"in memory".to_vec(), "pass", XChaCha20)?;
+let recovered = decryption!(
+    secret_key, 1024, encrypted, "pass", cipher, Some(nonce), XChaCha20
+)?;
+assert_eq!(recovered, b"in memory");
+
+// A file round trip with AES needs no nonce.
+let dir = tempfile::tempdir()?;
+let plain_path = dir.path().join("message.txt");
+let encrypted_path = dir.path().join("message.txt.enc");
+fs::write(&plain_path, b"file contents")?;
+let (public_key, secret_key) = kyber_keypair!(1024);
+let (_message, cipher) = encrypt_file!(public_key, 1024, plain_path.clone(), "pass", AES)?;
+fs::remove_file(&plain_path)?;
+let restored = decrypt_file!(secret_key, 1024, encrypted_path, "pass", cipher, AES)?;
+assert_eq!(restored, b"file contents");
+
+// A Dilithium signature over a message.
+let (verify_key, sign_key) = dilithium_keypair!(2);
+let signed = signature!(Dilithium, sign_key, 2, b"sign me".to_vec(), Message)?;
+let opened = verify!(Dilithium, verify_key, 2, signed, Message)?;
+assert_eq!(opened, b"sign me");
+let _ = falcon_keypair!(512); // Falcon works the same way as Dilithium above.
+# Ok(())
+# }
+# #[cfg(not(feature = "legacy-pqclean"))] fn main() {}
+```
+
+**Watch out:**
+
+- The legacy `AES` cipher (`Kyber<.., AES>`) is ECB mode: identical plaintext
+  blocks produce identical ciphertext blocks. Its format is kept only so
+  existing data can still be decrypted; never encrypt new data with it.
+- Any nonce-producing mode (`XChaCha20`, `AES_CTR`, `AES_GCM_SIV`, …) must
+  have its nonce saved (as a hex string, for instance) alongside the
+  ciphertext — without it, decryption is impossible.
+- `legacy-pqclean` depends on the unmaintained `pqcrypto-*` crates (see
+  [SECURITY.md](SECURITY.md)). Use it only in an isolated migration worker,
+  then move the data to `pq_hpke` and remove the feature.
+
+## Migrating from 3.0.x / CGv2
+
+CGv2 is compatibility-only in v3. Default builds do not expose the legacy
+builders or accept CGv2 as a v3 envelope.
+
+```toml
+[dependencies]
+crypt_guard = { version = "3.1.0", features = ["cgv2-compat"] }
+```
+
+1. Deploy a migration worker with `cgv2-compat` enabled.
+2. Read and authenticate the existing CGv2 envelope using the compatibility
+   API (`crypt_guard::protocol::Envelope`, `crypt_guard::hpke_open`).
+3. Re-encrypt the recovered plaintext with `pq_hpke::HpkeEnvelope::seal`.
+4. Store the `CGH3` bytes and preserve your application's `info`/`aad`
+   contract.
+5. Remove `cgv2-compat` after all stored data has been migrated.
+
+Never trial-decrypt an unknown record with both formats. Store or transmit a
+transport discriminator and select the reader directly.
+
+## Common mistakes
+
+- **Reusing `info` or `aad` incorrectly.** `info` is the setup context for a
+  channel; `aad` is per-message metadata. Mixing them up, or forgetting that
+  both must match *exactly* on open, is the most common cause of a surprise
+  `AuthenticationFailed`.
+- **Losing the seed.** The seed from `generate_recipient_seed` is the only
+  long-lived secret you need to keep; lose it and the key pair (and
+  everything encrypted to it) is gone.
+- **Logging secrets.** Never log a seed, a private key, a plaintext, or a
+  bearer token — CryptGuard already zeroizes and redacts its own
+  secret-bearing types, but a `println!` of the wrong variable defeats that.
+- **Using `legacy-pqclean` for new data.** It exists for migration only; the
+  legacy `AES` mode is ECB, and the underlying `pqcrypto-*` crates are
+  unmaintained.
+- **Exposing the KMS HTTP server without TLS or auth.** `crypt_guard_hyper`
+  does not terminate TLS itself and does not require an authenticator unless
+  you attach one — both are your responsibility before the service leaves
+  `localhost`.
+- **Branching on decryption failure reasons.** `AuthenticationFailed` is
+  intentionally uninformative; do not try to recover *why* it failed.
 
 ## Workspace layout
 
@@ -458,51 +840,6 @@ through their features; the default build never depends on Tower, Hyper,
 
 All crates share one version (`[workspace.package]`) and are released
 together.
-
-## Feature flags
-
-| Feature | Default | Purpose |
-|---|---:|---|
-| `ml-kem-backend` | yes | FIPS ML-KEM-512, ML-KEM-768, ML-KEM-1024 (`kem` module) |
-| `ml-dsa-backend` | yes | FIPS ML-DSA-44, ML-DSA-65, ML-DSA-87; also enables ML-DSA keys in the service |
-| `sign-slhdsa` | no | SLH-DSA signatures |
-| `service` | no | `crypt_guard::service`: Tower KMS service (no HTTP) |
-| `hyper` | no | `crypt_guard::hyper`: HTTP adapter and `TowerToHyperService` bridge (implies `service`) |
-| `cgv2-compat` | no | CGv2 envelope, builders, and compatibility helpers |
-| `legacy-pqclean` | no | Historical Kyber, Falcon, and Dilithium compatibility (enables all legacy ciphers) |
-| `legacy-aes`, `aes-ctr`, `aes-xts`, `aes-gcm-siv-cipher` | no | Individual legacy symmetric modes |
-| `archive`, `zip` | no | Archive helpers |
-
-Every feature builds on its own; CI checks each one.
-
-## CGv2 migration and legacy support
-
-CGv2 is compatibility-only in v3. Default builds do not expose the legacy
-builders or accept CGv2 as a v3 envelope. Existing stored data requires an
-explicit migration build.
-
-```toml
-[dependencies]
-crypt_guard = { version = "3.1.0", features = ["cgv2-compat"] }
-```
-
-Migration procedure:
-
-1. Deploy a migration worker with `cgv2-compat` enabled.
-2. Read and authenticate the existing CGv2 envelope using the compatibility API.
-3. Re-encrypt the recovered plaintext with `pq_hpke::HpkeEnvelope`.
-4. Store the `CGH3` bytes and preserve the application contract for `info` and AAD.
-5. Remove `cgv2-compat` after all stored data has been migrated.
-
-Never trial-decrypt unknown records with both formats. Store or transmit a
-transport discriminator and select the reader directly.
-
-The `legacy-pqclean` feature retains the historical Kyber, Falcon, and
-Dilithium path for explicitly managed legacy data. In 3.1 that path got
-redacted `Debug`, constant-time key comparison, `0600` key files, zeroizing
-key holders and `Sign::try_hmac` (the old `hmac()` swallowed verification
-failures and is deprecated). It remains best-effort and is not recommended
-for new designs.
 
 ## Security process
 
