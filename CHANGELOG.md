@@ -43,6 +43,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   hyper denies `unwrap`/`expect`.
 
 ### Changed
+- `kem::ml_kem` (`MlKem512Impl`/`MlKem768Impl`/`MlKem1024Impl`) now runs on
+  `libcrux-ml-kem` (PQCA / PQ Code Package), the same FIPS 203 implementation
+  as `pq_hpke`; the RustCrypto `ml-kem` dependency is gone. Keys and
+  ciphertexts are unchanged and interchangeable with the old backend (tested),
+  and encapsulation now rejects keys failing the FIPS 203 modulus check.
 - `legacy-pqclean` is documented as depending on the unmaintained PQClean
   based `pqcrypto-*` crates (RustSec unmaintained advisories); it stays
   opt-in and migration-only.
