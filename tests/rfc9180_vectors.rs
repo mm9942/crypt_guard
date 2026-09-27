@@ -9,7 +9,8 @@
 use crypt_guard::hpke::{key_schedule, AeadId, HpkeSuite, KdfId, KemId, Mode};
 use serde::Deserialize;
 
-const RFC_9180_VECTORS: &str = include_str!("vectors/rfc9180-test-vectors.json");
+const RFC_9180_VECTORS: &str =
+    include_str!("../crates/core/tests/vectors/rfc9180-test-vectors.json");
 
 #[derive(Deserialize)]
 struct Vector {

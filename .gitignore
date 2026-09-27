@@ -2,6 +2,7 @@ target/
 *.log
 *.md
 !README.md
+!CHANGELOG.md
 .github/
 Falcon1024/
 key/
@@ -18,4 +19,8 @@ tools/
 .codex
 test_legacy.log
 test_legacy_pqclean.log
-Cargo.lock
+# Cargo.lock is committed: reproducible CI and Dependabot advisories for
+# transitive dependencies. Library users still resolve their own lockfile.
+fuzz/target/
+fuzz/corpus/
+fuzz/artifacts/

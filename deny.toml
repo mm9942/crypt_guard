@@ -1,0 +1,71 @@
+# cargo-deny configuration: supply-chain checks run in CI (`cargo deny check`).
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = true
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+
+# Known vulnerabilities (RustSec advisory database).
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+# Add an advisory id here only with a comment explaining why it does not
+# apply, and remove it as soon as a fixed version is available.
+ignore = [
+    # The optional `legacy-pqclean` feature wraps PQClean via the pqcrypto-*
+    # crates. PQClean is being archived in 2026 and the crates are marked
+    # unmaintained; there is no drop-in replacement that keeps the historical
+    # Kyber/Falcon/Dilithium wire formats this feature exists to migrate away
+    # from. The feature is opt-in, migration-only and absent from the default
+    # build (see SECURITY.md). These entries are informational advisories,
+    # not vulnerabilities.
+    { id = "RUSTSEC-2024-0380", reason = "pqcrypto-dilithium: legacy-pqclean migration path only" },
+    { id = "RUSTSEC-2024-0381", reason = "pqcrypto-kyber: legacy-pqclean migration path only" },
+    { id = "RUSTSEC-2026-0162", reason = "pqcrypto-traits: legacy-pqclean migration path only" },
+    { id = "RUSTSEC-2026-0163", reason = "pqcrypto-internals: legacy-pqclean migration path only" },
+    { id = "RUSTSEC-2026-0165", reason = "pqcrypto-falcon: legacy-pqclean migration path only" },
+]
+
+# Every crate in the tree must carry an OSI/FSF approved, permissive licence.
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "MPL-2.0",
+    "BSL-1.0",
+    "0BSD",
+]
+confidence-threshold = 0.9
+
+[bans]
+# The crate deliberately carries two versions of a few crates during the
+# rand_core / sha2 transition; report them, do not fail the build.
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+deny = [
+    # Never let a non-constant-time or unmaintained crypto crate sneak in.
+    { crate = "openssl", reason = "pure-Rust cryptography only" },
+    { crate = "ring", reason = "pure-Rust cryptography only" },
+]
+
+# Only crates.io; no git or alternative-registry dependencies.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

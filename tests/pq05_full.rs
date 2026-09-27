@@ -109,9 +109,10 @@ fn corpus_manifest_preserves_all_thirteen_pinned_vector_descriptors() {
     // claim: the official corpus covers 13 Base vectors, several of which use
     // KEMs or TurboSHAKE not locally available yet.  Future vector execution
     // must consume every entry and may mark none as "passed" by fallback.
-    let vectors: serde_json::Value =
-        serde_json::from_str(include_str!("vectors/hpke-pq-draft-05-test-vectors.json"))
-            .expect("vendored draft corpus is JSON");
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"
+    ))
+    .expect("vendored draft corpus is JSON");
     let entries = vectors.as_array().expect("draft corpus is an array");
     assert_eq!(
         entries.len(),

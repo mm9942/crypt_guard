@@ -1,0 +1,55 @@
+[package]
+name = "crypt_guard-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+crypt_guard = { path = "..", features = ["hyper"] }
+crypt_guard_service = { path = "../crates/service", features = ["buffer"] }
+crypt_guard_hyper = { path = "../crates/hyper" }
+
+# Stand-alone: not a member of the main workspace.
+[workspace]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "hpke_envelope"
+path = "fuzz_targets/hpke_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pq_hpke_keys"
+path = "fuzz_targets/pq_hpke_keys.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kms_codec"
+path = "fuzz_targets/kms_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kms_decrypt"
+path = "fuzz_targets/kms_decrypt.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rfc9180_keys"
+path = "fuzz_targets/rfc9180_keys.rs"
+test = false
+doc = false
+bench = false

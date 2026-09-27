@@ -1,0 +1,32 @@
+# cargo-release configuration for the whole workspace.
+# https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
+#
+# All crates are released in lockstep from `[workspace.package] version`:
+#
+#   scripts/release.sh                  # dry run: release the current version
+#   scripts/release.sh patch            # dry run: 3.1.0 -> 3.1.1
+#   scripts/release.sh minor --execute  # the real thing
+#
+# (scripts/release.sh is `cargo release --workspace "$@"`; without
+# `--workspace` cargo-release would only select the root facade crate.)
+#
+# Without `--execute` nothing is changed, committed, tagged or published.
+# With it, cargo-release bumps the version, runs scripts/release_checks.sh,
+# updates README/CHANGELOG/crate docs, commits "Release X.Y.Z", tags vX.Y.Z,
+# publishes proc -> core -> service -> hyper -> crypt_guard in dependency
+# order (waiting for each to appear in the index) and pushes commit and tag.
+# The crates.io token comes from `cargo login` or CARGO_REGISTRY_TOKEN.
+
+allow-branch = ["main"]
+shared-version = true
+consolidate-commits = true
+dependent-version = "upgrade"
+pre-release-commit-message = "Release {{version}}"
+tag-name = "v{{version}}"
+tag-message = "CryptGuard {{version}}"
+sign-commit = false
+sign-tag = false
+verify = true
+publish = true
+push = true
+push-remote = "origin"

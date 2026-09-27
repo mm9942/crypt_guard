@@ -16,8 +16,10 @@ fn kdf(id: u64) -> Kdf {
 
 #[test]
 fn x25519_hybrid_matches_all_pinned_draft05_base_endpoint_vectors() {
-    let vectors: Vec<Value> =
-        serde_json::from_str(include_str!("vectors/hpke-pq-draft-05-test-vectors.json")).unwrap();
+    let vectors: Vec<Value> = serde_json::from_str(include_str!(
+        "../crates/core/tests/vectors/hpke-pq-draft-05-test-vectors.json"
+    ))
+    .unwrap();
     let vectors: Vec<_> = vectors
         .iter()
         .filter(|vector| vector["kem_id"].as_u64() == Some(0x647a))
