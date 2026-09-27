@@ -29,6 +29,8 @@ description = "CryptGuard is a post-quantum cryptography framework with NIST FIP
 # Release automation (cargo-release, see release.toml). The checks and the
 # README/CHANGELOG rewrites run once, from the facade crate.
 [package.metadata.release]
+tag-name = "v{{version}}"
+tag-message = "CryptGuard {{version}}"
 pre-release-hook = ["scripts/release_checks.sh", "{{version}}"]
 pre-release-replacements = [
   { file = "README.md", search = "^# CryptGuard v[0-9]+\\.[0-9]+\\.[0-9]+", replace = "# CryptGuard v{{version}}", exactly = 1 },

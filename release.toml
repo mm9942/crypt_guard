@@ -12,8 +12,8 @@
 #
 # Without `--execute` nothing is changed, committed, tagged or published.
 # With it, cargo-release bumps the version, runs scripts/release_checks.sh,
-# updates README/CHANGELOG/crate docs, commits "Release X.Y.Z", tags vX.Y.Z,
-# publishes proc -> core -> service -> hyper -> crypt_guard in dependency
+# updates README/CHANGELOG/crate docs, commits "Release X.Y.Z", tags every
+# crate (`<crate>-vX.Y.Z`, plus `vX.Y.Z` for the facade crate), publishes proc -> core -> service -> hyper -> crypt_guard in dependency
 # order (waiting for each to appear in the index) and pushes commit and tag.
 # The crates.io token comes from `cargo login` or CARGO_REGISTRY_TOKEN.
 
@@ -22,8 +22,10 @@ shared-version = true
 consolidate-commits = true
 dependent-version = "upgrade"
 pre-release-commit-message = "Release {{version}}"
-tag-name = "v{{version}}"
-tag-message = "CryptGuard {{version}}"
+# One tag per crate, e.g. crypt_guard_core-v3.1.0; the facade crate overrides
+# this to the plain vX.Y.Z in the root Cargo.toml.
+tag-name = "{{crate_name}}-v{{version}}"
+tag-message = "{{crate_name}} {{version}}"
 sign-commit = false
 sign-tag = false
 verify = true
