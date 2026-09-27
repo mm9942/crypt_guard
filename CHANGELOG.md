@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-27
+
 ### Added
 - Security process: `SECURITY.md`, Dependabot (Cargo and Actions),
   `cargo deny` in CI, committed `Cargo.lock`, and `cargo fuzz` targets for
