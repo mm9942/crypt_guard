@@ -73,3 +73,10 @@ pub mod service {
 pub mod hyper {
     pub use crypt_guard_hyper::*;
 }
+
+/// Compiles every Rust example in `README.md` as a doctest, so the README
+/// cannot drift from the real API. Examples that need an optional feature are
+/// wrapped in `#[cfg(feature = "...")]` and run in the matching CI lane.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

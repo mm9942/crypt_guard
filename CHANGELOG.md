@@ -30,6 +30,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `TryOsRng`, `try_generate_recipient_key_pair`, `RecipientKeyPair::into_parts`,
   `Sign::try_hmac`, `From` conversions of all error types into `CryptError`.
 - `examples/pq_hpke.rs`.
+- README rewritten as a beginner guide: which API to pick, a complete feature
+  table (including `service` and `hyper`) with ready-to-copy `Cargo.toml`
+  snippets, recipes, a KMS walkthrough, and why the legacy macros exist.
+  Every Rust example in it is compiled as a doctest of the facade crate.
 - Error layer: `crypt_guard_core::error::ErrorKind` (stable, non-exhaustive
   classification) with `kind()` on every core error type,
   `CryptError::is_transient`, `Result` aliases in core, service and hyper,
