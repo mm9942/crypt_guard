@@ -41,6 +41,7 @@ security and explicit protocol boundaries over compact ciphertexts.
    - [Signatures](#signatures)
    - [Signed HPKE](#signed-hpke)
    - [Error handling](#error-handling)
+   - [Building blocks for messengers](#building-blocks-for-messengers)
 5. [KMS for beginners](#kms-for-beginners)
    - [In-process, with `service`](#in-process-with-service)
    - [Over HTTP, with `hyper`](#over-http-with-hyper)
@@ -342,6 +343,41 @@ MlDsa65Impl::verify(&public_key, b"signed payload", &signature)?;
 # #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
 ```
 
+#### Seed-derived keys, context strings and fingerprints
+
+For key management, store only the 32-byte seed and re-derive the key pair
+from it. Sign with a FIPS 204 **context string** per purpose, so a signature
+made for one protocol message can never be replayed as another. These
+functions never panic: entropy comes from `TryOsRng`, and signing is
+*hedged* (fresh randomness is mixed into every signature).
+
+```rust,no_run
+# #[cfg(feature = "ml-dsa-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::sign::ml_dsa::MlDsa87Impl;
+
+// 1. A fresh seed; keep it in your key-management boundary.
+let seed = MlDsa87Impl::generate_seed()?;
+
+// 2. The same seed always re-derives the same key pair.
+let (signing_key, verifying_key) = MlDsa87Impl::keypair_from_seed(seed.as_slice())?;
+
+// 3. Domain-separate every purpose with its own context (at most 255 bytes).
+let sig = MlDsa87Impl::sign_with_context(&signing_key, b"payload", b"myapp:msg:v1")?;
+MlDsa87Impl::verify_with_context(&verifying_key, b"payload", b"myapp:msg:v1", &sig)?;
+
+// 4. A stable 32-byte key id, bound to the parameter set.
+let key_id: [u8; 32] = MlDsa87Impl::fingerprint(&verifying_key)?;
+# let _ = key_id;
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
+```
+
+`pq_hpke::RecipientPublicKey::fingerprint()` gives the matching 32-byte id
+for encryption keys. Use `sign_with_context_deterministic` only for
+known-answer tests.
+
 SLH-DSA (hash-based, larger signatures, more conservative security
 assumptions than ML-DSA) works the same way, with `SlhDsaShake128fImpl` (or
 one of its five siblings) in place of `MlDsa65Impl`:
@@ -454,6 +490,222 @@ assert_eq!(CryptError::AuthenticationFailed.kind(), ErrorKind::Authentication);
 **Watch out:** never write a `match` that treats `AuthenticationFailed`
 differently based on timing, error text, or any other side channel — that
 recreates the oracle the opaque error was designed to remove.
+
+### Building blocks for messengers
+
+Four small, panic-free primitives (plus the optional two-layer envelope
+`pq_cascade` described after them) cover what a post-quantum messenger needs
+beyond one-to-one encryption. The randomness they draw themselves (share
+coefficients, stream prefixes, content keys) comes from `TryOsRng`, so an
+entropy failure is returned as an error.
+
+**Derived identifiers and sub-keys (`prf`).** A labelled SHAKE256 PRF turns
+one secret key into many unrelated values: mailbox ids, capability tokens,
+per-file keys. Use one constant label per purpose; the output length is bound
+in, so a 16-byte id never leaks half of a 32-byte key.
+
+```rust,no_run
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::prf::prf32;
+
+let root_key = [0x42u8; 32]; // in real use: a key from your key store
+let mailbox_id = prf32(&root_key, b"myapp/mailbox-id", b"alice@example")?;
+let upload_cap = prf32(&root_key, b"myapp/capability/upload", b"alice@example")?;
+assert_ne!(*mailbox_id, *upload_cap);
+# Ok(())
+# }
+```
+
+**Recovery with k-of-n shares (`sharing`).** Shamir secret sharing splits a
+secret so that any `threshold` shares rebuild it and fewer reveal nothing.
+Commitments let you name the holder of a bad share later.
+
+```rust,no_run
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::sharing::{combine, commitment, split, verify_commitment};
+
+let recovery_key = [0x5Au8; 32];
+let shares = split(&recovery_key, 3, 5)?; // any 3 of 5
+let context = b"backup/alice/v1";
+let receipts: Vec<[u8; 32]> = shares.iter().map(|s| commitment(s, context)).collect();
+
+// Later: check each returned share against its receipt, then combine.
+for (share, receipt) in shares.iter().zip(&receipts) {
+    assert!(verify_commitment(share, context, receipt));
+}
+let restored = combine(&shares[1..4])?;
+assert_eq!(&restored[..], &recovery_key[..]);
+# Ok(())
+# }
+```
+
+**Large files in chunks (`pq_stream`).** STREAM seals a file chunk by chunk
+with ChaCha20-Poly1305. Reordered, dropped, modified or appended chunks fail,
+and a file cut short never completes, because only the last chunk carries the
+final flag.
+
+```rust,no_run
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::error::CryptError;
+use crypt_guard::pq_stream::{derive_stream_key, StreamDecryptor, StreamEncryptor};
+
+let file_key = [0x11u8; 32];
+let key = derive_stream_key(&file_key, b"file-0001")?; // a fresh key per file
+let prefix = [1u8, 0, 0, 0, 0, 0, 0];
+
+let mut enc = StreamEncryptor::new(&key, prefix)?;
+let mut sealed = Vec::new();
+for chunk in [b"part one, ".as_slice(), b"part two, ".as_slice()] {
+    sealed.push(enc.encrypt_next(chunk, b"file-0001")?);
+}
+sealed.push(enc.encrypt_last(b"the end", b"file-0001")?);
+
+let mut dec = StreamDecryptor::new(&key, prefix)?;
+let (last, rest) = sealed.split_last().ok_or(CryptError::InvalidParameters)?;
+let mut file = Vec::new();
+for chunk in rest {
+    file.extend_from_slice(&dec.decrypt_next(chunk, b"file-0001")?);
+}
+// Only a successful `decrypt_last` proves the file is complete.
+file.extend_from_slice(&dec.decrypt_last(last, b"file-0001")?);
+assert_eq!(file, b"part one, part two, the end");
+# Ok(())
+# }
+```
+
+**Group messages (`pq_multi`).** `seal_multi` encrypts the payload once and
+wraps its one-time key for every member with `pq_hpke`. Every part is bound
+to the header and to a hash of the sorted member fingerprints, so changing
+the group, the header or the body makes opening fail. `dummy_wrap` pads the
+visible member count.
+
+```rust,no_run
+# #[cfg(feature = "ml-kem-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::pq_hpke::{generate_recipient_key_pair, DEFAULT_SUITE};
+use crypt_guard::pq_multi::{dummy_wrap, open_multi, seal_multi};
+
+let alice = generate_recipient_key_pair(DEFAULT_SUITE.kem())?;
+let bob = generate_recipient_key_pair(DEFAULT_SUITE.kem())?;
+let header = b"group=7;epoch=3;msg=42";
+
+let members = [alice.public_key(), bob.public_key()];
+let mut ct = seal_multi(DEFAULT_SUITE, &members, header, b"chat/v1", b"hi all")?;
+ct.wraps.push(dummy_wrap(DEFAULT_SUITE)?);
+
+// Bob knows his wrap index (1) and his own fingerprint.
+let bob_fp = bob.public_key().fingerprint();
+let plain = open_multi(DEFAULT_SUITE, bob.private_key(), &bob_fp, &ct, 1, header, b"chat/v1")?;
+assert_eq!(&plain[..], b"hi all");
+
+// Was it sealed for exactly the members Bob expects (in any order)?
+ct.check_recipient_set(&[bob_fp, alice.public_key().fingerprint()])?;
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-kem-backend"))] fn main() {}
+```
+
+`open_multi` pins the suite: a wrap whose wire suite differs from the one you
+pass is rejected before decapsulation. The same check is available for single
+records as `HpkeEnvelope::open_pinned_zeroizing(expected_suite, key, info, aad)`.
+
+**Two-layer envelope (`pq_cascade`).** For messengers that offer a
+"maximum" protection level, `pq_cascade` seals data under AES-256-GCM-SIV
+*inside* XChaCha20-Poly1305. `Scheme` selects one layer (`ChaCha20Poly1305`,
+`Aes256GcmSiv`, `XChaCha20Poly1305`) or both (`Cascade`); every scheme grows
+the plaintext by exactly 32 bytes, so the chosen scheme cannot be read from a
+length. A `Cascade` derives independent layer keys from one 32-byte root key
+and a constant `domain` label of your protocol; the scheme id is bound into
+every key and every AAD. Raw AEAD calls stay inside the module, and every open
+failure is the same `CryptError::AuthenticationFailed`.
+
+```rust,no_run
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::pq_cascade::{Cascade, CascadeNonce, Scheme};
+
+let session_key = [0x42u8; 32]; // in real use: a key from your key schedule
+let cascade = Cascade::new(Scheme::Cascade, &session_key, b"myapp/frame/v1")?;
+
+// Counter nonce: you guarantee that `n` is never reused under this key.
+let nonce = CascadeNonce::Counter { domain: 1, n: 7 };
+let sealed = cascade.seal(&nonce, b"frame header", b"payload")?;
+assert_eq!(sealed.len(), b"payload".len() + 32);
+let plain = cascade.open(&nonce, b"frame header", &sealed)?;
+assert_eq!(&plain[..], b"payload");
+
+// One key, one message: `seal_once` consumes the `Cascade` and derives the nonce.
+let once = Cascade::new(Scheme::Cascade, &[0x17u8; 32], b"myapp/message/v1")?;
+let sealed = once.seal_once(b"header", b"one message")?;
+assert_eq!(sealed.len(), b"one message".len() + 32);
+# Ok(())
+# }
+```
+
+For group messages, `seal_multi_cascade` does what `seal_multi` does, but the
+body uses any `Scheme` and every wrap is a `MAXIMAL_SUITE` envelope
+(ML-KEM-1024/P-384, SHAKE256, XChaCha20-Poly1305) around the content key and the
+scheme id. All wraps are 1 751 bytes whatever the scheme, so a relay cannot tell
+them apart; `dummy_cascade_wrap` pads to a fixed count. `open_multi_cascade`
+asks your `accept` callback about the scheme before it decrypts the body, which
+is where a minimum-level policy belongs.
+
+```rust,no_run
+# #[cfg(feature = "ml-kem-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::pq_cascade::{Scheme, MAXIMAL_SUITE};
+use crypt_guard::pq_hpke::generate_recipient_key_pair;
+use crypt_guard::pq_multi::{open_multi_cascade, seal_multi_cascade};
+
+let bob = generate_recipient_key_pair(MAXIMAL_SUITE.kem())?;
+let header = b"group=7;epoch=3;msg=42";
+let ct = seal_multi_cascade(
+    MAXIMAL_SUITE,
+    Scheme::Cascade,
+    &[bob.public_key()],
+    header,
+    b"chat/v1",
+    b"hi all",
+)?;
+
+let bob_fp = bob.public_key().fingerprint();
+let (scheme, plain) = open_multi_cascade(
+    MAXIMAL_SUITE,
+    bob.private_key(),
+    &bob_fp,
+    &ct,
+    0,
+    header,
+    b"chat/v1",
+    &|scheme| scheme >= Scheme::Aes256GcmSiv, // refuse weaker schemes
+)?;
+assert_eq!(scheme, Scheme::Cascade);
+assert_eq!(&plain[..], b"hi all");
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-kem-backend"))] fn main() {}
+```
+
+`seal_envelope`/`open_envelope` give the same two-layer construction for a
+single recipient as an ordinary `HpkeEnvelope` (one KEM encapsulation, the
+inner key comes from the HPKE exporter), and `seal_random`/`open_random` seal
+stored values under a fresh random 192-bit nonce. The vectors in
+`crates/core/tests/vectors/pq-cascade-kats.json` come from an independent
+Python model and are checked by `tests/pq_cascade_kats.rs`.
+
+**Watch out:**
+- A `(key, prefix)` pair must encrypt one stream only. Use
+  `derive_stream_key` per file, or `pq_stream::random_prefix()` per stream.
+- `combine` cannot tell that it got too few shares; it then returns a wrong
+  value. Store the threshold with the shares and check the result.
+- Commitments hide a share only for secrets of 16 bytes or more; for shorter
+  secrets add a random salt to the context.
+- `seal_multi` does not prove who sent the message. Sign the ciphertext
+  (for example with ML-DSA) when the sender matters.
+- `Cascade::seal` with `CascadeNonce::Counter` or `Stream` trusts you never to
+  reuse a nonce under one key (ChaCha20-Poly1305 and XChaCha20-Poly1305 break
+  badly if you do; AES-256-GCM-SIV only leaks equality). Prefer `seal_once` or
+  `seal_random` where you can, and keep the counter atomic and persistent
+  otherwise.
 
 ## KMS for beginners
 
@@ -576,7 +828,7 @@ across connections through a cloneable handle).
 # #[cfg(feature = "hyper")]
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use crypt_guard::service::{
-    network_handle, CryptoService, InMemoryProvider, KeyNamespace, NamespacePolicy, OpSet,
+    try_network_handle, CryptoService, InMemoryProvider, KeyNamespace, NamespacePolicy, OpSet,
     PolicyProvider, Principal, SecretBytes, StackConfig,
 };
 use crypt_guard::hyper::{into_hyper, BearerTokens, CryptoHttpService, HttpConfig};
@@ -590,7 +842,9 @@ tokens.insert(SecretBytes::copy_from_slice(b"<token from your secret store>"), P
 
 // Inside a Tokio runtime:
 let provider = PolicyProvider::new(InMemoryProvider::new(), policy);
-let handle = network_handle(CryptoService::new(provider), StackConfig::default());
+// `try_network_handle` returns `Unavailable` instead of panicking when no
+// Tokio runtime is running (prefer it over `network_handle`).
+let handle = try_network_handle(CryptoService::new(provider), StackConfig::default())?;
 let http = CryptoHttpService::new(handle, HttpConfig::default()).with_authenticator(tokens);
 let hyper_service = into_hyper(http); // serve with hyper::server::conn::http1
 # let _ = hyper_service;
@@ -598,6 +852,10 @@ let hyper_service = into_hyper(http); // serve with hyper::server::conn::http1
 # }
 # #[cfg(not(feature = "hyper"))] fn main() {}
 ```
+
+Key versions also expose advisory lifecycle timestamps through
+`CryptoOperation::DescribeLifecycle` (`KeyLifecycle`: creation time and
+optional not-before / not-after / destroy-after).
 
 The runnable reference server is `crates/hyper/examples/kms_server.rs`. It
 refuses to start without an explicit admin token and never generates or

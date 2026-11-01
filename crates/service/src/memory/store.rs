@@ -12,6 +12,11 @@
 //!
 //! `PendingDestruction` is reserved for providers with delayed deletion and
 //! is never entered by this store.
+//!
+//! Every version also carries its [`KeyLifecycle`], stamped by the caller
+//! when the version is inserted (generate) or added (rotate). It is never
+//! changed afterwards and survives destruction on the tombstone, so a
+//! destroyed version can still be described.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -20,6 +25,7 @@ use crypt_guard_core::pq_hpke::{RecipientKeyPair, Suite};
 use crate::{
     error::CryptoServiceError,
     key::{KeyAlgorithm, KeyId, KeyMetadata, KeyNamespace, KeyRef, KeyState, KeyVersion},
+    lifecycle::KeyLifecycle,
 };
 
 /// Secret key material of one key version. Never `Clone`, never printed.
@@ -57,6 +63,8 @@ pub(crate) struct VersionEntry {
     pub(crate) state: KeyState,
     /// `None` once destroyed.
     pub(crate) material: Option<KeyMaterial>,
+    /// Non-secret lifecycle timestamps; kept on the tombstone.
+    pub(crate) lifecycle: KeyLifecycle,
 }
 
 impl VersionEntry {
@@ -96,7 +104,8 @@ impl KeyStore {
         Self::default()
     }
 
-    /// Create a new key with version 1 as primary.
+    /// Create a new key with version 1 as primary, recording `lifecycle` for
+    /// it.
     ///
     /// Errors: key already exists → [`CryptoServiceError::Conflict`].
     /// Returns the versioned `KeyRef` of the new version.
@@ -106,6 +115,7 @@ impl KeyStore {
         id: KeyId,
         algorithm: KeyAlgorithm,
         material: KeyMaterial,
+        lifecycle: KeyLifecycle,
     ) -> Result<KeyRef, CryptoServiceError> {
         use std::collections::hash_map::Entry;
 
@@ -120,6 +130,7 @@ impl KeyStore {
                         version,
                         state: KeyState::Enabled,
                         material: Some(material),
+                        lifecycle,
                     },
                 );
                 slot.insert(KeyEntry {
@@ -132,13 +143,15 @@ impl KeyStore {
         }
     }
 
-    /// Add a new version (highest + 1) and make it primary. `key.version` is
+    /// Add a new version (highest + 1) with its own `lifecycle` and make it
+    /// primary. Earlier versions keep their lifecycle. `key.version` is
     /// ignored. Errors: unknown key → `NotFound`; version overflow → `Conflict`.
     /// Returns the versioned `KeyRef` of the new version.
     pub(crate) fn rotate(
         &mut self,
         key: &KeyRef,
         material: KeyMaterial,
+        lifecycle: KeyLifecycle,
     ) -> Result<KeyRef, CryptoServiceError> {
         let entry = self
             .keys
@@ -163,6 +176,7 @@ impl KeyStore {
                 version: new_version,
                 state: KeyState::Enabled,
                 material: Some(material),
+                lifecycle,
             },
         );
         entry.primary = new_version;
@@ -281,6 +295,12 @@ impl KeyStore {
             .ok_or(CryptoServiceError::NotFound)
     }
 
+    /// Lifecycle of a version (primary when unversioned), whatever its state;
+    /// resolves exactly like [`Self::metadata`]. Errors: unknown → `NotFound`.
+    pub(crate) fn lifecycle(&self, key: &KeyRef) -> Result<KeyLifecycle, CryptoServiceError> {
+        self.resolve(key).map(|entry| entry.lifecycle)
+    }
+
     /// Metadata of a version (primary when unversioned), with a versioned
     /// `KeyRef`. Errors: unknown → `NotFound`.
     pub(crate) fn metadata(&self, key: &KeyRef) -> Result<KeyMetadata, CryptoServiceError> {
@@ -328,11 +348,15 @@ mod tests {
         KeyId::new(s).unwrap()
     }
 
+    fn at(created_at_unix_ms: u64) -> KeyLifecycle {
+        KeyLifecycle::new(created_at_unix_ms)
+    }
+
     #[test]
     fn insert_new_creates_enabled_primary_v1() {
         let mut store = KeyStore::new();
         let key_ref = store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         assert_eq!(key_ref.version, Some(KeyVersion::FIRST));
 
@@ -345,10 +369,10 @@ mod tests {
     fn insert_new_conflict_on_existing() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let err = store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap_err();
         assert_eq!(err, CryptoServiceError::Conflict);
     }
@@ -357,7 +381,7 @@ mod tests {
     fn rotate_unknown_key_not_found() {
         let mut store = KeyStore::new();
         let err = store
-            .rotate(&KeyRef::latest(ns("t"), id("k")), material())
+            .rotate(&KeyRef::latest(ns("t"), id("k")), material(), at(2))
             .unwrap_err();
         assert_eq!(err, CryptoServiceError::NotFound);
     }
@@ -366,10 +390,10 @@ mod tests {
     fn rotate_bumps_version_and_primary() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let rotated = store
-            .rotate(&KeyRef::latest(ns("t"), id("k")), material())
+            .rotate(&KeyRef::latest(ns("t"), id("k")), material(), at(2))
             .unwrap();
         assert_eq!(rotated.version, Some(KeyVersion::new(2).unwrap()));
 
@@ -396,7 +420,7 @@ mod tests {
     fn set_state_disable_then_enable_roundtrip() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let key = KeyRef::latest(ns("t"), id("k"));
 
@@ -416,7 +440,7 @@ mod tests {
     fn set_state_rejects_non_enabled_disabled_targets() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let key = KeyRef::latest(ns("t"), id("k"));
 
@@ -430,7 +454,7 @@ mod tests {
     fn set_state_on_destroyed_version_is_conflict() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let key = KeyRef::versioned(ns("t"), id("k"), KeyVersion::FIRST);
         store.destroy(&key).unwrap();
@@ -443,7 +467,7 @@ mod tests {
     fn destroy_requires_explicit_version() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let err = store
             .destroy(&KeyRef::latest(ns("t"), id("k")))
@@ -464,7 +488,7 @@ mod tests {
     fn destroy_drops_material_and_is_terminal() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let key = KeyRef::versioned(ns("t"), id("k"), KeyVersion::FIRST);
 
@@ -484,7 +508,7 @@ mod tests {
     fn destroyed_primary_makes_latest_unusable() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let versioned = KeyRef::versioned(ns("t"), id("k"), KeyVersion::FIRST);
         store.destroy(&versioned).unwrap();
@@ -504,7 +528,7 @@ mod tests {
     fn resolve_version_unknown_not_found() {
         let mut store = KeyStore::new();
         store
-            .insert_new(ns("t"), id("k"), algorithm(), material())
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
             .unwrap();
         let err = store
             .resolve_version(&ns("t"), &id("k"), KeyVersion::new(7).unwrap())
@@ -519,6 +543,53 @@ mod tests {
             .metadata(&KeyRef::latest(ns("t"), id("k")))
             .unwrap_err();
         assert_eq!(err, CryptoServiceError::NotFound);
+    }
+
+    #[test]
+    fn lifecycle_is_per_version_and_survives_disable_and_destroy() {
+        let mut store = KeyStore::new();
+        store
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(100))
+            .unwrap();
+        let latest = KeyRef::latest(ns("t"), id("k"));
+        let v1 = KeyRef::versioned(ns("t"), id("k"), KeyVersion::FIRST);
+        assert_eq!(store.lifecycle(&latest).unwrap(), at(100));
+
+        store.rotate(&latest, material(), at(200)).unwrap();
+        let v2 = KeyRef::versioned(ns("t"), id("k"), KeyVersion::new(2).unwrap());
+        assert_eq!(store.lifecycle(&latest).unwrap(), at(200));
+        assert_eq!(store.lifecycle(&v2).unwrap(), at(200));
+        assert_eq!(store.lifecycle(&v1).unwrap(), at(100));
+
+        store.set_state(&v1, KeyState::Disabled).unwrap();
+        assert_eq!(store.lifecycle(&v1).unwrap(), at(100));
+        store.destroy(&v1).unwrap();
+        assert_eq!(store.lifecycle(&v1).unwrap(), at(100));
+        assert_eq!(store.lifecycle(&v2).unwrap(), at(200));
+    }
+
+    #[test]
+    fn lifecycle_unknown_key_or_version_not_found() {
+        let mut store = KeyStore::new();
+        assert_eq!(
+            store
+                .lifecycle(&KeyRef::latest(ns("t"), id("k")))
+                .unwrap_err(),
+            CryptoServiceError::NotFound
+        );
+        store
+            .insert_new(ns("t"), id("k"), algorithm(), material(), at(1))
+            .unwrap();
+        assert_eq!(
+            store
+                .lifecycle(&KeyRef::versioned(
+                    ns("t"),
+                    id("k"),
+                    KeyVersion::new(9).unwrap()
+                ))
+                .unwrap_err(),
+            CryptoServiceError::NotFound
+        );
     }
 
     #[test]

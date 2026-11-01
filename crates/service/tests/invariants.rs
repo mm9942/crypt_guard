@@ -8,9 +8,10 @@ use static_assertions::{assert_impl_all, assert_not_impl_any};
 use crypt_guard_core::pq_hpke::{RecipientContext, RecipientPrivateKey, SenderContext};
 use crypt_guard_service::{
     CryptoOperation, CryptoRequest, CryptoResponse, CryptoService, Decrypt, DescribeKey,
-    DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey, InMemoryProvider,
-    NamespacePolicy, NullProvider, OpSet, PolicyProvider, Principal, RequestContext, RewrapKey,
-    RotateKey, SecretBytes, SecretEgress, Sign, UnwrapKey, Verify, WrapKey,
+    DescribeLifecycle, DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey,
+    InMemoryProvider, KeyLifecycle, NamespacePolicy, NullProvider, OpSet, PolicyProvider,
+    Principal, RequestContext, RewrapKey, RotateKey, SecretBytes, SecretEgress, Sign, UnwrapKey,
+    Verify, WrapKey,
 };
 
 // Secret containers.
@@ -40,6 +41,7 @@ assert_not_impl_any!(DisableKey: Clone);
 assert_not_impl_any!(EnableKey: Clone);
 assert_not_impl_any!(DestroyKey: Clone);
 assert_not_impl_any!(DescribeKey: Clone);
+assert_not_impl_any!(DescribeLifecycle: Clone);
 assert_not_impl_any!(GetPublicKey: Clone);
 assert_not_impl_any!(Verify: Clone);
 assert_not_impl_any!(RewrapKey: Clone);
@@ -62,6 +64,9 @@ assert_impl_all!(PolicyProvider<InMemoryProvider, NamespacePolicy>: Send);
 assert_impl_all!(Principal: Clone);
 assert_impl_all!(RequestContext: Clone);
 assert_impl_all!(OpSet: Clone);
+
+// Lifecycle timestamps are non-secret plain data.
+assert_impl_all!(KeyLifecycle: Copy, Send, Sync);
 
 // Core stateful HPKE contexts and private keys stay linear.
 assert_not_impl_any!(SenderContext: Clone);

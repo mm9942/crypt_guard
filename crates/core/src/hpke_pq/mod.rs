@@ -2736,6 +2736,29 @@ pub mod draft_ietf_hpke_pq_05_full {
                 RecipientPublicKeyInner::Hybrid(value) => value.as_bytes(),
             }
         }
+
+        /// Compute the stable 32-byte fingerprint of this public key.
+        ///
+        /// # Description
+        /// `SHA3-256("crypt_guard/v3/fingerprint/pq-hpke" ‖ 0x00 ‖ kem_id_be16 ‖ len_be32 ‖ pk)`.
+        /// The KEM id is bound in, so identical bytes under different KEMs can never
+        /// share a fingerprint. Use it as a key id in directories and envelopes.
+        ///
+        /// # Concurrency
+        /// Pure function; callable from any thread.
+        pub fn fingerprint(&self) -> [u8; 32] {
+            let bytes = self.as_bytes();
+            // Public keys are at most a few KiB, so the length always fits in u32;
+            // saturate instead of truncating should that ever change.
+            let len = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+            let mut h = Sha3_256::new();
+            sha3::Digest::update(&mut h, b"crypt_guard/v3/fingerprint/pq-hpke");
+            sha3::Digest::update(&mut h, [0u8]);
+            sha3::Digest::update(&mut h, self.kem.id().to_be_bytes());
+            sha3::Digest::update(&mut h, len.to_be_bytes());
+            sha3::Digest::update(&mut h, bytes);
+            h.finalize().into()
+        }
     }
 
     impl fmt::Debug for RecipientPublicKey {

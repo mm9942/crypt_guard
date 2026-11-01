@@ -105,7 +105,7 @@ aes-gcm = { version = "=0.11.0" }
 # key schedule created per message.
 aes = { version = "0.8.4", features = ["zeroize"] }
 aes_09 = { version = "0.9", package = "aes", features = ["zeroize"] }
-sha3 = { version = "=0.11.0" }
+sha3 = { version = "=0.11.0", features = ["zeroize"] }  # wipe SHAKE/SHA3 state that absorbed keys or shares
 turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"] }
 # Direct, pure-Rust traditional components for the revision-pinned concrete
 # hybrid KEMs.  Keep their feature closure minimal: arithmetic only for the

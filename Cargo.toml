@@ -81,6 +81,7 @@ crypt_guard_hyper   = { workspace = true, optional = true }
 hex = "0.4.3"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
+sha3 = "0.11"
 tempfile = "3.10.1"
 trybuild = "=1.0.117"
 turboshake = { version = "=0.7.1", default-features = false, features = ["zeroize"] }

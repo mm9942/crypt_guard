@@ -480,6 +480,7 @@ name = "crypt_guard_service"
 version = "3.1.0"
 dependencies = [
  "crypt_guard_core",
+ "tokio",
  "tower",
  "tower-service",
  "zeroize",

@@ -33,16 +33,70 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 use ml_dsa::{
-    Generate, KeyExport, KeyInit, MlDsa44, MlDsa65, MlDsa87, Signature, SignatureEncoding, Signer,
-    SigningKey, Verifier, VerifyingKey,
+    ExpandedSigningKey, Generate, KeyExport, KeyInit, MlDsa44, MlDsa65, MlDsa87, Seed, Signature,
+    SignatureEncoding, Signer, SigningKey, Verifier, VerifyingKey,
 };
 // Keypair trait provides .verifying_key() on SigningKey.
 use ml_dsa::Keypair as MlDsaKeypairTrait;
 
 use crate::error::CryptError;
 use crate::kem::backend::rand_core_010;
+use crate::kem::backend::rand_core_010::TryRng;
+use crate::kem::backend::TryOsRng;
 use crate::sign::algorithm::SignAlgorithm;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use sha3::{Digest, Sha3_256};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
+/// Length in bytes of an ML-DSA seed `ξ` (FIPS 204, Algorithm 6 input).
+///
+/// # Description
+/// Every ML-DSA parameter set derives its whole key pair from exactly this many
+/// bytes. [`MlDsaSigningKey`] stores the seed, never the expanded key.
+pub const ML_DSA_SEED_LEN: usize = 32;
+
+/// Maximum length in bytes of a FIPS 204 context string.
+///
+/// # Description
+/// FIPS 204 encodes the context length in one byte, so contexts longer than
+/// 255 bytes are rejected with [`CryptError::InvalidParameters`].
+pub const ML_DSA_MAX_CONTEXT_LEN: usize = 255;
+
+/// Length in bytes of a verifying-key fingerprint.
+pub const ML_DSA_FINGERPRINT_LEN: usize = 32;
+
+/// Domain label of [`MlDsa44Impl::fingerprint`] and its siblings.
+const FINGERPRINT_LABEL: &[u8] = b"crypt_guard/v3/fingerprint/ml-dsa";
+
+/// Fixed error text for an unavailable OS entropy source.
+///
+/// # Description
+/// [`CryptError`] has no randomness variant and is not `#[non_exhaustive]`, so
+/// adding one would be a breaking change. The text is constant and carries no
+/// secret data.
+const ENTROPY_UNAVAILABLE: &str = "os entropy source unavailable";
+
+/// Draw a fresh 32-byte ML-DSA seed from the OS without panicking.
+fn fresh_seed() -> Result<Zeroizing<[u8; ML_DSA_SEED_LEN]>, CryptError> {
+    let mut seed = Zeroizing::new([0u8; ML_DSA_SEED_LEN]);
+    TryOsRng
+        .try_fill_bytes(seed.as_mut_slice())
+        .map_err(|_| CryptError::CustomError(ENTROPY_UNAVAILABLE.to_owned()))?;
+    Ok(seed)
+}
+
+/// Convert caller bytes into an ML-DSA [`Seed`], rejecting any other length.
+fn seed_from_slice(bytes: &[u8]) -> Result<Zeroizing<Seed>, CryptError> {
+    let seed = Seed::try_from(bytes).map_err(|_| CryptError::InvalidDataLength)?;
+    Ok(Zeroizing::new(seed))
+}
+
+/// Reject context strings that FIPS 204 cannot encode.
+fn check_context(context: &[u8]) -> Result<(), CryptError> {
+    if context.len() > ML_DSA_MAX_CONTEXT_LEN {
+        return Err(CryptError::InvalidParameters);
+    }
+    Ok(())
+}
 
 /// ML-DSA signing key newtype (secret; `ZeroizeOnDrop`).
 ///
@@ -198,6 +252,227 @@ pub struct MlDsa87Impl;
 impl_ml_dsa!(MlDsa44Impl, MlDsa44);
 impl_ml_dsa!(MlDsa65Impl, MlDsa65);
 impl_ml_dsa!(MlDsa87Impl, MlDsa87);
+
+/// Add the seed, context and fingerprint API to one ML-DSA parameter set.
+///
+/// # Description
+/// These inherent functions are additive to [`SignAlgorithm`]. They never panic:
+/// entropy comes from [`TryOsRng`], every length is checked, and every failure
+/// is returned as a [`CryptError`].
+macro_rules! impl_ml_dsa_ext {
+    ($impl_ty:ty, $param:ty, $id:expr, $vk_len:expr, $sig_len:expr) => {
+        impl $impl_ty {
+            /// Stable parameter-set identifier bound into fingerprints (44, 65 or 87).
+            pub const PARAMETER_SET_ID: u16 = $id;
+            /// Length in bytes of an encoded verifying key of this parameter set.
+            pub const VERIFYING_KEY_LEN: usize = $vk_len;
+            /// Length in bytes of a signature of this parameter set.
+            pub const SIGNATURE_LEN: usize = $sig_len;
+
+            /// Generate a fresh 32-byte seed from the OS entropy source.
+            ///
+            /// # Description
+            /// Store this seed in your key-management boundary; it re-derives the
+            /// same key pair through [`Self::keypair_from_seed`].
+            ///
+            /// # Returns
+            /// The seed in zeroizing memory.
+            ///
+            /// # Errors
+            /// - [`CryptError::CustomError`]: the OS entropy source failed.
+            ///
+            /// # Concurrency
+            /// Stateless; callable from any thread.
+            pub fn generate_seed() -> Result<Zeroizing<[u8; ML_DSA_SEED_LEN]>, CryptError> {
+                fresh_seed()
+            }
+
+            /// Deterministically derive a key pair from a 32-byte seed (FIPS 204 Algorithm 6).
+            ///
+            /// # Arguments
+            /// - `seed` (`&[u8]`): exactly [`ML_DSA_SEED_LEN`] bytes of secret seed.
+            ///
+            /// # Returns
+            /// `(signing_key, verifying_key)`; the signing key stores only the seed.
+            ///
+            /// # Errors
+            /// - [`CryptError::InvalidDataLength`]: `seed` is not 32 bytes long.
+            ///
+            /// # Concurrency
+            /// Pure function; callable from any thread.
+            pub fn keypair_from_seed(
+                seed: &[u8],
+            ) -> Result<(MlDsaSigningKey, MlDsaVerifyingKey), CryptError> {
+                let seed = seed_from_slice(seed)?;
+                let sk = SigningKey::<$param>::from_seed(&seed);
+                let vk: VerifyingKey<$param> = MlDsaKeypairTrait::verifying_key(&sk);
+                let vk_bytes = KeyExport::to_bytes(&vk).as_slice().to_vec();
+                Ok((
+                    MlDsaSigningKey::from_bytes(seed.as_slice().to_vec()),
+                    MlDsaVerifyingKey::from_bytes(vk_bytes),
+                ))
+            }
+
+            /// Generate a key pair from OS entropy without any panic path.
+            ///
+            /// # Description
+            /// Unlike [`SignAlgorithm::keypair`] with `OsRng`, an entropy failure
+            /// is returned as an error instead of a panic.
+            ///
+            /// # Errors
+            /// - [`CryptError::CustomError`]: the OS entropy source failed.
+            ///
+            /// # Concurrency
+            /// Stateless; callable from any thread.
+            pub fn try_keypair() -> Result<(MlDsaSigningKey, MlDsaVerifyingKey), CryptError> {
+                let seed = fresh_seed()?;
+                Self::keypair_from_seed(seed.as_slice())
+            }
+
+            /// Recompute the verifying key that belongs to a stored signing key.
+            ///
+            /// # Arguments
+            /// - `sk` (`&MlDsaSigningKey`): the seed-backed signing key.
+            ///
+            /// # Errors
+            /// - [`CryptError::InvalidDataLength`]: the stored seed is not 32 bytes long.
+            ///
+            /// # Concurrency
+            /// Pure function; callable from any thread.
+            pub fn verifying_key_from_seed(
+                sk: &MlDsaSigningKey,
+            ) -> Result<MlDsaVerifyingKey, CryptError> {
+                Self::keypair_from_seed(sk.as_bytes()).map(|(_, vk)| vk)
+            }
+
+            /// Sign `message` under a FIPS 204 context string with hedged randomness.
+            ///
+            /// # Description
+            /// Uses the randomized ("hedged") ML-DSA.Sign variant: 32 fresh bytes
+            /// from [`TryOsRng`] are mixed into the signing nonce, which protects
+            /// against fault and side-channel attacks on devices such as phones.
+            /// Use a distinct `context` per purpose (domain separation).
+            ///
+            /// # Arguments
+            /// - `sk` (`&MlDsaSigningKey`): the seed-backed signing key.
+            /// - `message` (`&[u8]`): the bytes to sign.
+            /// - `context` (`&[u8]`): FIPS 204 context, at most 255 bytes.
+            ///
+            /// # Errors
+            /// - [`CryptError::InvalidParameters`]: `context` is longer than 255 bytes.
+            /// - [`CryptError::InvalidDataLength`]: the stored seed is not 32 bytes long.
+            /// - [`CryptError::CustomError`]: the OS entropy source failed.
+            ///
+            /// # Concurrency
+            /// Stateless; callable from any thread.
+            pub fn sign_with_context(
+                sk: &MlDsaSigningKey,
+                message: &[u8],
+                context: &[u8],
+            ) -> Result<MlDsaSignature, CryptError> {
+                check_context(context)?;
+                let seed = seed_from_slice(sk.as_bytes())?;
+                // `ExpandedSigningKey` zeroizes itself on drop (ml-dsa `zeroize` feature).
+                let expanded = ExpandedSigningKey::<$param>::from_seed(&seed);
+                let sig = expanded
+                    .sign_randomized(message, context, &mut TryOsRng)
+                    .map_err(|_| CryptError::CustomError(ENTROPY_UNAVAILABLE.to_owned()))?;
+                Ok(MlDsaSignature(sig.to_vec()))
+            }
+
+            /// Sign under a context string with the deterministic FIPS 204 variant.
+            ///
+            /// # Description
+            /// Produces reproducible signatures. Intended for known-answer tests and
+            /// interoperability checks; prefer [`Self::sign_with_context`] in production.
+            ///
+            /// # Errors
+            /// - [`CryptError::InvalidParameters`]: `context` is longer than 255 bytes.
+            /// - [`CryptError::InvalidDataLength`]: the stored seed is not 32 bytes long.
+            ///
+            /// # Concurrency
+            /// Pure function; callable from any thread.
+            pub fn sign_with_context_deterministic(
+                sk: &MlDsaSigningKey,
+                message: &[u8],
+                context: &[u8],
+            ) -> Result<MlDsaSignature, CryptError> {
+                check_context(context)?;
+                let seed = seed_from_slice(sk.as_bytes())?;
+                let expanded = ExpandedSigningKey::<$param>::from_seed(&seed);
+                let sig = expanded
+                    .sign_deterministic(message, context)
+                    .map_err(|_| CryptError::InvalidParameters)?;
+                Ok(MlDsaSignature(sig.to_vec()))
+            }
+
+            /// Verify a signature produced under a FIPS 204 context string.
+            ///
+            /// # Description
+            /// Verification with an empty `context` accepts signatures from
+            /// [`SignAlgorithm::sign`], which signs with the empty context.
+            ///
+            /// # Errors
+            /// - [`CryptError::SignatureVerificationFailed`]: malformed key or
+            ///   signature, oversized context, or a signature that does not verify.
+            ///
+            /// # Concurrency
+            /// Pure function; callable from any thread.
+            pub fn verify_with_context(
+                vk: &MlDsaVerifyingKey,
+                message: &[u8],
+                context: &[u8],
+                sig: &MlDsaSignature,
+            ) -> Result<(), CryptError> {
+                if context.len() > ML_DSA_MAX_CONTEXT_LEN {
+                    return Err(CryptError::SignatureVerificationFailed);
+                }
+                let verifying_key = VerifyingKey::<$param>::new_from_slice(vk.as_bytes())
+                    .map_err(|_| CryptError::SignatureVerificationFailed)?;
+                let signature = Signature::<$param>::try_from(sig.as_ref())
+                    .map_err(|_| CryptError::SignatureVerificationFailed)?;
+                if verifying_key.verify_with_context(message, context, &signature) {
+                    Ok(())
+                } else {
+                    Err(CryptError::SignatureVerificationFailed)
+                }
+            }
+
+            /// Compute the stable fingerprint of a verifying key.
+            ///
+            /// # Description
+            /// `SHA3-256("crypt_guard/v3/fingerprint/ml-dsa" ‖ 0x00 ‖ id_be16 ‖ len_be32 ‖ vk)`,
+            /// where `id` is [`Self::PARAMETER_SET_ID`]. The parameter set is bound
+            /// in, so the same bytes can never collide across parameter sets.
+            ///
+            /// # Errors
+            /// - [`CryptError::InvalidDataLength`]: `vk` is not a valid key of this
+            ///   parameter set.
+            ///
+            /// # Concurrency
+            /// Pure function; callable from any thread.
+            pub fn fingerprint(
+                vk: &MlDsaVerifyingKey,
+            ) -> Result<[u8; ML_DSA_FINGERPRINT_LEN], CryptError> {
+                VerifyingKey::<$param>::new_from_slice(vk.as_bytes())
+                    .map_err(|_| CryptError::InvalidDataLength)?;
+                let len = u32::try_from(vk.as_bytes().len())
+                    .map_err(|_| CryptError::InvalidDataLength)?;
+                let mut h = Sha3_256::new();
+                Digest::update(&mut h, FINGERPRINT_LABEL);
+                Digest::update(&mut h, [0u8]);
+                Digest::update(&mut h, Self::PARAMETER_SET_ID.to_be_bytes());
+                Digest::update(&mut h, len.to_be_bytes());
+                Digest::update(&mut h, vk.as_bytes());
+                Ok(h.finalize().into())
+            }
+        }
+    };
+}
+
+impl_ml_dsa_ext!(MlDsa44Impl, MlDsa44, 44, 1312, 2420);
+impl_ml_dsa_ext!(MlDsa65Impl, MlDsa65, 65, 1952, 3309);
+impl_ml_dsa_ext!(MlDsa87Impl, MlDsa87, 87, 2592, 4627);
 
 #[cfg(test)]
 mod tests {

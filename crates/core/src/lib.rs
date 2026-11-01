@@ -35,6 +35,15 @@
 //! accepted by these APIs. AES-256-GCM-SIV and XChaCha20-Poly1305 are explicit
 //! crypt_guard private extensions and require [`pq_hpke::HpkeEnvelope`].
 //!
+//! ## Two-layer envelope
+//!
+//! [`pq_cascade`] adds a keyed AEAD with a fixed 32-byte overhead for every
+//! scheme (ChaCha20-Poly1305, AES-256-GCM-SIV, XChaCha20-Poly1305, or the
+//! AES-256-GCM-SIV + XChaCha20-Poly1305 cascade), a random-nonce mode, and a
+//! two-layer [`pq_hpke::HpkeEnvelope`] under [`pq_cascade::MAXIMAL_SUITE`]
+//! with a single KEM encapsulation. It is purely additive;
+//! [`pq_hpke::DEFAULT_SUITE`] is unchanged.
+//!
 //! ## CGv2 migration
 //!
 //! CGv2 is not a v3 default API or transport. Enable `cgv2-compat` only to read
@@ -95,14 +104,26 @@ pub mod hpke_pq;
 pub mod kdf;
 /// ML-KEM backend trait and ML-KEM-512/768/1024 implementations (FIPS 203).
 pub mod kem;
+/// Two-layer cascade AEAD (AES-256-GCM-SIV + XChaCha20-Poly1305), random-nonce
+/// mode, and the "Maximal" single-encapsulation HPKE cascade envelope.
+pub mod pq_cascade;
 /// Canonical v3 PQ HPKE transport API.
 pub mod pq_hpke;
+/// Multi-recipient PQ HPKE seal bound to the recipient set (group messages).
+#[cfg(feature = "ml-kem-backend")]
+pub mod pq_multi;
+/// STREAM chunked AEAD (ChaCha20-Poly1305) with a final-chunk flag, for files.
+pub mod pq_stream;
+/// Labelled SHAKE256 PRF/KDF for identifiers, capabilities and sub-keys.
+pub mod prf;
 /// Internal CGv2 authenticated-envelope implementation for compatibility
 /// migrations only.
 ///
 /// New applications should use [`pq_hpke`].
 #[cfg(feature = "cgv2-compat")]
 pub mod protocol;
+/// Shamir secret sharing over GF(2^8) with attributable share commitments.
+pub mod sharing;
 /// SignAlgorithm trait and ML-DSA/SLH-DSA implementations (FIPS 204/205).
 pub mod sign;
 /// Application-layer, explicitly versioned signatures over HPKE transport bindings.

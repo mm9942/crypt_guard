@@ -9,6 +9,107 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- ML-DSA (`MlDsa44Impl`, `MlDsa65Impl`, `MlDsa87Impl`), all additive and
+  panic-free:
+  - `generate_seed`, `keypair_from_seed`, `try_keypair` and
+    `verifying_key_from_seed`: seed-based key management without the
+    panicking `OsRng` path;
+  - `sign_with_context` (hedged, FIPS 204 randomized variant via `TryOsRng`),
+    `sign_with_context_deterministic` (for known-answer tests) and
+    `verify_with_context`;
+  - `fingerprint`: `SHA3-256` key id bound to the parameter set;
+  - constants `PARAMETER_SET_ID`, `VERIFYING_KEY_LEN`, `SIGNATURE_LEN`,
+    plus `ML_DSA_SEED_LEN`, `ML_DSA_MAX_CONTEXT_LEN`, `ML_DSA_FINGERPRINT_LEN`.
+- `pq_hpke::RecipientPublicKey::fingerprint`: `SHA3-256` key id bound to the KEM.
+- Vendored LAMPS / RFC 9881 example keys
+  (`crates/core/tests/vectors/ml-dsa-lamps-example-keys.json`) as a
+  known-answer test for seed-based key derivation.
+- `SECURITY.md` is now actually tracked (it was excluded by `.gitignore`).
+- `scripts/release_checks.sh` runs `cargo semver-checks` before a release.
+- Building blocks for messengers (new modules, additive, panic-free; the
+  randomness they draw themselves comes from `TryOsRng`):
+  - `prf`: labelled SHAKE256 PRF/KDF (`prf`, `prf32`) for identifiers,
+    capabilities and sub-keys; label, key, input and output length are all
+    bound into the derivation.
+  - `sharing`: Shamir secret sharing over GF(2^8) (`split`, `combine`,
+    `Share`) with constant-time field arithmetic, and SHA3-256 share
+    commitments (`commitment`, `verify_commitment`, `check_commitment`) that
+    attribute a bad share to its holder; typed `SharingError`
+    (`From<SharingError> for CryptError`).
+  - `pq_stream`: STREAM chunked AEAD with ChaCha20-Poly1305
+    (`StreamEncryptor`, `StreamDecryptor`, final chunk consumes the state),
+    detecting reordering, truncation, extension and tampering;
+    `derive_stream_key`, `random_prefix`.
+  - `pq_multi` (feature `ml-kem-backend`): multi-recipient seal bound to the
+    recipient set (`seal_multi`, `open_multi`, `recipient_set_hash`,
+    `dummy_wrap`, `MultiRecipientCiphertext::check_recipient_set`).
+- `pq_hpke::HpkeEnvelope::open_pinned_zeroizing`: rejects a record whose wire
+  suite differs from the locally pinned suite before decapsulation.
+- `tests/m0_ext_primitives.rs` with known-answer vectors computed
+  independently with Python `hashlib`.
+- `crypt_guard_service`: `try_network_handle` (feature `buffer`), the
+  panic-free variant of `network_handle`: `Unavailable` without a Tokio
+  runtime, `Malformed` for a zero or oversized `queue_bound`/`max_in_flight`.
+  `buffer` now depends on `tokio` (`rt`, `sync`) directly; it was already
+  pulled in by `tower/buffer`.
+- `crypt_guard_service`: per-version key lifecycle metadata. `KeyLifecycle`
+  (`created_at_unix_ms`, optional `not_before`/`not_after`/`destroy_after`,
+  builder `with_*`, `is_within_validity`, `is_destruction_due`),
+  `CryptoOperation::DescribeLifecycle` / `CryptoResponse::Lifecycle`,
+  `OpKind::DescribeLifecycle` (`"describe_lifecycle"`, own `OpSet` bit,
+  included in `OpSet::READ_PUBLIC`). `InMemoryProvider` stamps creation
+  times at generate/rotate; `InMemoryProvider::with_clock` injects a clock.
+- `pq_cascade` (new module, additive, panic-free): a selectable one- or
+  two-layer AEAD over caller-supplied 32-byte keys, plus a two-layer variant of
+  the `HpkeEnvelope` (`CGH3`) container, for the "Maximal" protection level of
+  messengers. Nothing existing changes: `DEFAULT_SUITE`, `pq_hpke`, `pq_stream`
+  and `pq_multi::seal_multi` keep their signatures and wire formats.
+  - `Scheme` (non-exhaustive): `ChaCha20Poly1305` = 1, `Aes256GcmSiv` = 2,
+    `XChaCha20Poly1305` = 3 and `Cascade` = 4 (AES-256-GCM-SIV inside,
+    XChaCha20-Poly1305 outside). Every scheme expands the plaintext by exactly
+    32 bytes (`CASCADE_OVERHEAD`); the single-layer schemes carry 16 zero
+    filler bytes inside the AEAD, so the scheme cannot be read from the length.
+  - `Cascade`: independent sub-keys per scheme and caller `domain` from one
+    32-byte root key via `prf32`; the scheme id is part of every key and of the
+    AAD of every layer. `seal`/`open` take a `CascadeNonce` (`Counter` for
+    session frames, `Stream` for file chunks, same layout as `pq_stream`);
+    `seal_once` consumes the `Cascade` and derives the nonce from the key, so
+    one key can never seal two messages. In-place variants avoid copies.
+  - `seal_random`/`open_random`: random 192-bit nonce per value (`TryOsRng`),
+    for stored values.
+  - `MAXIMAL_SUITE` (`MlKem1024P384`, `Shake256`, `XChaCha20Poly1305`),
+    `seal_envelope`/`open_envelope`: AES-256-GCM-SIV inside, the HPKE
+    XChaCha20-Poly1305 context outside, with one KEM encapsulation. The result
+    is a normal `HpkeEnvelope`; the suite is pinned before decapsulation.
+  - `CascadeSealer`/`CascadeOpener`: one-shot wrappers around an HPKE context
+    for protocols that control `enc` and exporters themselves.
+  - Every open failure is the same `CryptError::AuthenticationFailed`; keys
+    and intermediate plaintext live in `Zeroizing` buffers.
+- `pq_multi` (feature `ml-kem-backend`): `seal_multi_cascade`,
+  `open_multi_cascade`, `dummy_cascade_wrap` and `WRAP_PAYLOAD_LEN`. The body
+  uses any `Scheme`; every wrap is a `MAXIMAL_SUITE` cascade envelope of
+  `version ‖ scheme_id ‖ CEK` (1 751 bytes whatever the scheme, so the body
+  scheme is invisible to relays). `open_multi_cascade` calls an `accept`
+  callback with the scheme before the body is decrypted (minimum-level
+  policies) and returns one opaque error for every failure. The recipient-set
+  binding is the same as for `seal_multi`.
+- Known-answer vectors for `pq_cascade` and `pq_multi`'s cascade variant,
+  computed independently with a Python reference model (`hashlib` plus
+  `cryptography`): `crates/core/tests/vectors/pq-cascade-kats.json` (listed in
+  `SHA256SUMS`) and `tests/pq_cascade_kats.rs`. The model itself is
+  `crates/core/tests/vectors/pq_cascade_ref.py`; `pq_cascade_kats_gen.py`
+  regenerates the JSON byte for byte (`python3 -I`).
+- Documented limitation (see `SECURITY.md`): `aes-gcm-siv`'s POLYVAL sub-keys
+  of the AES-256-GCM-SIV layer are not reliably wiped from freed memory
+  (upstream `polyval` 0.6.2); the root key and the layer keys are unaffected.
+
+### Changed
+- `OpSet::READ_PUBLIC` (and `ALL`) now include `DescribeLifecycle`; grants
+  built from `OpKind::Describe` alone must add `OpKind::DescribeLifecycle`.
+- `sha3` is built with its `zeroize` feature, so hash state that absorbed
+  keys or shares is wiped on drop.
+
 ## [3.1.0] - 2026-09-27
 
 ### Added
