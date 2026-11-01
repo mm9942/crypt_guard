@@ -1,6 +1,8 @@
-# SHA-256 manifest for vendored HPKE and ML-DSA test vectors.
+# SHA-256 manifest for vendored HPKE and ML-DSA test vectors and the generated
+# pq_cascade known-answer vectors (python3 -I model of the cipher-suite contract).
 #
 # Format: <64 lowercase hexadecimal SHA-256 characters> *<basename>
 61fc662f01996cd06d713dacf5e133167bd309a1f329442d53f1e21a47b3ede6 *rfc9180-test-vectors.json
 35c59f4a0132e5631e50ac039d8ca3a72e99f5e92dfd94d45338d6ae243f613c *hpke-pq-draft-05-test-vectors.json
 669ba93a3fe13e10519c85e61e91aab0dfb375aa602a473d40d077ab45212253 *ml-dsa-lamps-example-keys.json
+747be0de77ae9a21f5ae96f85137a7114ad67aedb70df69628bba11ca72f8dbc *pq-cascade-kats.json

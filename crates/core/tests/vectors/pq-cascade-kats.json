@@ -1,0 +1,1026 @@
+{
+ "source": "Reference model of Anhang A (docs/plans/cipher-suite-contract.md in the comnet repository), run with python3 -I; same text as crates/core/tests/vectors/pq_cascade_ref.py. Regenerate with that model; do not edit by hand.",
+ "contract_sections": [
+  "2.2.3",
+  "2.2.6",
+  "Anhang A"
+ ],
+ "format": "all binary values are lowercase hex; ct = AEAD output, |ct| = |pt| + 32; sealed = n24 || ct (random mode); domain_byte/n/index are decimal (n is a string to carry the full u64)",
+ "labels": {
+  "L_IN": "crypt_guard/v3/cascade/inner",
+  "L_OUT": "crypt_guard/v3/cascade/outer",
+  "L_ONE": "crypt_guard/v3/cascade/single",
+  "L_NONCE": "crypt_guard/v3/cascade/nonce",
+  "L_RANDOM": "crypt_guard/v3/cascade/random",
+  "A_IN": "crypt_guard/v3/cascade/aad/inner",
+  "A_OUT": "crypt_guard/v3/cascade/aad/outer",
+  "A_ONE": "crypt_guard/v3/cascade/aad/single"
+ },
+ "primitive_selftest": {
+  "xchacha20_poly1305_draft_irtf_cfrg_xchacha_03_a31": {
+   "key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+   "nonce": "404142434445464748494a4b4c4d4e4f5051525354555657",
+   "aad": "50515253c0c1c2c3c4c5c6c7",
+   "ct_first16": "bd6d179d3e83d43b9576579493c0e939",
+   "tag": "c0875924c1c7987947deafd8780acf49"
+  }
+ },
+ "cases": [
+  {
+   "name": "main",
+   "root": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+   "domain": "63727970745f67756172642f746573742f63617363616465",
+   "domain_text": "crypt_guard/test/cascade",
+   "aad": "6161642d31",
+   "pt": "63617363616465206b6e6f776e20616e73776572",
+   "subkeys": {
+    "4": {
+     "scheme": "Cascade",
+     "ctx": "040000001863727970745f67756172642f746573742f63617363616465",
+     "k_in": "29eecf9a61cb966250a804b1e531c86ace2802ab217d9a1b8800d74a3cef0292",
+     "k_out": "0b6df53cdb3e6329fe08c6fe5407857f7e29b8d36f26315da007695562b214f9",
+     "k_one": "583d269f6ab03d2bcadf39dd2fbd9abd774c26f143df0ce9c6f972e9389589bd",
+     "nonce_once": "e0fbac1160eeeec3cdf30d68d18a7586b88e68d6be2858af"
+    },
+    "3": {
+     "scheme": "XChaCha20Poly1305",
+     "ctx": "030000001863727970745f67756172642f746573742f63617363616465",
+     "k_in": "783c5dc55d1e82178365c00a25444277b8e4b9c5d9abefd95d88a7a9d170feac",
+     "k_out": "835ff184c0fdfde0b7f70f8de284d56b3bdd866ad674167bac56778af2d8d119",
+     "k_one": "58d81669dd4795a3b6a4da233d5457f79b593db66e6255e74776987d035f0b2a",
+     "nonce_once": "995dd25c4fb1dd4a3ad3086ce04d7fc60192be8201fccf11"
+    },
+    "2": {
+     "scheme": "Aes256GcmSiv",
+     "ctx": "020000001863727970745f67756172642f746573742f63617363616465",
+     "k_in": "7be9cf15c20dfd589cd03f3835f03311f3a1a3293b160ef1464493e9b6e43d90",
+     "k_out": "9d296bcb8efd7dba3d7442615726e20a7e8560117abbd5519a0adfb2486fe1af",
+     "k_one": "2102f5469119816ad0d688e01cc989dca845c9218b012a48509ce5a5ebcd5a7c",
+     "nonce_once": "45f49b55ac265a6d0068ce472dfe619bb6a0cd9f6c45ed69"
+    },
+    "1": {
+     "scheme": "ChaCha20Poly1305",
+     "ctx": "010000001863727970745f67756172642f746573742f63617363616465",
+     "k_in": "5ba547f66b5c61731de3b7c8c339bd8875dc711e50848ca30b19acf265138305",
+     "k_out": "fde3a9a167ce4a843c42f04c778447f790df4a3576f0f29f2b94903266fa8b06",
+     "k_one": "36ff7bfbe6df1ee33b991468ce48b8b1a2001e47ceb6a318e4debb7c4f007195",
+     "nonce_once": "578d32725f38fa5471b7e6c325ae2d085b6f5da7ed58432e"
+    }
+   },
+   "vectors": [
+    {
+     "id": "counter/Cascade/1/5",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "71b3d7c5e2cc0ec27edec4dd0949e0039d80207ee810c95567adb765640b7c1a79b269fe0bba036e20b52090685895bbe46fc06b"
+    },
+    {
+     "id": "counter/Cascade/2/72623859790382856",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "bbba9bcb41bd9aa44d00b15965a756e8342c2df9f6584995584f105739ecc477ac39c1b7c0c50b4abd037ef61a1ecca7550e367a"
+    },
+    {
+     "id": "once/Cascade",
+     "scheme": 4,
+     "mode": "once",
+     "n24": "e0fbac1160eeeec3cdf30d68d18a7586b88e68d6be2858af",
+     "ct": "a649da40579f391994babd7f2ebef1217b13efe922f5cf6c61ff6723237ff270c0e65d57be1c5d7107dad7fe419dc59ccc362f10"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "1af3e77dec051584db464a63a695e45d63d1eb26835926adca9508b0bfa12878d6d2093f2d80cd13c032e4af8c1b63604010f18b"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "1ce90b5ed61e3be892e424ae37b90dca8041e4ccffd3b8b12707a4b6abb1e346a09202e1de2a5ff3452270d8d91de6de73fe0dcf"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/4294967295/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "1e642f7f17a9565ec7042c491ef95ac16f3678a0e7a3aaa3902671afb0b05ac85a6d1869f9e6bc99eadaaab208ca27f1c7c0b5f3"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/0/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "7e792cf1e42035cd620f3cd9509fc683b922d527d52c63ba30381fb4b5b818f834a1f7773c82c9f6fcbeb40ae3a2218f78fd0417"
+    },
+    {
+     "id": "random/Cascade",
+     "scheme": 4,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7057f374419c4fdc4aae3e6a494831e67db98e6ef20e3f00f27501fbaf827112c2df118fa802cc302a0f0e41019ab7084def2c80d"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/1/5",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "432f81fce4584c0be14cc6e5641387f84f21c702fb8ce953256ab62e90e182ff7c3f16972f93fd002116bb28f25953f67e36778c"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/2/72623859790382856",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "7c3922cce9a05c4b6d2335794c6b56dc51321fd050fe39b27e21aea905dfec3c43b4175fbde67aadf538b34abe33644dbc2cced3"
+    },
+    {
+     "id": "once/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "once",
+     "n24": "995dd25c4fb1dd4a3ad3086ce04d7fc60192be8201fccf11",
+     "ct": "dcfa76956289816bc5e41abf0f0d43a07692602aa44ed867e5421a97187b1ad78ccf902cacf91dcbd2ec283a99493f2df5fe5a66"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "2717fd1b0c76f9cfc533f9d2d889b397bc1b652e9e7b9516de9ab9036ec2fd6d6922f875519c602a5babc293a8dcfa92d6ddbc08"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "26cbaa1036f491739275000ec407f17c58ea88f8b31823dc7fe97c5d604611f7f03932a2f57a318d0461470711741d8635d9088e"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "ead3a667ca0cbd322453ea74ea17a37652cd63d064a1e5d2e9e8e8f09ba7a5956a84a791a7caacb296d0e3c56c632db067d17a42"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "2af13da1f2eb30311b55e11cafb962f867449deba23e28ad8c608bed736a502f91e4261b5b71834d3cf26e44979c43002df5b04f"
+    },
+    {
+     "id": "random/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b78494ed04dd0b3c9f06777616d067b1dfd539de95fe3e71946370dd4615618170954cae1be1ef20bff322e4663db30db37832c4ac"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/1/5",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "b6428725da3ab72ca71605ae5c0e93fd9e8729215eff00d1c88dbd2c03649960632d737c8a28c82812d90adce5a5db899b5fc2f5"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/2/72623859790382856",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "07541deac647e02174ecdc3b2e8f51560d48dd3917bc7f113bba7a1d4089d8cd9254c3f9aeeee217529efd1745f74a0e21930b45"
+    },
+    {
+     "id": "once/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "once",
+     "n24": "45f49b55ac265a6d0068ce472dfe619bb6a0cd9f6c45ed69",
+     "ct": "19754ce11f6f7c0b3f2a6e68d6071b89ca5bc6e120eaa5f27abfcd4d665063a158d4445966e6cdfbbdbda70cd0b9a231c6723beb"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "3a1730a82622c9fa5643863251efd4a1a7be525fa81cab1eafb6e1f28ba4468cee67db6285e7b013c843744981c95bee60f8c331"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "ceef288735dd32dcf8df9dacef181f89866c5184cc6420247c253d663a394d7606fe3bf51b1897cdbc1c0024283cc65b002eaaab"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/4294967295/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "d1ddd729d0516f10ffd23d79c0079c52138588b23bfddf6f8258e9b106c01caf9a00dac375fb49d8414bdffcd793385b555a6a60"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/0/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "dfe672d745b86001e28cabc275cf1cce49957556d5dd7f1357c34ba9e7af8fd926076ff8e71e6d3c85a80e0e10812290ce994a47"
+    },
+    {
+     "id": "random/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b73d3191633bfc5e7b4f2e1f014cc1bc0031597c9889986cbc8935957fc5cc4de57a70444ca42a879dac9caddb3fd42dc7a6f1d431"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/1/5",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "975ab325c73f69cf5e2633291eb9d7384a7b4893189aa5e581391226b9ed33f89dea2a5784b25164f3e542f1ec3c52d9ef4ecc4c"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/2/72623859790382856",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "7e7282ac1e42821bd6aa023bef11b3f6b18e577788485f59207f7600344aa88fdf986da52782b7c9c15067ab9a54fefb0dac45d6"
+    },
+    {
+     "id": "once/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "once",
+     "n24": "578d32725f38fa5471b7e6c325ae2d085b6f5da7ed58432e",
+     "ct": "e8bcf516fa6c771c812493cfa955fa9e059d2bb3d741f6123c1ff2418e1989bca08f3bb25605ca74ccfb6eb32acb9512b0881117"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "ec640920f6c0d61458ac45df2ebb8968cd9c6475c61709308d78759d20e2628e035178396d8825f71d4d3e22d230852e06c6eab6"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "4d530c4345fc5dfae62d1188515be2341bc6aef004292691e80da324bd02efd2e8f85b90c3a73bc79d09d77b53792f3b6ab4ec69"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "68910ae5c9a930c21496be21b5be4226ffa15f3e77db62591579ddff7c99787966a95e3e5be5a1bda8c0ce455b636500e917e366"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "e133ea82e0a3ef037485c30a680db581bcace6558f8049a772889b956aa15c55c78062adfae8c52ea9f686ce9a26edeb4fb99cc4"
+    },
+    {
+     "id": "random/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7223b95e1ec2a0be7b7d29680de01fcb9821bf7f60d038302c4f50cc9d014d367329279047dc242a790b308e83f196f270eb904a8"
+    }
+   ]
+  },
+  {
+   "name": "empty",
+   "root": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+   "domain": "636f6d6e65742f73657373696f6e2f6672616d652f7631",
+   "domain_text": "comnet/session/frame/v1",
+   "aad": "",
+   "pt": "",
+   "subkeys": {
+    "4": {
+     "scheme": "Cascade",
+     "ctx": "0400000017636f6d6e65742f73657373696f6e2f6672616d652f7631",
+     "k_in": "e523b412620597b740a3445dcf725d6f38717307b3381d8a1cc04b9fd519efdf",
+     "k_out": "51e45d262c0445bcd903e50a94bfdbe17d803fe6310090dc9ccc18a405208b6a",
+     "k_one": "d8cf8c17e592971775c8eedbe57116f43c047dee1c9fe7245f527d97b2992744",
+     "nonce_once": "f2334b9e9ead641cdabd7f070cef65068aab0128a7db4b25"
+    },
+    "3": {
+     "scheme": "XChaCha20Poly1305",
+     "ctx": "0300000017636f6d6e65742f73657373696f6e2f6672616d652f7631",
+     "k_in": "67056029b2be05c964ef6c974904b117f76723397c253ff298e9eb20752f0538",
+     "k_out": "7409a5db39d72ddc1480deefd5ce40183422d31654ec4a0e19e32058310fa26d",
+     "k_one": "a6b83f4feb5b2f54be2ef4676d4821fd4d5d7b2a1bc800cda5c0a927d47158f2",
+     "nonce_once": "840bffc20ebd1c2c03add525d1121cf76544f275c621454f"
+    },
+    "2": {
+     "scheme": "Aes256GcmSiv",
+     "ctx": "0200000017636f6d6e65742f73657373696f6e2f6672616d652f7631",
+     "k_in": "8e9b0ce8dfe62d8868c8bd89819fa5168b6037d73a9939618653387342812178",
+     "k_out": "660592e2215bdf3d1163a6788fe16510571438f47265caedef2b4a8b3461672f",
+     "k_one": "8d5457e9ab98ecbf44a840d4e0c8390c56b7bd3d6021139cdf2eadd95e9b1438",
+     "nonce_once": "83366f899d82332bec4890730e9e08e60d2216cf63cf7924"
+    },
+    "1": {
+     "scheme": "ChaCha20Poly1305",
+     "ctx": "0100000017636f6d6e65742f73657373696f6e2f6672616d652f7631",
+     "k_in": "a30d79a3580b3ed3c2e5a87896125863061c5e8f2b9d0815d02496a75bafb1fd",
+     "k_out": "1a42342319e5d94137acf5be3797ed7ea0a87900ed5386fe46b9840d7c6f307d",
+     "k_one": "16fec4f072a8d8030f2194c52339caaba78a6f842108565908400ccaf141097b",
+     "nonce_once": "7c98ffc9c1232e93a73c90d11df7933c2669cc685e131cad"
+    }
+   },
+   "vectors": [
+    {
+     "id": "counter/Cascade/1/5",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "c6bf542cfd099bea221aa506cc7f56b4abc82a16cebfc0d82648822282227722"
+    },
+    {
+     "id": "counter/Cascade/2/72623859790382856",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "dc3a535d7d2827c4490ebf3903a4422c89a6980d5496c761c33dcb835dce965e"
+    },
+    {
+     "id": "once/Cascade",
+     "scheme": 4,
+     "mode": "once",
+     "n24": "f2334b9e9ead641cdabd7f070cef65068aab0128a7db4b25",
+     "ct": "10706bb1f42ec4867ba40c4b5a53f745ec02e1b3b3d7b8124b637eeb9ffbfcf1"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "d72c58d08c28d3b109ee18d9814fdaa77938fad2ecb123a05d0d0ab49554c6d5"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "98bcc6f1fb3410186cf08c8e04f72298742143203d83ec74fae340adb9b91bf8"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/4294967295/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "a33f30d32686856ab2ec33422fd86e1016d61f3686b905c6a85fc5e6a108595a"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/0/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "ee9cfc98bd9072a1dcc33980b4eea6684bd096bc176c34d25811656b1bcbf02f"
+    },
+    {
+     "id": "random/Cascade",
+     "scheme": 4,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7a9da6387ccc0b74a556d2a7f913ba0261e156e66092bcd26bc19b6e478f5cb84"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/1/5",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "23ebcc492326e0cb2dbc63ee82e938964a5b46b6413dc2531abf3db60b305048"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/2/72623859790382856",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "9afee32d410bc99d7711d981ea91e1d6bce8925b36d09e7fa3b24b023b2cae32"
+    },
+    {
+     "id": "once/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "once",
+     "n24": "840bffc20ebd1c2c03add525d1121cf76544f275c621454f",
+     "ct": "6e35efe1a06c78ecd283a9f1c8df6b532a13acf66db8c80d1c91a611649a7b1e"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "22f4069d26600bbbf15aaaf605cfef8164395f1a3ecc3b57bf4f0dd8843908de"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "578409bc705881e46c8d8607f7e014d72c783125365d84e323a64254977c22b8"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "ca1a55ee5c2b6b68ceabba8fc303705347bbfbb4f5b1e115a98b29a572cb8b3d"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "145023c29fa67eadf01b3580d7e15e0c1a76f7cac0679a495bcef1ae4183443d"
+    },
+    {
+     "id": "random/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7de97410b9fe487575684fcc436a41e7798eabe964cd72bc0e6399d5a816308f4"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/1/5",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "e0df729ebe8c83ea38b8afaad02c3c6676926ff2a7fb5124e5d41bfe612d6cc6"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/2/72623859790382856",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "f378424b24b5f18d946a3eb4c4da6cd437d90ff0eeb47abde427c1b298db74ca"
+    },
+    {
+     "id": "once/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "once",
+     "n24": "83366f899d82332bec4890730e9e08e60d2216cf63cf7924",
+     "ct": "001c52c6a86e0ad6de3ed9f2fca1636000a913af8175bc73dc7d65380a79ff75"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "887f6d1c96de0afae9cfc46a39f72b79457149395242cfd12e7b3d287c16e355"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "de8e74402864c3f9441581f331103f1532f09d8b12fac6f4174679f6b2f9c51b"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/4294967295/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "ec8368b0182a9459d648054b9a5c549180eb86df5fa26c080e2d0db447f9589b"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/0/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "16c0a12ec5efd7901c5221baad8fdf73e51cba5a117b727253efeeebc463358a"
+    },
+    {
+     "id": "random/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b770065544410cfab0880c1aab91f954e7a69def90848f89ccc752d393f1a3bac3"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/1/5",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "848ffcf00a1546d30aa263e1f30e40990227287c38cf9ac6b7d76735768fa8fd"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/2/72623859790382856",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "122a24d7e9e18718e8171a3222657a8e492d2c1f57a0ca255a0890d4aee0f611"
+    },
+    {
+     "id": "once/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "once",
+     "n24": "7c98ffc9c1232e93a73c90d11df7933c2669cc685e131cad",
+     "ct": "3f56becfb5b281c032c23f72c59c9d7aa14a427f2c1e3190f9425044ffba24fc"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "4b0a0037e3aa65d0aec54c4935afab293298e79272ce298ea23c04e0df3d2d1b"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "ea624cfe9c04d9bb663208470544f217c7cba8257bd9deba70d07e635e5c0921"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "f88783c2b1f72f03491992f435ae2c065499bfaff44afeb4a29addb3cfc7ab8d"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "55b6ebd200488b08767871e5b30390553ca00625fbbaec3cde60e430c1561fea"
+    },
+    {
+     "id": "random/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b79cf07c7a65c2cbaabec3366b1ba2c545f470ae47e4d8fb8aa17badc0df61a6ac"
+    }
+   ]
+  },
+  {
+   "name": "long",
+   "root": "0c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5",
+   "domain": "636f6d6e65742f73746f72652f76616c75652f7632",
+   "domain_text": "comnet/store/value/v2",
+   "aad": "0104070a0d101316191c1f2225282b2e3134373a3d404346494c4f5255585b5e6164676a6d707376797c7f8285888b8e9194979a9da0a3a6a9acafb2b5b8bbbec1c4c7cacdd0d3d6d9dcdfe2e5e8ebeef1f4f7fafd000306090c0f1215181b1e2124272a",
+   "pt": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930",
+   "subkeys": {
+    "4": {
+     "scheme": "Cascade",
+     "ctx": "0400000015636f6d6e65742f73746f72652f76616c75652f7632",
+     "k_in": "992e1582fcfd454fb568e2c96a2d4a418b4b1ecfa9be5e4cb4375b4504892f3b",
+     "k_out": "654a1b4b101529d364bfc9218ea975999fddec829f663459f8fb9a15aa1fb0bc",
+     "k_one": "b8995d94759eef964bcbffc7be687cb5c8be13588e8aca31dbc668c2f4cb7dca",
+     "nonce_once": "3569a9b909ab25d972a91bfc0570da3284b790ff8c8b5318"
+    },
+    "3": {
+     "scheme": "XChaCha20Poly1305",
+     "ctx": "0300000015636f6d6e65742f73746f72652f76616c75652f7632",
+     "k_in": "a45d45d8752dd3aff01d186a4f65a04da99a9b7f66660dc8ca7a7fdf34ed88d8",
+     "k_out": "b4f28d4ffa4e409480ff431b69aff97baada2aa366acd3d7507fcf61034068ff",
+     "k_one": "1c2c0e02430e2d9889a75bdec326f3ce2131b417d8963457de903c84b8987046",
+     "nonce_once": "c20c6eb4e27668cd6a10926c5fe0ef5cd3e2f66e441dbe50"
+    },
+    "2": {
+     "scheme": "Aes256GcmSiv",
+     "ctx": "0200000015636f6d6e65742f73746f72652f76616c75652f7632",
+     "k_in": "fe95f4c5d5d1c0e2e7fdaa3c52735d9e3a5b5049207ba89c38d502e7361c15bd",
+     "k_out": "1031d883f971aa8349453c239320c95f54d6dd1c5e6292959ca80bfb5a65eaa1",
+     "k_one": "30af6838bdc9bffb4e9886f835182647a9d4c164a4c8d4bd599b770fbeb4f023",
+     "nonce_once": "5332f76c2ce3c3f75953281dbf6285637149e767c8d244fe"
+    },
+    "1": {
+     "scheme": "ChaCha20Poly1305",
+     "ctx": "0100000015636f6d6e65742f73746f72652f76616c75652f7632",
+     "k_in": "f8d827d51598b91b93a967d3f0e705c406a2eac9f0da3b4e84b5a82ccf78e8f6",
+     "k_out": "4425a39240bcb417170af18abca9201402fda849135eae968e0b0ad176d25c07",
+     "k_one": "c76f05c8615e49eaa59ffa15cbefa394f59a0d5017619303d6fe160a81b1c5ce",
+     "nonce_once": "16e72a71558efe788f73bac63a35ba242195fb4924b05232"
+    }
+   },
+   "vectors": [
+    {
+     "id": "counter/Cascade/1/5",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "43e91d74cbcda77f15f6fa95483ae1deedc47f7fbe396665dcde5112d614975165891818b6789eb7dce88bdb6584e7ef4260914143a678c149458c26f0b8fd59781e13631cf9e51863997b08647a65a42a968a5544472321392a97fbff03a28320d9af9695a2c17af780cfd301a97e0c43cdb188bb06bb15b1ebedad45bb37b70f039f22354272d47ad0d969a5a4b4863946cbe3b94caa52ec6a8d87d3e84336e4ca71f8e0fc87970530a9bbfab667391d82ffe1773d8cb852560b3d78ff9434bc1f5384b3df55e3408c605cbd841a560bc7a01dbe89b175929615a272f1948209e8c0571734a7d8da98a7e4b81ce008217c289e17ff6db8044f30541e300dd342ef5245c9bb252e81cd874965a5796b8e61a60543c3700680205b79196ef72b42a9308666391ebb5d45231322bff8fc197e83cd8173a556ac8b047961663c3b01edfb85b7dcd47193a2bddf"
+    },
+    {
+     "id": "counter/Cascade/2/72623859790382856",
+     "scheme": 4,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "e96e28793124561c2d44aaf6c03a513f758c45ea427975b53a42e3377dc63db3e57f7b63c0bd4f6a247ff6159e11ad7724d28cd8b031903f67c74edf341c92a9554bb53ae91c326f90ca48e5c655bc51b422b313146e577078d10cd9b45fdfaa2244e55a317982dcb2d25612034701b93c27da52985e06ace3e55e5b39aedf556e233238c3a0b9efd2aa6e522cec71ff292434c96622adfd8ab40145f9912c8051e514fa1692e7f6319664d7ada02897df14eca12f271a28528329d8bad20b5ebf14a73330f6e9a6d212ea368fc16ce1df3694f9c7fbea89eef636d9fea169528afbe3276b6b0ef40cd3c973065808dfe875380274d796e1715c95b06096112f91ae91adcdce5fbf8485c0d879db4a22234105a63dcdb3b8c7cbbcb26c785d0b43f99d7960dc7e0bce7e2259b02b2c976b81baf57fda5e439f28ea6dab3ee3816f6fe4a5f008f9d1e47a7d94"
+    },
+    {
+     "id": "once/Cascade",
+     "scheme": 4,
+     "mode": "once",
+     "n24": "3569a9b909ab25d972a91bfc0570da3284b790ff8c8b5318",
+     "ct": "f4a6078405cde96808671cc1fa91ae60fed9f7b3118a28062708bd7e94fb42ddc70e8d3c27641b0d0dd3b04fa86fa90db597ebc29edcc4ca10c9467f7138a559d4dadd878f3433d2b55a988165ce517bf819990d036f68aedce97351becc9c87418f46f39b0720d186b58ef96b7a0d87acc93d055ed92a5041e281cad05a3f417431429a099ecc3e42352ab086a1e5e7cd4c2938ce3a6bbd463edfb7df484668a56f81b555892f3f406b13ef1f6d2caaeb6f834b0b2b09c840faba2bcf049b5c8dcccb013b4a4a85b37144b057018933163e335ea4a0ce2c23f3d2a0192f685e7cae5534c83fb31f9afb96a5178a2b95adfdf8e3f3fd035e3a31b7ceac9f6815df5a61ab6910f1b81c65cc1559c5a10f069f21711e20b65d259ba1960698dc42b320523789ac0b244a56bbabc450acbe8eeb3ec54bb41f1da6bd4c00bd4dbf6ec4749293c40ecd6c5bdc59e7"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "d9cae5a38251053dc676cbe68fe0141336be124479bebed72a8f60a5ae3342bb669e9b152b6ebbeca2c65c03757233c4e00afc7d35f8922254f6383c5a351c94e6bb1e1de1b23765a52d45f19d097f0b6612a4c8c6a29410b83c826c121ea86a7d29b573fb253148983ddcfb81662acacafb65c65c1d93f4c57584bda3c195aa8441f465739b90ab74f52f891518f63640175691ec69dbd9e0337149ce14e79580907e48c8afca11414ead54fa1846299953e905a1a8adec6cdbaab51c4520dfac8e5c536dc919e1cf290be20cfca17cace73474348e13b0ecebec88eedd46a0b53f3199fdfb451fbb54b55cc580f349586761231be37b8da86b787b5f20b22a8fb4b778e5377b6de1fb720fda05899ee3a21d4a6a55b7fb8dc04633adc0e268e6a44400bff472d281a4574adccb3b1dbae79403322e5e96a35a4f9b88dcd27d02be3236834f8092f2f1ca60"
+    },
+    {
+     "id": "stream/Cascade/00000000000001/3/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "50a71413be40cd1f65590bf48afd88d858377027486c3a5c883a0129c3dd189e04484bf7b480425e675de33dd425179bf7ac76b9abaa70e7b4ec21aae834debba80715b2d7b3de437844ec0be07f568af848c46c022faa36be8655c2096a6ba7eb90e8c1b2fd60404f3468b73be538b500a434db90f0cbf47457e0d74a5375f0065153f8dbf56cf89d4153228270c4ba8760798e3b3822d72aaf47c6d0a5e3f3c8f402013fa11dbfe877ca7da30faadb7300f9f65f701899571909242d4551d0da8462945d49d5580be1c78e8bdd462352edf9b6fc1065ed0903bbbcc1bb4e81b7ae287b18f15933cd23e69d7a81fa7ee953a5bda38ed7aeb65347d680c3d2b3e5326eaef27a199262b9f077347bc8f2322523dc34c2c78a292e7bace720d63179c6d3aa45975fad1b52ef6677fd76c260500cd2684de972257b1475d3a0e86db78f44a87151acf3fe3cb353"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/4294967295/last",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "e8027558951f78e1e8ff6d4e928cb85b896443118e84ab0270b1046fa9b4b9d2fe959fcc1155c939eabfe678c3814ad43fe60322928af871840f71e689f201d48c8170d9b28daa02109f7bd896ced3284091ad75201cbbe23160c8c3dce333b68273724e796c0b6f43514c1f62f26f12b6adebfa5b163baae0cd116f1c64583333c61a98846abef0ef6678ce68ce11d4abf7c2eea293c81859732321c4d8dc8de885519584385688d199ff253012654e890fae76fb36480d0a62202be20d23b926c265a03a26b60408387d596e4a14642384cd113eb18e0b3a55dc9a2399dae3587dd83f1351e77ab13063dabc69181664773211d844fccd7a9dddaf78633a55ac7dea448c689e7b2efb5ff472365f651f728e09c5a9d08cffe27ae07915f910e0ab7f67b21b6b93312050790fa4aad8856b4d85778ee54aaa729788620b37b40304e5f48c70e26c90fb8dbd"
+    },
+    {
+     "id": "stream/Cascade/09080706050403/0/more",
+     "scheme": 4,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "22bb44d088fd6f6259338f65364fe70456d5d33c100a7214f2fd8f75a95c6eb65eabc6a6717530c83ff8a6961dac57bc21546d6b7f802c4569816bf4b2f1bf20cd5f216a6ca8ab71a1d6a8b843f21812f43e4da3d315a604fbcb77370b6f5a8da069a6ff9135c0544d9c8fc3ff22b187d776d126bfccbf17cde6f797431bcb8a30c77b480513b35b39ea31ae55c86d408d1572bc4f245cf57a607e1d42f58d7980a00d5f1909b7b9004fe07889049bc2b35b8ad983daff0f86f9755b8c94e36c3089f629247c21f8e2530d659a35984009192248ddb84a6c45e922c372fe8f44d2bac53255b3ed5ba413e6dc7ed6ce5d6f1cfb233a5e122ba161b4c1d12d3fcaf408ff7eca7b1b9fe8dcba240e6770497b162d6df261d58c61e64efca960a5703af9d21a0b7ce4021ab1c87229255160010ec8f6f3f1d30d9d03988348dbbd1fc03a59fd02e12609fb2febbb"
+    },
+    {
+     "id": "random/Cascade",
+     "scheme": 4,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b2c1be50053d82dee270ea09da27fa129503a17db48a47b21bead6f1f9307bdd5a9a2ad7bf715281ac16ebd72e3aa3060c92fec537c9c766b24f777bdec8d4146f9f5f6d7dd5968e46528b95cb53c5f47bba82b1c17aca144fc22c698f97f9a9a81ee5f743e02b5f2bc4ed972412c4eac9f3cd34bd20788e9535ae2dd82b6c593dba55729c2114a85e1df4db129f1561fd6b3374548b62de32d6eaef243e706bcdd5b72d6db8fa845b27af2451529a5c874bf815a0b0d28e8db8ead6af0b468190b760fe32b69b15a5d5bd61c35d1c85410d911446f6a9ef47c80f5ecb6a1758403e6fc1be296f6bfea28f36d125a6de713d0985b705a7d266aee5f1b2445fd35d1218d44a81cb377133babe95d292d3c53f55bc0ed708859e394b6984fa0848f00c8c0309dfef43f293dc62fb8c5fa23a89b67a5e7dc73fbad11b638065122f7ec13cd82cd477367205d6ca"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/1/5",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "a3d234efc11732ac858bb5b410174542ee0bdcebbbca7a3e5b66a8b5c8ccc1311544df7006955512e90ab0b3f7f5a514f6de54215940f7600a111134121a1ee4849247361f34a10dd7cccd0f1b82593f0d9d47d0c0d1f80b37ede75e5e2b074ff7024744344226fbd9ea25fe06e82429970d4f3901abf868e03b1c1e40b7cef4194b8d2fae7e2c199d75117ee36d220169c5b9e501e3161ed24fa209b8bd9e58d94d72aa93f43b41b9176ee9b62dc3ca2034af76bbe1822a832a87e8f7e9ac51dbad3e56771c25f843371e5d3f8486e78a9b97ba2763b50a66f8b84e7392d248189d6d06e71a538ed324efa621d3c4a961ddd47a60376541c837ff9a9e1fcaafd1a71dfe0f1f1883a9e56efcf1729239147431eb8eaef8606f18849e4e6ea80eaff79961917450636f9484991a04ef3d5f16e10cb6a0d26b3e3400936b102e2e0563e41839b224513b98b243"
+    },
+    {
+     "id": "counter/XChaCha20Poly1305/2/72623859790382856",
+     "scheme": 3,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "23e2313bba2cc582d28e4bb0a988b97bdd9d7706844aa35b69aee09914c9e05a1c48a758c22a45566d73baacf7fc1d86ba65c7ff574749d0a9f19af281b1b5167e99fbd5925a1d5ac997be91a8ef44cb302e1abaa9ef86184d22628a31c1f391a26a09edfce50c21d7e11b7b0deb4f02ebad1c17d4cfd8992d1a824937bf7e9a39953bd881e26304282fb598c6f27c98e681a9779389ef9638e0530a87c51cb87771cdf2040aaaf5cf5bb39e49bb204e6af73dd7301e2c69d75a77ea08f517cacdf0206b90e3c875acc0696c3e035f63f2bc6197f7ab9bd9c15c09359e53b865b1cbbb9141c2679fc86e571d15258790655b1647f70c29de4fa990c91286bbe7c851d37228b5afa135286fc2271dfe65fe08541a039c878be5e934f68988d7fea0b53c70fe1371bc71000842a803e6f7f1aea7c47cb660eb423eee0a00cc486b89e67306b39413b1017c622e"
+    },
+    {
+     "id": "once/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "once",
+     "n24": "c20c6eb4e27668cd6a10926c5fe0ef5cd3e2f66e441dbe50",
+     "ct": "f07c218625610da3ca6e3cfffb532945ce0e0ab605397bef835edda175a26611e6876fea9b3839ca7ffca8d1e608561f7311ea398152da38190dfaf2364df1f408e68a03642d05e79413fd17e9e7fe496dbe19ed7c6684ee01023e2f8c6c4ef43de906369f347efd5083cb6391ddb56b67b686c66bd4bd8b0deae194907d3c34b0f38bbaa0f0c9e3eb10017ca17234cc5ddf832958131632b3479ed6eff13f06078aeaf976c3d2d80a79182588b129569e4f0ae6fe0e638ceca6c3cf4a64b0373da59cc2f113c74c7f1a57c6664f84a050dbfa5e246214ef19e342ad471e40f11897f18034eb7ab99dd179aff878a197cce9419678bbbbfeb0305ea2a5233879cfbf16e7537e7e6aa2c6d466589f00fae10a9320ba14f4274a1ffd922272d449d484cd5e311dd2346bac7566503e615b3821aea5967ab9505bdac6915a8cfd0fb4424d4d5ec7bd2090c23a95"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "9d555b01688334bc4c5b136495d19588c00b3237867c5796592ce083ce01c7ed454897adb5fea781e7ec7f1a8960dd2f3a1bd989f6bcd2f352bdd45d87150b9225a3b5292c75987a3a0d9cb283f23e1d00184207696a24cd4f3e18bb935bcad360e60c1071689bec960705aa63b49062ba0efa761099fc53c7f521a4d7ed7bd4f9c30824cc5c8bebefc9dc9e327c5f0f9268512253197748315939c2c824aedb542547689acb04404493b39ef984693b3d184e5f41109b3366e8e57a6aaec2d89c388e8816dd365ca98789dd92d5136ff8805d25c70ca2a6a709dcfa921620f57cb3ff5416028b1b35985337d80b7fd12406cdd4f0fcc2afad02fdf7e0a2fbfb7015ee765684db63293d471efb844c6e4a835631601f4528fbd0c6809ca344c8bc5ac1972ddcf835009c36eacda60e1cd26fd5e8cf0df828717e2d8f6fccb22c8a9990b53f0fe259588276a4"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "2007e7a1f9a41a86f45016855bd349f2ac6535690494332f50fd671f867e910500f7aa6484288a985ce9f99397a0f7234f5513d2e66c40c3263e9fe734508154f7036eea3a11ae39d167b9b70727788cc04e897ede5d9a9b7a67a9484799148c9ee4f1bab4152a1adaa406d08a379156e214cda70b7768d22962ecf6352a8ae4ef0da6c36a80a60a2d1d0095f351d1ac5427e1047424e081cc1800802abc944c13ab6e595725f0f2d22d682f278beb7d17c18d6e0099dfc1fca8fac3fb53460704dc6d3f90f57ece64b5a93825c14ca0100c0b37a4fe218097c1ded293a23830f4dee86794b60cf57c4de449cb4dc055d3fa0580137e73429eb0dd2a11c11b6ce4fd300e07a0f95890e981f921e162f6083d30dc9d16b474638731404dd3c6c2b5eaebefdd8a6a2a65ba4ea52dbbc20c1c18b9279a8eea72feb67182fa3cca2fd3baa89339a3a52f2e622c9b"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "06293e2fce28bc8dcdd192c6771d991b87419bdaea487f910155170d94801c370535c1713f6a87bf0c4a2401f12d098f7d58a5172d1c10f74d6fba48a22de47e06dc856dfa023fa3920f1223da4f95c08be222f46d0e2f422ceee844fc2c21abf6bdc8edab8b0a10c8ab5422cf9f3ad3b48b6bace013ed16b11b4e487c414308663fd610890cd01a2f802e76a7838fbea5c6d5f89c68d454bd1eb31e070b087eacc945e227dea9a88bb85d6994745acafabd31c1ff636578e59d18bd01181872d3f8f9be632bb00e334614261ea7547ac7c2813b61fd5cc13efc1d55fe4cbd1c8d1ff05a8ceb688cb22153d995d9d51581dd49b4555be87f643906e711e63a15653068f29a634c7b182668282422331981297b842ac1f1a9a4d495751050558fb8abeea21f8b782eb7514779399c8ebb57f9438d3173459411f790fb3095d315604dcd662b105b1ce2980e76"
+    },
+    {
+     "id": "stream/XChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 3,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "e8d84fd9d9e3309dd99a470a2b6048a2c02ece3cac43a05a71c9aa399283f339b06aa31bce9480439f53e2f4fc7702d422e6532cdaedb8e84eec5962f6bfdbd6bb2c4a8a929c7a013204780b0cfba7778099bef18a0f2a483848eeb22a37d492653437c48a1c3a7afe8b8a870e4b92be2ea4c45a38092f7c0640c0b89bae34d47a0208bdaec312269ed98a7a3bc4c288e8c8ac1e52d3a880edd9998d0b7bc3232462adc33cac2fa7652bb25a9fbb6482c6e896794b956f9104ca88954645273c7397672b688cb3e701244b737f0d6246aac8339551bdcc4db71f5fbc21614a512759ae00b43bc1b8aecbf184d97e44d881f27da7c04f34cab8bfd3275c9256e25fda4e0bce8752bdb835433df344a3322f9a549cdb051fa8507d0ec3a8b28add6b7d8e380541f70e63e6011c8efcf491ecfd97b3d3ac2517b1760356e1cfa45157dce33aef8cb9fe92edcb6e"
+    },
+    {
+     "id": "random/XChaCha20Poly1305",
+     "scheme": 3,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b78d1f3620aa0f0ba1cfa8aebaa5eb51c6452d3853076ae5541900d203d59d768a79e7447c3349dab65be65de26bdd7a62034b5ac56ef3785bb02711fdb1d4eb6a41c3cac7340f414e21a8fc194577dfcd42b71b707baf09b92b2e4e642df5f98640cfb2eab94f5b0edc2d00b7c69ae3ceb2523b5e1104876596e8071864d4ea5b37733820a8eb4d895ce4183283361b83ecc4e2caeb22be79a625f742bb94392e6d385ee59265dad438e8c1accea8277fcaf4097164e3d830df735f824f8f0dd71b4736ec80e05de9df520261054cb057bc78acce8c734099bceef44eb12c2dd7c6a243ed0b61407772464996a49b743a1fc90d5045d49a023420a563d4f4b88680ef25a29884ea91f55933cde0d443274f7da6ae53758f594e94fb6b693fc3c39f93d1c84d6f1fd23a586c35469e6ac03c9fc7f4d9998a2db90db9698c1466b74570c54e1b73ae2a18a09e67"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/1/5",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "96103edff9c77520f4fb2c7b51f497f524aef28bfb74d0d8b83eaaedba06c642ff2bed08fc38cd74728384690db054ac261b2ff0a2aa5085dceb3d2c58ae6af07b4649b9d20da34a7da879050823f9db2a48b255142e03cd5ffe695b2d0e74a7efc78d473483cc59a12eedfdb5fe07044e4c18b9ee2fb1844bdd5c9fff63f2d7f6d66a03537d5cae91488216e0b5d7ab76ad589559bddd91a179350c8f371de510c9d1394b5a6adb7a255e7d9ed129a7b3bf1643eccb610890af09478bea34fe981e9bc563e11bee225dc92fc1258c7c97ecd70a82f1772907164695f163676b9bc63089474020ed69832de8c94c98e0732775c549365463310d298abb7932e243d53d2064b8b7d457e195c3ad47d1a96f241dd6bf09fdaac9cfd7f55936136aa58acef80c73840898d45dc889050765186ad2be2a8073ca6124d00a16e4af747f5a1ef639a44f8e37ab1213"
+    },
+    {
+     "id": "counter/Aes256GcmSiv/2/72623859790382856",
+     "scheme": 2,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "2f7f55e347b1c58966e97d45c9143f3735e84aead1683a2a48f291ffa1a43f83f8d102a29f339d143505a69a9528ea0289e6f32be4142f888d736eaf4ab9ffa05e57acc95de5e66382ae91d36f66521b6084d210258ac09a3b439dae6e19458badcb556027d723c8aaf23080333174212a69068e2fa95d3c9b6f987cc22869421efeea751721142efcad7fd619533c087731e730d3d4d8db8b1c45f58e205a0f70a812f2666cc22b590bdc4eceb3b49e2c87d8739382333ab204b2ceb57e1b5a24810e7af12980065d537aac0268d6878aff073741c397dab3204f99dcd68ffb880b0cce33bca3b1b28dc36f2ff693da14badac6990bd45c3bbc9ac8f4fe146c5cafa20738857b423d9abd8e17595964996e72a3d2cd219d3a9236d7c5f7674d6677b99d8a32290be22172d7c46f06a17e4591e90524f2a2e4a75eeb79049f5228be1dd59a6559c5a9ce3074"
+    },
+    {
+     "id": "once/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "once",
+     "n24": "5332f76c2ce3c3f75953281dbf6285637149e767c8d244fe",
+     "ct": "c14ac655634e681866f2cbee1470c052d5d96676efbd4bcb12225f2a018e10c14d0389bbc2b4d352cc7eedeb16cb10d5fb6df19d19dfd0f5e9c387809b7d423b30858d2b2a29bbedc26667a083ccdfb7a64af6ff6cef6bbafb435f82171d35faabdb6298314a2269cae273d6feb841ce4199176e91fee428f3373443cb8b6c3eaf6b9a11df2c0c54d03b38911af771cbc5ed2da6e87bb67fd77f8dae80c8952c398a287f14ec29f810066e3197e1bd53134d24a97933b7464441d30fb2757929a4c168aadb43991ed3b2092dc3320cb0c1fc1c366eed76a6436ffc0c5ada75bd1225e2acf9bcb1fcfbbf4c203df93683de489b291eea2ddaa574742e8665adad0314a07108c857299bd6aa23a37994e2d1de21f55217066d1de6993ee2c6d9ed7dcbe7aa7d7e07f5b00db8c9826926d9af077d5015fef812a9989639c0b69a2834246bc78eaf2c9b6e53ad0e"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "f00679c794e7d184801aaf0e22d3f0c81942d54b87283a1478cd6724dcf2c9d90aea1d29c36d81a7ae4c9618debc990c35351e865302b6de7af5402e6ff5e55cda7b1d0cd55ada06fc31689edf6fcf1bd5aac6a4af8560879f33f9025f41be6625d68cb8323ef699e90867d74b358d15b70e5cfc6bac6b5429050cb6a4c9c97ea0d4cef2639a7c440193b4954a0184b398aa21d4ad386fa942212bd56274d59c9955cc45414cc3840a9a0136927c74508fcb3eb0894e4e22096a4ea48543fcfe793c5c6d3843ff66779894ea934579be516fb6e8e84152e5d0a69c399ddd227e5bf011c09695b477e817b247bae3f62da0b4229ebf4f49e57d5db36e8381297a6f6e28d93261c0d3c88fd884b79611f27bd145098251e9a53865335808f5098cb48df108b11ae4351a0761d70c84036612c9f8097f2c543eb08490e843f2f580f63f8fcaf49aea6d7d6dc617"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/00000000000001/3/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "e777f80b022aa0795f484c0b0bb6aa461e9164778a8d38376771819e0461b09be0a4aba22a09d65774fabd09d643c8098b18208522ff62f572b6e17f0d67c847f9e83df2b415d5df300378128ec061fb0c5bee12359f2c078750c17d577285ea167b4e62616882edbdca84a01290315f1a15a679d5d40b164e75c4d789c3647ad502eff7318d4b45efc54af6c01f528431520248f990485fa3a70d7e87aa84b7762fe07ea10248ae2d2558de185af247c45a491f90c70758fbd66538fc5084b17c5b1c07874afa298bf451f3a78afecfafdd21fb6557fff55bce4bc3ea4008aaef39fcd60b4b2261acdb25337f93fb1627fe2702a5ac070ec5956fddc1b061e056e9f4b186c5489a6a76e2a81e3589bb62bf0e90880db623c8ae7cf076f48501a2f51c649c4947e72c57fcd3d812f0596e629e903696993fc4dc9dc396a690b8c6da1c2000105e6423e06163"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/4294967295/last",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "9e0119df7b447b07c3c29970971463408e5e396cca12bf95fe18ac0f918e929211a3a8d4f00495055c0d83066ba7340227d2cdf0a091d6781b60c729d7a57dd1e964d130edeb21922a0701d5f6cc6ef7ec9ce97e44c501d1b096ffcfc9921d26bd92a163d2d7b2babfc2c6e36995549069e8dd242a88db612d89c6d01d74c31231b558482b9d8545824c0ef4de4b7d01e129c2df8ca29433e0df334896cf02e19c086d5caa530ad36236bf9bd5094772d7404e7410e65c315bae76dbe5b42c5e678f5794386b0436e3ebfb78465fdcc098f8d0ff27e10e5f6a48adc5a00a2568442c3b1e30673981b4b6344f4dacccc4480ba291483d5a5464b9f3034e1cbb36396eb76b079ac58d23016b054eadf0be1fa81528395532a69d30b76d11b63601e17c5bd7eb8a1dda5482b29627097d8e214940655d24e18bc604a3998177b6e334b898e499a3b3af6bb9cc51"
+    },
+    {
+     "id": "stream/Aes256GcmSiv/09080706050403/0/more",
+     "scheme": 2,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "228d6c5c0205e570887e76c9afd9d06f20cb1b94d21c08029b498659d63de0144c246e45502a58944ac20d1a99a7a3871bbbeb067411e8abaec16af0398d8c44b45b9c203beae69b5d12d977f44ff9e4a86cc77b46ba577ee6871743f634c15ef7d89a90690534ce6efce89873550650f4c34e2e0d8c3262db28e1552b80a7ab1c5bc75879002767ff3857d01b1f473e2e77398a653536f35793df5023ad2423d3fc02497041158e07b3d1c0593a642467b877857507272b0cfd1f0fe4d9e5d87756be73a61007898bd944b35ba102cc3add16747c0384db39848819631dbd38d1f2e47d2ac2c3ff1bbad43eb306b884e395c2f95c096a0ae1b4c4154516d8ad969c53c0caab8334aed699332d53f4f13a225a057c1fe7bd0e2adeba015dea36717556e2cbb7bbd646352c3196f14176f68c1f0e77dc42b23da5195bc573079ae10585443d9eca1e2a30d027"
+    },
+    {
+     "id": "random/Aes256GcmSiv",
+     "scheme": 2,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7f5e2622077ac0330d182b0bdd5a760bd97860a655e1c9cf9baf1db74ba42275b20067da13ee6d56923f3ab6dfbf4fb0138411541dd91d8c910b2d2e65917f03682be8beaf1de82e3742b085e45a62e84a8097cbe76e4db64e5fa396af527b11da8f5cab04349d261c6212140253cbdf58af5975cea015f3da3e6be2b722e50109f6437d2779469c4ec8177c630066c0f0f7a672bceae5ec49d8d96555316b76331c4444a52b02485b874f572431a966662665b33f1212fa2a8416931934bc11b812d28c908891c181a508694d780cf8adde6de69b4da3f716aba8b317e8209c96b627daadd9bbec86141bd1a86c4e1897c9c73913aac75d1e11de1852b30a8baa05dbd60ef68a7091325c6671edafcf5df3d660c1a8da6111a19a4c038b749ef680b150e8c82b6ee13221ac46adf72585cb94a1d75dbf7e6b35de7de54b0fe9939bad579f47e82118ff53bb2"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/1/5",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 1,
+     "n": "5",
+     "n24": "010000000000000000000005000000000000000000000000",
+     "ct": "e7a4cc7b61f4310b839d0d637768cfb34a9e9377786bd3a427a9dd77ef253c1c74861187e43672359f777e6ae3aa7c07d774cc74932c135c9d64c990daf5eb7efd4e047ffe86a3294a5c8202089bc9952b1ea579fa1c93f866824bd78db4df587cd88141c496f3eab65f4fde6cfeb7cd720192d7eb8709f463841e342692622c231bff388c278f5c918d75eb40de09032d09bee01a8dd50f7cfa969cf38363a6dfc844a19ec6f50e73db0f53bde6f5f378fc16c4f69e869418431b5addac48120fea44b9ed9b049e1a70708b171b2226ce8f3611c23ec696d5d2314013d9291f86c94f6d2255d2b10b83a729a727e5b08611b52d0166abd0e4a311100b4c1021adaa10a7b07300719f8d5f4b8a2771482e6ce148a183a4c938e384d4b9b7c6270f170a42bb969010ade31d713fd173bd263ad5b76d5b760cf69c4963838d31c681a67690c4e6866e30b90ce2"
+    },
+    {
+     "id": "counter/ChaCha20Poly1305/2/72623859790382856",
+     "scheme": 1,
+     "mode": "counter",
+     "domain_byte": 2,
+     "n": "72623859790382856",
+     "n24": "020000000102030405060708000000000000000000000000",
+     "ct": "9dbadcc5305d5ac1ec9587b08604e6482efe43facb98b69f88cd1068d6ae6485c864daba7035ca70b2a187444ea39c569c2d225dc0c0f37cdc248ccabd5d9656564dacaae0f306233fa9fb118aa809e6154a7d4f8288502820d1ebe1812a0e31eb94f10b552f2659c32e7cfa1b4a27b14bb47c2d2f8903963ffcc1abc3071686b0e4fbc72b8bd76ea4c4692448bd61cbb94d7ec0049060ec499ee570f9bb5d7f28c980b5693dbbde3c61cff16655a350811c1cbb8c3af3c2a05e1264d44df76838c8672922bc5dfec714eeb3ea816720e5a8c8c29413a56dfc13607fe59fa29672fa590a7d287f87da67e5003ecd938c35ef132851e437cde0d46af9c665e29ad753b5dcc2ae5413e834665104b49135472abc15a5e10803116741c90961d8aac6a6d4277b1af423387f1e2205ae17bc893ebbf41a248567a1610837f60405ca65bf5ffa529d7153f63572e2"
+    },
+    {
+     "id": "once/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "once",
+     "n24": "16e72a71558efe788f73bac63a35ba242195fb4924b05232",
+     "ct": "61b1553b5bff7ed4a9b1aba326637463c55320a482cf1b1057916bb3a649ddef037ee9e49d9e923caa421bcca8e6da85158efcffc1cda7b8cb2e945be5acaadf23e76cd42fc2ec6b945067567b21f1d4a290f0e81656511f106c9c46f37eaa0d1dbebe9d35e43656c59b023d4c3dbb426bed7f547ba29b213e466c940f9f079ba4ce4211c16145c586462bf61b98933bc2783c22bb7dcaf10ba895c84fca2307409140d52bf7c6f3032112876ec21d678e55c6191041dfe70f8d0d9e0125f3b44cbff54fa2affd98c337ff7ca54febe4d2f0e0fc3fe9c5bc7020f0a1378cb7fb2df9f4b5b4374903e4aedd62d74686e2a3de68b5f3b942f9c473d0ae68ada32df780d4347a57e26a8b898e67f267820effb908c8f33fbf6e6043c8184431aa8d00d0ca43084650830e8838c8495c76779bc085a416461cbcae018f191b84e76191c865205706ff853fa58188"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": false,
+     "n24": "000000000000010000000300000000000000000000000000",
+     "ct": "3f2f4f2892fa59a382bc5dce9b34b51f18e44cc7ce1003b3d46d2839de9cb700672571718df280390ab5c076c493b8db285a2f2849f434027bb673a0e7aeb782cab1d73c440d9b34cdfc20aefd745f7c4d9331608b971a0da85370480764158f493174f68d60d61307f5d431d9a6048e2301d104306cb6bbae315c19ea6ca5252fc321b98237f459907e5922965a9eaf6116d0844491c7e26b30bb3c4fd76481b4e5e726ecf13499bdb91496ad57a0211565373298087bee94b84885fcd96b6391164a73f5b960c1e4836ab0416ba92eb89100c34aca1dffdc58aaa449c520b84ed4d9184fff8a3ccd7c0dc0f04c017e56d9ee7c484f64269e312a491c588e2fabf3b74ce512e3c822cf1b568ca7d0bb9bf0ea133ecf48884a293f778e43751951e4f96d32cb712e03e408b7e6aaa660af910957d321b397b7faebbe2f77cfead6eed29d7cb88b41a499370f"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/00000000000001/3/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "00000000000001",
+     "index": 3,
+     "last": true,
+     "n24": "000000000000010000000301000000000000000000000000",
+     "ct": "3fbeca6b51bc31ff4581834a7718e86c76e3199c0c349c48b70d7c23e06f137ca5384b1407d69423f5959180621da5b24e627d184da3994fd484f6a8f559b553c87eeaec1fd64e9a6590851c10d1099424f9933e076f315efeb4ae9ec1c95fd719f8a6b9951a50a91504964060b93f415824cf962cccf73ca803a4122c326dfb275018452a5be9354deb1e96b9eed2fbb5477d3f855ca81939de171557f2a0751681b8e398ff22ee6e09b7379dd2c9053333bc8c81984dddce6d8b7b4abaa8effcb703c1b4771697e5ca19ebc993d143cc23f1550e484cee6a4f9d939c03f4f19744f6efd816e55550aca1fca96bb4192bd5b133093fb8f02b15c44333fb9e6a66e553828c0cea8f1613f395c878407c82b2128c8ca445b8946fe377dc512472d3d8bb6b7242b1035878ceac2ece24d113d1fd0e925d56ed9fc36942d6f7647d2045510581896cf605d98e95"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/4294967295/last",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 4294967295,
+     "last": true,
+     "n24": "09080706050403ffffffff01000000000000000000000000",
+     "ct": "47e3381d84d00b508dcde904bd3908056aed9378dd69d335e75794e6bd7085177437e8f342192c587f0d54741a7366a12b27c930f667bc1b097e16b5bd676b8d3abecc44c02b2af750f6f8e90c93c814aa22ad46b3830f557a72c4613ad805950f3373d53a58e9c8d5199e4cb7f268cab47290e54b6630c165f98e26e7e3d50e01d2b711ba3c69b66f0c3e937e69331818dcc060d09c34a75713963babf717d176f0ad501e76cdcec6004808c5ac4939d2df6fabc2943f6ce70783bfc97d0dd615572e07eb3b0cc8c5a8406c0619460ce9fdd6e7bdca44bf01b45d8f26f61227ca548c4cabdc0e1592e7ba04a06d52d3f5c5fdc9039ea95408df93a5565335b43033301d17b9a3de2b6da7b334f6b2e9da07aa32f98ede0051c92288e52f8a567ba999b797edf3d699de6c38398b9420c2c80691349e8855d0140454731b7dcffafebd45669a3cb027b7c0b7"
+    },
+    {
+     "id": "stream/ChaCha20Poly1305/09080706050403/0/more",
+     "scheme": 1,
+     "mode": "stream",
+     "prefix": "09080706050403",
+     "index": 0,
+     "last": false,
+     "n24": "090807060504030000000000000000000000000000000000",
+     "ct": "a709ffa28cdac0cbe1880fc8597e6b9d42f14538d1f634eaff375ba861c6ec35c58cd368a48ec6903c5e9f1a0f563082e0f68c3096317dface4c544564be8ac4719adbd4340e389c33b075e0765e9de7db3808a63d998ca661d4499d464cabdeaa79492aea44640a015d8c949a5f9830c03ee86b2f12b04bc109ccd56cb091713d99a4859e37b517a6045716fcbc72debcf4efebfe8709d269bd4af6eb5ca0e43b37889e543d80222b80b54cf06beb28202e9a4ac8e58d879a5ba1182b1b69fe020dececa10adf90d954f56e9ebccfc6296b36955c0608f795f3c7914149c9e63b1ed227e961e0dc16a57fe01bf342aeda8e990425397b9553f59aab4dab54bfdbbe05b13d753eed0a5f3f0a3e55229cff2afd68ce76f000cd29cdf6305f8f4ea4493a03fdd85d237ca2bfd39a5ceda0a5c1fc0297d54cce8943ea9b0a9bead06d4aa8ba17646739039a7d49"
+    },
+    {
+     "id": "random/ChaCha20Poly1305",
+     "scheme": 1,
+     "mode": "random",
+     "n24": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+     "sealed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7e534ed391428a9cb9d184c1eef4daac16458e5dd6170574389beb68f9352b0fd719a96d2cc4ee239cb05ddab674fdb7ae1a909d74315d12ab1175834e678e08c816b79d7a950d121160cb739515588172aacb67c037742a57ca284bfa4c3c5fb5dec149a067a7464e501937c3c21147cf9ce11797e64a3b1ca13c8dcf2529cf6a598199c5a99eaf1f3e9ad4d7282e6239fd7c52aeb92d26f60038173b692dec1ba1c2bcfd7141970775ba810682abf0d511b3d0abe362a0c914b31784c2924ee3a1aec4cec3f74013f3397cff8bd725f323ddc5606c70b297a86391401107755f7bd1038fba6e1ae7588b8446f0b985e12929e4bb60a8852a62a1a487b23f4ddd89f5b30536072c2a1166d74778ef970db2ed083fada11a996e776db27c62b0a9a03034e8ebbc85c8aebbdc28ba6535c7bc1622e05161298e7cddea39edc34bb49e55ae89036d3ae81038ead"
+    }
+   ]
+  }
+ ]
+}
