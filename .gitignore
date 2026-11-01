@@ -25,3 +25,4 @@ test_legacy_pqclean.log
 fuzz/target/
 fuzz/corpus/
 fuzz/artifacts/
+!docs/**/*.md

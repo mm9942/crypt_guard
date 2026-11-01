@@ -104,14 +104,14 @@ pub mod pq_multi;
 pub mod pq_stream;
 /// Labelled SHAKE256 PRF/KDF for identifiers, capabilities and sub-keys.
 pub mod prf;
-/// Shamir secret sharing over GF(2^8) with attributable share commitments.
-pub mod sharing;
 /// Internal CGv2 authenticated-envelope implementation for compatibility
 /// migrations only.
 ///
 /// New applications should use [`pq_hpke`].
 #[cfg(feature = "cgv2-compat")]
 pub mod protocol;
+/// Shamir secret sharing over GF(2^8) with attributable share commitments.
+pub mod sharing;
 /// SignAlgorithm trait and ML-DSA/SLH-DSA implementations (FIPS 204/205).
 pub mod sign;
 /// Application-layer, explicitly versioned signatures over HPKE transport bindings.

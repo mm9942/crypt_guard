@@ -12,6 +12,9 @@
 //! cargo test -p crypt_guard --test ml_dsa_seed_context
 //! ```
 
+// The whole file needs ML-DSA; the `legacy-pqclean` lane builds without it.
+#![cfg(feature = "ml-dsa-backend")]
+
 use crypt_guard::error::CryptError;
 use crypt_guard::pq_hpke::{derive_recipient_key_pair, Kem, DEFAULT_SUITE};
 use crypt_guard::sign::ml_dsa::{
