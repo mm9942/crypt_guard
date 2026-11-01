@@ -493,7 +493,8 @@ recreates the oracle the opaque error was designed to remove.
 
 ### Building blocks for messengers
 
-Four small, panic-free primitives cover what a post-quantum messenger needs
+Four small, panic-free primitives (plus the optional two-layer envelope
+`pq_cascade` described after them) cover what a post-quantum messenger needs
 beyond one-to-one encryption. The randomness they draw themselves (share
 coefficients, stream prefixes, content keys) comes from `TryOsRng`, so an
 entropy failure is returned as an error.
@@ -608,6 +609,89 @@ ct.check_recipient_set(&[bob_fp, alice.public_key().fingerprint()])?;
 pass is rejected before decapsulation. The same check is available for single
 records as `HpkeEnvelope::open_pinned_zeroizing(expected_suite, key, info, aad)`.
 
+**Two-layer envelope (`pq_cascade`).** For messengers that offer a
+"maximum" protection level, `pq_cascade` seals data under AES-256-GCM-SIV
+*inside* XChaCha20-Poly1305. `Scheme` selects one layer (`ChaCha20Poly1305`,
+`Aes256GcmSiv`, `XChaCha20Poly1305`) or both (`Cascade`); every scheme grows
+the plaintext by exactly 32 bytes, so the chosen scheme cannot be read from a
+length. A `Cascade` derives independent layer keys from one 32-byte root key
+and a constant `domain` label of your protocol; the scheme id is bound into
+every key and every AAD. Raw AEAD calls stay inside the module, and every open
+failure is the same `CryptError::AuthenticationFailed`.
+
+```rust,no_run
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::pq_cascade::{Cascade, CascadeNonce, Scheme};
+
+let session_key = [0x42u8; 32]; // in real use: a key from your key schedule
+let cascade = Cascade::new(Scheme::Cascade, &session_key, b"myapp/frame/v1")?;
+
+// Counter nonce: you guarantee that `n` is never reused under this key.
+let nonce = CascadeNonce::Counter { domain: 1, n: 7 };
+let sealed = cascade.seal(&nonce, b"frame header", b"payload")?;
+assert_eq!(sealed.len(), b"payload".len() + 32);
+let plain = cascade.open(&nonce, b"frame header", &sealed)?;
+assert_eq!(&plain[..], b"payload");
+
+// One key, one message: `seal_once` consumes the `Cascade` and derives the nonce.
+let once = Cascade::new(Scheme::Cascade, &[0x17u8; 32], b"myapp/message/v1")?;
+let sealed = once.seal_once(b"header", b"one message")?;
+assert_eq!(sealed.len(), b"one message".len() + 32);
+# Ok(())
+# }
+```
+
+For group messages, `seal_multi_cascade` does what `seal_multi` does, but the
+body uses any `Scheme` and every wrap is a `MAXIMAL_SUITE` envelope
+(ML-KEM-1024/P-384, SHAKE256, XChaCha20-Poly1305) around the content key and the
+scheme id. All wraps are 1 751 bytes whatever the scheme, so a relay cannot tell
+them apart; `dummy_cascade_wrap` pads to a fixed count. `open_multi_cascade`
+asks your `accept` callback about the scheme before it decrypts the body, which
+is where a minimum-level policy belongs.
+
+```rust,no_run
+# #[cfg(feature = "ml-kem-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::pq_cascade::{Scheme, MAXIMAL_SUITE};
+use crypt_guard::pq_hpke::generate_recipient_key_pair;
+use crypt_guard::pq_multi::{open_multi_cascade, seal_multi_cascade};
+
+let bob = generate_recipient_key_pair(MAXIMAL_SUITE.kem())?;
+let header = b"group=7;epoch=3;msg=42";
+let ct = seal_multi_cascade(
+    MAXIMAL_SUITE,
+    Scheme::Cascade,
+    &[bob.public_key()],
+    header,
+    b"chat/v1",
+    b"hi all",
+)?;
+
+let bob_fp = bob.public_key().fingerprint();
+let (scheme, plain) = open_multi_cascade(
+    MAXIMAL_SUITE,
+    bob.private_key(),
+    &bob_fp,
+    &ct,
+    0,
+    header,
+    b"chat/v1",
+    &|scheme| scheme >= Scheme::Aes256GcmSiv, // refuse weaker schemes
+)?;
+assert_eq!(scheme, Scheme::Cascade);
+assert_eq!(&plain[..], b"hi all");
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-kem-backend"))] fn main() {}
+```
+
+`seal_envelope`/`open_envelope` give the same two-layer construction for a
+single recipient as an ordinary `HpkeEnvelope` (one KEM encapsulation, the
+inner key comes from the HPKE exporter), and `seal_random`/`open_random` seal
+stored values under a fresh random 192-bit nonce. The vectors in
+`crates/core/tests/vectors/pq-cascade-kats.json` come from an independent
+Python model and are checked by `tests/pq_cascade_kats.rs`.
+
 **Watch out:**
 - A `(key, prefix)` pair must encrypt one stream only. Use
   `derive_stream_key` per file, or `pq_stream::random_prefix()` per stream.
@@ -617,6 +701,11 @@ records as `HpkeEnvelope::open_pinned_zeroizing(expected_suite, key, info, aad)`
   secrets add a random salt to the context.
 - `seal_multi` does not prove who sent the message. Sign the ciphertext
   (for example with ML-DSA) when the sender matters.
+- `Cascade::seal` with `CascadeNonce::Counter` or `Stream` trusts you never to
+  reuse a nonce under one key (ChaCha20-Poly1305 and XChaCha20-Poly1305 break
+  badly if you do; AES-256-GCM-SIV only leaks equality). Prefer `seal_once` or
+  `seal_random` where you can, and keep the counter atomic and persistent
+  otherwise.
 
 ## KMS for beginners
 
