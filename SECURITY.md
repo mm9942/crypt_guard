@@ -59,4 +59,10 @@ Known, documented exceptions:
   Internet-Draft, not a final IANA registration.
 - `cargo deny` checks RustSec advisories, licences and sources in CI;
   `deny.toml` documents every accepted advisory with a reason.
+- Accepted for now: RUSTSEC-2026-0387 (`crypto-bigint 0.5`, timing
+  variability in constant-time operations) through `hpke 0.13` →
+  `p256`/`p384 0.13`, which the classical DHKEM suites of the RFC 9180
+  wrapper use. The hybrid PQ KEMs of `pq_hpke` use `p256`/`p384 0.14`
+  (`crypto-bigint 0.7`) and are not affected. The path disappears with the
+  `hpke 0.15` migration (see CHANGELOG "Unreleased").
 - Fuzz targets for every parser live in `fuzz/`.

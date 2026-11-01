@@ -31,6 +31,16 @@ ignore = [
     { id = "RUSTSEC-2026-0162", reason = "pqcrypto-traits: legacy-pqclean migration path only" },
     { id = "RUSTSEC-2026-0163", reason = "pqcrypto-internals: legacy-pqclean migration path only" },
     { id = "RUSTSEC-2026-0165", reason = "pqcrypto-falcon: legacy-pqclean migration path only" },
+    # crypto-bigint 0.5 (timing variability in constant-time operations) is
+    # still reachable through one path: `hpke 0.13` -> `p256/p384 0.13` ->
+    # `elliptic-curve 0.13` -> `crypto-bigint 0.5`, used by the classical
+    # DHKEM suites of the RFC 9180 wrapper (`hpke::rfc`). The direct
+    # `p256`/`p384` dependencies of the hybrid PQ KEMs are on 0.14 and
+    # therefore on the fixed `crypto-bigint 0.7`. The remaining path is only
+    # cleared by migrating to `hpke 0.15` (new rand_core/aead/sha2 generations),
+    # which is tracked as an open point in CHANGELOG.md "Unreleased"; remove
+    # this entry with that migration.
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 via hpke 0.13 (classical DHKEM suites only); cleared by the hpke 0.15 migration" },
 ]
 
 # Every crate in the tree must carry an OSI/FSF approved, permissive licence.
@@ -49,6 +59,10 @@ allow = [
     "MPL-2.0",
     "BSL-1.0",
     "0BSD",
+    # bzip2 and libbzip2 License v1.0.6 (BSD-style, FSF/OSI-compatible):
+    # `libbz2-rs-sys`, the pure-Rust bzip2 behind `zip`'s `bzip2` feature,
+    # which the optional `zip` feature of `crypt_guard_core` uses.
+    "bzip2-1.0.6",
 ]
 confidence-threshold = 0.9
 

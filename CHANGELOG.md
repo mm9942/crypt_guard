@@ -66,6 +66,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   built from `OpKind::Describe` alone must add `OpKind::DescribeLifecycle`.
 - `sha3` is built with its `zeroize` feature, so hash state that absorbed
   keys or shares is wiped on drop.
+- `tests/ml_dsa_seed_context.rs` is gated on `ml-dsa-backend`, so the
+  `legacy-pqclean` lane (no default features) builds again.
+
+### Security
+- Dependency updates driven by `cargo deny` (RustSec advisories):
+  - `p256`/`p384` `0.13` → `0.14.0` (pinned): moves the hybrid PQ KEMs off
+    `crypto-bigint 0.5` (RUSTSEC-2026-0387, timing variability) onto
+    `crypto-bigint 0.7`. The hybrid KEM wire bytes and the pinned vectors are
+    unchanged; only the `ecdh` feature and the `ToSec1Point` trait name changed.
+  - `zip` `2.x` → `9.x` (feature `zip`): RUSTSEC-2026-0367/0368/0369 (symlink
+    and SUID/SGID handling in `extract`), and with it `zstd 0.14.3` /
+    `zstd-safe 8.2.0` (RUSTSEC-2026-0391/0398/0403). `ZipFile::name` now
+    returns a `Result`; the archive tests were adapted.
+  - Lockfile-only: `tokio 1.54.1` (RUSTSEC-2026-0386, `AsyncFd` I/O safety),
+    `ctutils 0.4.7` (RUSTSEC-2026-0385), `zstd-sys 2.1.2` (RUSTSEC-2026-0410).
+- **Open:** `crypto-bigint 0.5` is still reachable through `hpke 0.13` →
+  `p256/p384 0.13`, used by the classical DHKEM suites of the RFC 9180
+  wrapper. RUSTSEC-2026-0387 is accepted in `deny.toml` for that path only;
+  clearing it requires migrating to `hpke 0.15` (rand_core 0.10, aead 0.6,
+  sha2 0.11, x25519-dalek 3), which is a separate change.
 
 ## [3.1.0] - 2026-09-27
 

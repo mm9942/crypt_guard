@@ -501,7 +501,9 @@ fn test_zip_creation() {
         let file = zip_archive
             .by_index(i)
             .expect("Failed to access file in ZIP archive");
-        println!("Found file in ZIP: {}", file.name());
+        // zip 9: `name()` returns `Result<Cow<str>, ZipError>` (invalid names are errors).
+        let name = file.name().expect("ZIP entry has an invalid name");
+        println!("Found file in ZIP: {}", name);
     }
 
     // Attempt to locate the test file in the ZIP archive
@@ -576,8 +578,10 @@ fn test_zip_folder() {
         let file = zip_archive
             .by_index(i)
             .expect("Failed to access file in ZIP archive");
-        println!("Found file in ZIP: {}", file.name());
-        found_files.push(file.name().to_string());
+        // zip 9: `name()` returns `Result<Cow<str>, ZipError>` (invalid names are errors).
+        let name = file.name().expect("ZIP entry has an invalid name");
+        println!("Found file in ZIP: {}", name);
+        found_files.push(name.to_string());
     }
 
     // Search for files dynamically in the archive structure, ignoring the temp folder name

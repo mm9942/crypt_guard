@@ -1875,7 +1875,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce, XChaCha20Poly1305,
         XNonce as XChaCha20Poly1305Nonce,
     };
-    use p256::elliptic_curve::sec1::ToEncodedPoint;
+    use p256::elliptic_curve::sec1::ToSec1Point;
     use p256::{ecdh::diffie_hellman, PublicKey as P256PublicKey, SecretKey as P256SecretKey};
     use p384::{
         ecdh::diffie_hellman as p384_diffie_hellman, PublicKey as P384PublicKey,
@@ -2241,7 +2241,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             match kem {
                 Kem::MlKem768P256 => {
                     let (pq, _, scalar) = derive_hybrid_key_pair(seed)?;
-                    let point = scalar.public_key().to_encoded_point(false);
+                    let point = scalar.public_key().to_sec1_point(false);
                     let mut bytes = Vec::with_capacity(MLKEM768_P256_PUBLIC_KEY_BYTES);
                     bytes.extend_from_slice(pq.as_bytes());
                     bytes.extend_from_slice(point.as_bytes());
@@ -2249,7 +2249,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 }
                 Kem::MlKem1024P384 => {
                     let (pq, _, scalar) = derive_hybrid_p384_key_pair(seed)?;
-                    let point = scalar.public_key().to_encoded_point(false);
+                    let point = scalar.public_key().to_sec1_point(false);
                     let mut bytes = Vec::with_capacity(MLKEM1024_P384_PUBLIC_KEY_BYTES);
                     bytes.extend_from_slice(pq.as_bytes());
                     bytes.extend_from_slice(point.as_bytes());
@@ -2373,12 +2373,12 @@ pub mod draft_ietf_hpke_pq_05_full {
         let comb = combine_hybrid(
             pss.as_bytes(),
             ss_t.raw_secret_bytes().as_slice(),
-            eph.public_key().to_encoded_point(false).as_bytes(),
+            eph.public_key().to_sec1_point(false).as_bytes(),
             &key.bytes[ML_KEM_768_PUBLIC_KEY_BYTES..],
         );
         let mut bytes = Vec::with_capacity(MLKEM768_P256_ENCAPSULATION_BYTES);
         bytes.extend_from_slice(pqenc.as_bytes());
-        bytes.extend_from_slice(eph.public_key().to_encoded_point(false).as_bytes());
+        bytes.extend_from_slice(eph.public_key().to_sec1_point(false).as_bytes());
         Ok((HybridEncapsulation { kem, bytes }, MlKemSharedSecret(comb)))
     }
     fn hybrid_decapsulate(
@@ -2526,7 +2526,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         let rpk = P384PublicKey::from_sec1_bytes(&key.bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..])
             .map_err(|_| Error::InvalidRecipientPublicKey)?;
         let ss_t = p384_diffie_hellman(eph.to_nonzero_scalar(), rpk.as_affine());
-        let eph_bytes = eph.public_key().to_encoded_point(false);
+        let eph_bytes = eph.public_key().to_sec1_point(false);
         let comb = combine_hybrid_for(
             pss.as_bytes(),
             ss_t.raw_secret_bytes().as_slice(),

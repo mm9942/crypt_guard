@@ -110,8 +110,8 @@ turboshake = { version = "=0.7.1", default-features = false, features = ["zeroiz
 # Direct, pure-Rust traditional components for the revision-pinned concrete
 # hybrid KEMs.  Keep their feature closure minimal: arithmetic only for the
 # NIST curves, and the RFC 7748 primitive for X25519.
-p256 = { version = "=0.13.2", default-features = false, features = ["arithmetic"] }
-p384 = { version = "=0.13.1", default-features = false, features = ["arithmetic"] }
+p256 = { version = "=0.14.0", default-features = false, features = ["arithmetic", "ecdh"] }
+p384 = { version = "=0.14.0", default-features = false, features = ["arithmetic", "ecdh"] }
 x25519-dalek = { version = "=2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
 ml-dsa  = { version = "0.1.1", optional = true, features = ["zeroize", "rand_core"] }
 # `zeroize`: wipe SLH-DSA signing keys (sk_seed/sk_prf) on drop.
@@ -134,7 +134,7 @@ xz2     = { version = "0.1.7",  optional = true, features = ["static"] }
 tar     = { version = "0.4.43", optional = true }
 flate2  = { version = "1.0.35", optional = true }
 walkdir = { version = "2.5.0",  optional = true }
-zip     = { version = "2.2.2",  optional = true }
+zip     = { version = "9", optional = true }
 rand_core_010 = { version = "0.10", package = "rand_core" }
 rand_core_09 = { version = "0.9.5", package = "rand_core", features = ["os_rng"] }
 sha2_011 = { version = "0.11", package = "sha2" }
