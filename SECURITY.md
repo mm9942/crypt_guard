@@ -28,12 +28,18 @@ Modules marked `// Panic-freedom contract: see SECURITY.md` follow these rules:
 - Entropy failures are returned as errors on the `TryOsRng` paths
   (`pq_hpke::generate_recipient_seed`, `MlDsa*Impl::generate_seed`,
   `try_keypair`, `sign_with_context`).
+- Entropy failures are also returned as errors by `sharing::split`,
+  `pq_stream::random_prefix` and the content-key / throwaway-seed draws of
+  `pq_multi::seal_multi` / `dummy_wrap`.
 
 Known, documented exceptions:
 
 - `kem::backend::OsRng` panics if the OS entropy source fails, because its
   `rand_core` error type is `Infallible`. Use `TryOsRng` (or the seed-based
   functions above) where a panic is unacceptable.
+- KEM encapsulation inside `pq_hpke::HpkeEnvelope::seal` (and therefore
+  `pq_multi::seal_multi` / `dummy_wrap`) and `generate_recipient_key_pair`
+  still use `rand::rngs::OsRng`, which panics if the OS entropy source fails.
 - Legacy code behind `legacy-pqclean` and `cgv2-compat` is retained for
   migration only and is not covered by the contract.
 - Third-party crates may still contain internal assertions.

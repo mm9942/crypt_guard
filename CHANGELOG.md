@@ -27,6 +27,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   known-answer test for seed-based key derivation.
 - `SECURITY.md` is now actually tracked (it was excluded by `.gitignore`).
 - `scripts/release_checks.sh` runs `cargo semver-checks` before a release.
+- Building blocks for messengers (new modules, additive, panic-free; the
+  randomness they draw themselves comes from `TryOsRng`):
+  - `prf`: labelled SHAKE256 PRF/KDF (`prf`, `prf32`) for identifiers,
+    capabilities and sub-keys; label, key, input and output length are all
+    bound into the derivation.
+  - `sharing`: Shamir secret sharing over GF(2^8) (`split`, `combine`,
+    `Share`) with constant-time field arithmetic, and SHA3-256 share
+    commitments (`commitment`, `verify_commitment`, `check_commitment`) that
+    attribute a bad share to its holder; typed `SharingError`
+    (`From<SharingError> for CryptError`).
+  - `pq_stream`: STREAM chunked AEAD with ChaCha20-Poly1305
+    (`StreamEncryptor`, `StreamDecryptor`, final chunk consumes the state),
+    detecting reordering, truncation, extension and tampering;
+    `derive_stream_key`, `random_prefix`.
+  - `pq_multi` (feature `ml-kem-backend`): multi-recipient seal bound to the
+    recipient set (`seal_multi`, `open_multi`, `recipient_set_hash`,
+    `dummy_wrap`, `MultiRecipientCiphertext::check_recipient_set`).
+- `pq_hpke::HpkeEnvelope::open_pinned_zeroizing`: rejects a record whose wire
+  suite differs from the locally pinned suite before decapsulation.
+- `tests/m0_ext_primitives.rs` with known-answer vectors computed
+  independently with Python `hashlib`.
+- `crypt_guard_service`: `try_network_handle` (feature `buffer`), the
+  panic-free variant of `network_handle`: `Unavailable` without a Tokio
+  runtime, `Malformed` for a zero or oversized `queue_bound`/`max_in_flight`.
+  `buffer` now depends on `tokio` (`rt`, `sync`) directly; it was already
+  pulled in by `tower/buffer`.
+- `crypt_guard_service`: per-version key lifecycle metadata. `KeyLifecycle`
+  (`created_at_unix_ms`, optional `not_before`/`not_after`/`destroy_after`,
+  builder `with_*`, `is_within_validity`, `is_destruction_due`),
+  `CryptoOperation::DescribeLifecycle` / `CryptoResponse::Lifecycle`,
+  `OpKind::DescribeLifecycle` (`"describe_lifecycle"`, own `OpSet` bit,
+  included in `OpSet::READ_PUBLIC`). `InMemoryProvider` stamps creation
+  times at generate/rotate; `InMemoryProvider::with_clock` injects a clock.
+
+### Changed
+- `OpSet::READ_PUBLIC` (and `ALL`) now include `DescribeLifecycle`; grants
+  built from `OpKind::Describe` alone must add `OpKind::DescribeLifecycle`.
+- `sha3` is built with its `zeroize` feature, so hash state that absorbed
+  keys or shares is wiped on drop.
 
 ## [3.1.0] - 2026-09-27
 

@@ -84,15 +84,25 @@ impl<P: CryptoProvider, A: Authorizer> CryptoProvider for PolicyProvider<P, A> {
 }
 
 /// A set of [`OpKind`]s, used to express grants.
+///
+/// Every [`OpKind`] has its own bit, so a grant names exactly the operations
+/// it allows. [`OpKind::DescribeLifecycle`] (added in 3.2.0) has a bit of its
+/// own rather than sharing [`OpKind::Describe`]'s: it is part of
+/// [`OpSet::READ_PUBLIC`] (and so of [`OpSet::ALL`]), while a grant built
+/// operation by operation with `OpSet::NONE.with(OpKind::Describe)` does not
+/// silently gain it (deny by default for new operations). The bit layout is
+/// private, so widening the set later is not an API change.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct OpSet(u16);
 
 impl OpSet {
     /// No operations.
     pub const NONE: Self = Self(0);
-    /// Read-only, non-secret operations: describe, public key, verify.
+    /// Read-only, non-secret operations: describe, describe lifecycle, public
+    /// key, verify.
     pub const READ_PUBLIC: Self = Self(0)
         .with(OpKind::Describe)
+        .with(OpKind::DescribeLifecycle)
         .with(OpKind::PublicKey)
         .with(OpKind::Verify);
     /// Encrypt and wrap.
@@ -135,6 +145,8 @@ impl OpSet {
             OpKind::WrapKey => 1 << 11,
             OpKind::UnwrapKey => 1 << 12,
             OpKind::RewrapKey => 1 << 13,
+            // Bit 15 is the last free bit of the `u16`.
+            OpKind::DescribeLifecycle => 1 << 14,
         }
     }
 
@@ -289,8 +301,61 @@ mod tests {
             OpKind::WrapKey,
             OpKind::UnwrapKey,
             OpKind::RewrapKey,
+            OpKind::DescribeLifecycle,
         ] {
             assert!(OpSet::ALL.contains(kind));
+        }
+    }
+
+    const ALL_KINDS: [OpKind; 15] = [
+        OpKind::Generate,
+        OpKind::Rotate,
+        OpKind::Disable,
+        OpKind::Enable,
+        OpKind::Destroy,
+        OpKind::Describe,
+        OpKind::PublicKey,
+        OpKind::Encrypt,
+        OpKind::Decrypt,
+        OpKind::Sign,
+        OpKind::Verify,
+        OpKind::WrapKey,
+        OpKind::UnwrapKey,
+        OpKind::RewrapKey,
+        OpKind::DescribeLifecycle,
+    ];
+
+    #[test]
+    fn every_op_kind_has_its_own_bit() {
+        for a in ALL_KINDS {
+            for b in ALL_KINDS {
+                assert_eq!(
+                    OpSet::NONE.with(a).contains(b),
+                    a == b,
+                    "{a:?} / {b:?} share a bit"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn describe_lifecycle_is_read_public_but_not_implied_by_describe() {
+        assert!(OpSet::READ_PUBLIC.contains(OpKind::DescribeLifecycle));
+        assert!(OpSet::ALL.contains(OpKind::DescribeLifecycle));
+        assert!(!OpSet::NONE
+            .with(OpKind::Describe)
+            .contains(OpKind::DescribeLifecycle));
+        assert!(!OpSet::NONE
+            .with(OpKind::DescribeLifecycle)
+            .contains(OpKind::Describe));
+        for set in [
+            OpSet::ENCRYPT,
+            OpSet::SECRET_EGRESS,
+            OpSet::SIGN,
+            OpSet::REWRAP,
+            OpSet::ADMIN,
+        ] {
+            assert!(!set.contains(OpKind::DescribeLifecycle), "{set:?}");
         }
     }
 

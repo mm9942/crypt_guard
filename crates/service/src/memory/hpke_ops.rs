@@ -155,6 +155,7 @@ pub(crate) fn rewrap(
 mod tests {
     use super::*;
     use crate::key::{KeyAlgorithm, KeyId, KeyNamespace};
+    use crate::lifecycle::KeyLifecycle;
 
     fn store_with_hpke_key(suite: Suite) -> (KeyStore, KeyRef) {
         let mut store = KeyStore::new();
@@ -163,7 +164,7 @@ mod tests {
         let material = generate_hpke(suite).unwrap();
         let algorithm = KeyAlgorithm::Hpke { suite };
         let key_ref = store
-            .insert_new(namespace, id, algorithm, material)
+            .insert_new(namespace, id, algorithm, material, KeyLifecycle::new(0))
             .unwrap();
         (store, key_ref)
     }

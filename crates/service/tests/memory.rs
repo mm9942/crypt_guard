@@ -1,18 +1,22 @@
 //! Behaviour and security invariants of `InMemoryProvider`: key lifecycle,
 //! encrypt/decrypt and wrap/unwrap round trips, opaque authentication
-//! failures on tampering, and domain separation between purposes and key
-//! versions.
+//! failures on tampering, domain separation between purposes and key
+//! versions, and per-version lifecycle metadata.
 //!
 //! The provider is driven directly and synchronously through
 //! `CryptoProvider::execute`; no Tokio runtime or `CryptoService` wrapper is
 //! needed for these tests.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crypt_guard_service::{
     pq_hpke::DEFAULT_SUITE, CiphertextBlob, CryptoContext, CryptoOperation, CryptoProvider,
-    CryptoRequest, CryptoResponse, CryptoServiceError, Decrypt, DescribeKey, DestroyKey,
-    DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey, InMemoryProvider, KeyAlgorithm,
-    KeyId, KeyNamespace, KeyRef, KeyState, KeyVersion, PublicBlob, RequestId, RewrapKey, RotateKey,
-    SecretBytes, SignatureAlgorithm, UnwrapKey, WrapKey,
+    CryptoRequest, CryptoResponse, CryptoServiceError, Decrypt, DescribeKey, DescribeLifecycle,
+    DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey, InMemoryProvider,
+    KeyAlgorithm, KeyId, KeyLifecycle, KeyMetadata, KeyNamespace, KeyRef, KeyState, KeyVersion,
+    PublicBlob, RequestId, RewrapKey, RotateKey, SecretBytes, SignatureAlgorithm, UnwrapKey,
+    WrapKey,
 };
 
 // ---------------------------------------------------------------------------
@@ -728,4 +732,265 @@ fn generate_signature_key_without_ml_dsa_feature_is_unsupported() {
     )
     .unwrap_err();
     assert_eq!(err, CryptoServiceError::Unsupported);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Lifecycle metadata (DescribeLifecycle)
+// ---------------------------------------------------------------------------
+
+const FIXED_NOW_MS: u64 = 1_700_000_000_000;
+
+fn fixed_clock() -> Option<u64> {
+    Some(FIXED_NOW_MS)
+}
+
+fn no_clock() -> Option<u64> {
+    None
+}
+
+/// 1000, 2000, 3000, ... Used by exactly one test, so the sequence is
+/// deterministic even though tests run in parallel.
+fn ticking_clock() -> Option<u64> {
+    static TICKS: AtomicU64 = AtomicU64::new(0);
+    Some((TICKS.fetch_add(1, Ordering::Relaxed) + 1) * 1_000)
+}
+
+/// Reads 5000 once, then has no time. Used by exactly one test.
+fn clock_that_stops() -> Option<u64> {
+    static CALLS: AtomicU64 = AtomicU64::new(0);
+    (CALLS.fetch_add(1, Ordering::Relaxed) == 0).then_some(5_000)
+}
+
+fn system_now_ms() -> u64 {
+    let elapsed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    u64::try_from(elapsed.as_millis()).unwrap()
+}
+
+fn describe_lifecycle(
+    provider: &mut InMemoryProvider,
+    id: u128,
+    key: &KeyRef,
+) -> Result<KeyLifecycle, CryptoServiceError> {
+    let op = CryptoOperation::DescribeLifecycle(DescribeLifecycle { key: key.clone() });
+    run(provider, id, op).map(|resp| match resp {
+        CryptoResponse::Lifecycle(lifecycle) => lifecycle,
+        other => panic!("unexpected response: {other:?}"),
+    })
+}
+
+fn describe(
+    provider: &mut InMemoryProvider,
+    id: u128,
+    key: &KeyRef,
+) -> Result<KeyMetadata, CryptoServiceError> {
+    let op = CryptoOperation::Describe(DescribeKey { key: key.clone() });
+    run(provider, id, op).map(|resp| match resp {
+        CryptoResponse::Metadata(meta) => meta,
+        other => panic!("unexpected response: {other:?}"),
+    })
+}
+
+fn rotate(provider: &mut InMemoryProvider, id: u128, key: &KeyRef) -> KeyRef {
+    let op = CryptoOperation::Rotate(RotateKey { key: key.clone() });
+    match run(provider, id, op).unwrap() {
+        CryptoResponse::KeyCreated { key, .. } => key,
+        other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[test]
+fn generate_then_describe_lifecycle_reports_creation_time() {
+    let mut provider = InMemoryProvider::with_clock(fixed_clock);
+    let (key_v1, _) = generate_hpke(&mut provider, 1, "app", "k1");
+    let latest = KeyRef::latest(ns("app"), kid("k1"));
+
+    for (id, key) in [(2, &key_v1), (3, &latest)] {
+        let lifecycle = describe_lifecycle(&mut provider, id, key).unwrap();
+        assert_eq!(lifecycle, KeyLifecycle::new(FIXED_NOW_MS));
+        assert_eq!(lifecycle.created_at_unix_ms, FIXED_NOW_MS);
+        // The in-memory provider records the creation time only.
+        assert_eq!(lifecycle.not_before_unix_ms, None);
+        assert_eq!(lifecycle.not_after_unix_ms, None);
+        assert_eq!(lifecycle.destroy_after_unix_ms, None);
+    }
+}
+
+#[test]
+fn system_clock_stamps_generated_keys() {
+    let before = system_now_ms();
+    let mut provider = InMemoryProvider::new();
+    let (key, _) = generate_hpke(&mut provider, 1, "app", "k1");
+    let after = system_now_ms();
+
+    let created = describe_lifecycle(&mut provider, 2, &key)
+        .unwrap()
+        .created_at_unix_ms;
+    // Generous slack: the wall clock is not monotonic.
+    assert!(created > 1_600_000_000_000, "{created}");
+    assert!(
+        created.saturating_add(60_000) >= before,
+        "{created} < {before}"
+    );
+    assert!(
+        created <= after.saturating_add(60_000),
+        "{created} > {after}"
+    );
+}
+
+#[test]
+fn rotate_keeps_per_version_created_at() {
+    let mut provider = InMemoryProvider::with_clock(ticking_clock);
+    let (key_v1, _) = generate_hpke(&mut provider, 1, "app", "rot");
+    let latest = KeyRef::latest(ns("app"), kid("rot"));
+    let key_v2 = rotate(&mut provider, 2, &latest);
+    let key_v3 = rotate(&mut provider, 3, &latest);
+    assert_eq!(key_v3.version, Some(KeyVersion::new(3).unwrap()));
+
+    // Each version keeps the time it was created; rotation does not touch
+    // earlier versions.
+    for (id, key, created) in [
+        (4, &key_v1, 1_000),
+        (5, &key_v2, 2_000),
+        (6, &key_v3, 3_000),
+        (7, &latest, 3_000),
+    ] {
+        let lifecycle = describe_lifecycle(&mut provider, id, key).unwrap();
+        assert_eq!(lifecycle.created_at_unix_ms, created, "{key}");
+    }
+
+    // Describe and DescribeLifecycle resolve the unversioned ref to the same
+    // (new primary) version.
+    assert_eq!(describe(&mut provider, 8, &latest).unwrap().key, key_v3);
+}
+
+#[test]
+fn describe_lifecycle_follows_describe_for_disabled_destroyed_and_unknown() {
+    let mut provider = InMemoryProvider::with_clock(fixed_clock);
+    let (key_v1, _) = generate_hpke(&mut provider, 1, "app", "k1");
+    let latest = KeyRef::latest(ns("app"), kid("k1"));
+    let expected = KeyLifecycle::new(FIXED_NOW_MS);
+
+    // Disabled: both still describe the version.
+    run(
+        &mut provider,
+        2,
+        CryptoOperation::Disable(DisableKey {
+            key: key_v1.clone(),
+        }),
+    )
+    .unwrap();
+    assert_eq!(
+        describe(&mut provider, 3, &key_v1).unwrap().state,
+        KeyState::Disabled
+    );
+    assert_eq!(describe_lifecycle(&mut provider, 4, &key_v1), Ok(expected));
+
+    // Destroyed: the tombstone keeps its metadata and its lifecycle, also
+    // through the unversioned ref (the primary still points at v1).
+    run(
+        &mut provider,
+        5,
+        CryptoOperation::Destroy(DestroyKey {
+            key: key_v1.clone(),
+        }),
+    )
+    .unwrap();
+    for (id, key) in [(6, &key_v1), (8, &latest)] {
+        assert_eq!(
+            describe(&mut provider, id, key).unwrap().state,
+            KeyState::Destroyed
+        );
+        assert_eq!(describe_lifecycle(&mut provider, id + 1, key), Ok(expected));
+    }
+
+    // Unknown key, version or namespace: both are NotFound.
+    let unknown = [
+        KeyRef::latest(ns("app"), kid("missing")),
+        KeyRef::versioned(ns("app"), kid("k1"), KeyVersion::new(9).unwrap()),
+        KeyRef::latest(ns("other"), kid("k1")),
+    ];
+    for (offset, key) in (0u128..).step_by(2).zip(unknown.iter()) {
+        assert_eq!(
+            describe(&mut provider, 10 + offset, key).unwrap_err(),
+            CryptoServiceError::NotFound
+        );
+        assert_eq!(
+            describe_lifecycle(&mut provider, 11 + offset, key).unwrap_err(),
+            CryptoServiceError::NotFound
+        );
+    }
+}
+
+#[test]
+fn generate_without_a_clock_is_unavailable_and_creates_nothing() {
+    let mut provider = InMemoryProvider::with_clock(no_clock);
+    let err = run(
+        &mut provider,
+        1,
+        CryptoOperation::Generate(GenerateKey {
+            namespace: ns("app"),
+            id: kid("k1"),
+            algorithm: hpke_algorithm(),
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Unavailable);
+
+    let latest = KeyRef::latest(ns("app"), kid("k1"));
+    assert_eq!(
+        describe(&mut provider, 2, &latest).unwrap_err(),
+        CryptoServiceError::NotFound
+    );
+
+    // An unsupported algorithm is still Unsupported, not Unavailable.
+    #[cfg(not(feature = "ml-dsa"))]
+    {
+        let err = run(
+            &mut provider,
+            3,
+            CryptoOperation::Generate(GenerateKey {
+                namespace: ns("app"),
+                id: kid("signer"),
+                algorithm: KeyAlgorithm::Signature(SignatureAlgorithm::MlDsa65),
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(err, CryptoServiceError::Unsupported);
+    }
+}
+
+#[test]
+fn rotate_without_a_clock_is_unavailable_and_keeps_the_primary() {
+    let mut provider = InMemoryProvider::with_clock(clock_that_stops);
+    let (key_v1, _) = generate_hpke(&mut provider, 1, "app", "k1");
+    let latest = KeyRef::latest(ns("app"), kid("k1"));
+
+    let err = run(
+        &mut provider,
+        2,
+        CryptoOperation::Rotate(RotateKey {
+            key: latest.clone(),
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Unavailable);
+
+    // Nothing was added: v1 is still the primary, with its original stamp.
+    assert_eq!(describe(&mut provider, 3, &latest).unwrap().key, key_v1);
+    assert_eq!(
+        describe_lifecycle(&mut provider, 4, &latest),
+        Ok(KeyLifecycle::new(5_000))
+    );
+
+    // An unknown key is still NotFound: request errors take precedence over
+    // a missing time.
+    let err = run(
+        &mut provider,
+        5,
+        CryptoOperation::Rotate(RotateKey {
+            key: KeyRef::latest(ns("app"), kid("missing")),
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(err, CryptoServiceError::NotFound);
 }

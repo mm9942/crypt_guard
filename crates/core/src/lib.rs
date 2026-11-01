@@ -97,6 +97,15 @@ pub mod kdf;
 pub mod kem;
 /// Canonical v3 PQ HPKE transport API.
 pub mod pq_hpke;
+/// Multi-recipient PQ HPKE seal bound to the recipient set (group messages).
+#[cfg(feature = "ml-kem-backend")]
+pub mod pq_multi;
+/// STREAM chunked AEAD (ChaCha20-Poly1305) with a final-chunk flag, for files.
+pub mod pq_stream;
+/// Labelled SHAKE256 PRF/KDF for identifiers, capabilities and sub-keys.
+pub mod prf;
+/// Shamir secret sharing over GF(2^8) with attributable share commitments.
+pub mod sharing;
 /// Internal CGv2 authenticated-envelope implementation for compatibility
 /// migrations only.
 ///

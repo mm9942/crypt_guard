@@ -382,6 +382,50 @@ impl HpkeEnvelope {
         self.open(recipient, info, aad).map(Zeroizing::new)
     }
 
+    /// Open like [`Self::open_zeroizing`], but only if the record's wire suite
+    /// equals the suite pinned in local metadata.
+    ///
+    /// # Description
+    /// The suite in a received record is attacker-controlled. Applications
+    /// that store the expected suite with the key (or in a protocol
+    /// definition) pass it as `expected`; any difference in KEM, KDF or AEAD
+    /// is rejected before decapsulation, so a downgraded or substituted
+    /// suite never reaches the key.
+    ///
+    /// # Errors
+    /// - [`Error::UnavailableCapability`] carrying the wire suite when it differs
+    ///   from `expected` (maps to `ErrorKind::Unsupported`).
+    /// - Otherwise the same errors as [`Self::open_zeroizing`].
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crypt_guard_core::pq_hpke::{generate_recipient_key_pair, HpkeEnvelope, DEFAULT_SUITE};
+    ///
+    /// # fn main() -> Result<(), crypt_guard_core::pq_hpke::Error> {
+    /// let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem())?;
+    /// let record = HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"info", b"aad", b"hi")?;
+    /// let plaintext =
+    ///     record.open_pinned_zeroizing(DEFAULT_SUITE, keys.private_key(), b"info", b"aad")?;
+    /// assert_eq!(&plaintext[..], b"hi");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn open_pinned_zeroizing(
+        &self,
+        expected: Suite,
+        recipient: &RecipientPrivateKey,
+        info: &[u8],
+        aad: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, Error> {
+        if self.suite != expected {
+            return Err(Error::UnavailableCapability {
+                suite: self.suite,
+                reason: "envelope suite differs from the locally pinned suite",
+            });
+        }
+        self.open_zeroizing(recipient, info, aad)
+    }
+
     /// Decode a wire-format v3 envelope and open it in one step.
     ///
     /// This is a convenience that composes [`Self::from_bytes`] and
@@ -754,6 +798,31 @@ mod tests {
         let via_bytes =
             HpkeEnvelope::open_bytes_zeroizing(&bytes, keys.private_key(), b"i", b"a").unwrap();
         assert_eq!(plain.as_slice(), via_bytes.as_slice());
+    }
+
+    #[test]
+    fn open_pinned_zeroizing_rejects_a_different_wire_suite() {
+        let keys = generate_recipient_key_pair(DEFAULT_SUITE.kem()).unwrap();
+        let envelope =
+            HpkeEnvelope::seal(DEFAULT_SUITE, keys.public_key(), b"i", b"a", b"payload").unwrap();
+        let pinned = envelope
+            .open_pinned_zeroizing(DEFAULT_SUITE, keys.private_key(), b"i", b"a")
+            .unwrap();
+        assert_eq!(pinned.as_slice(), b"payload");
+
+        for other in [
+            Suite::new(DEFAULT_SUITE.kem(), Kdf::HkdfSha384, DEFAULT_SUITE.aead()),
+            Suite::new(DEFAULT_SUITE.kem(), DEFAULT_SUITE.kdf(), Aead::Aes256Gcm),
+            Suite::new(Kem::MlKem1024, DEFAULT_SUITE.kdf(), DEFAULT_SUITE.aead()),
+        ] {
+            assert_eq!(
+                envelope.open_pinned_zeroizing(other, keys.private_key(), b"i", b"a"),
+                Err(Error::UnavailableCapability {
+                    suite: DEFAULT_SUITE,
+                    reason: "envelope suite differs from the locally pinned suite",
+                })
+            );
+        }
     }
 
     #[test]
