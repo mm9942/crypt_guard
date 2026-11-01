@@ -35,6 +35,15 @@
 //! accepted by these APIs. AES-256-GCM-SIV and XChaCha20-Poly1305 are explicit
 //! crypt_guard private extensions and require [`pq_hpke::HpkeEnvelope`].
 //!
+//! ## Two-layer envelope
+//!
+//! [`pq_cascade`] adds a keyed AEAD with a fixed 32-byte overhead for every
+//! scheme (ChaCha20-Poly1305, AES-256-GCM-SIV, XChaCha20-Poly1305, or the
+//! AES-256-GCM-SIV + XChaCha20-Poly1305 cascade), a random-nonce mode, and a
+//! two-layer [`pq_hpke::HpkeEnvelope`] under [`pq_cascade::MAXIMAL_SUITE`]
+//! with a single KEM encapsulation. It is purely additive;
+//! [`pq_hpke::DEFAULT_SUITE`] is unchanged.
+//!
 //! ## CGv2 migration
 //!
 //! CGv2 is not a v3 default API or transport. Enable `cgv2-compat` only to read
@@ -95,6 +104,9 @@ pub mod hpke_pq;
 pub mod kdf;
 /// ML-KEM backend trait and ML-KEM-512/768/1024 implementations (FIPS 203).
 pub mod kem;
+/// Two-layer cascade AEAD (AES-256-GCM-SIV + XChaCha20-Poly1305), random-nonce
+/// mode, and the "Maximal" single-encapsulation HPKE cascade envelope.
+pub mod pq_cascade;
 /// Canonical v3 PQ HPKE transport API.
 pub mod pq_hpke;
 /// Multi-recipient PQ HPKE seal bound to the recipient set (group messages).

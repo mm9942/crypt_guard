@@ -31,6 +31,16 @@ Modules marked `// Panic-freedom contract: see SECURITY.md` follow these rules:
 - Entropy failures are also returned as errors by `sharing::split`,
   `pq_stream::random_prefix` and the content-key / throwaway-seed draws of
   `pq_multi::seal_multi` / `dummy_wrap`.
+- The same holds for the new cascade paths: the content-key, throwaway-seed
+  and filler draws of `pq_multi::seal_multi_cascade` / `dummy_cascade_wrap`
+  and the nonce draw of `pq_cascade::seal_random` use `TryOsRng` and return
+  an error. `pq_cascade` (and the cascade functions of `pq_multi`) never
+  panics on malformed input: a wrong key, AAD, nonce, scheme, length, wrap
+  version or filler is the single opaque `CryptError::AuthenticationFailed`
+  (programming errors such as an all-zero root key, an empty `domain`, a
+  wrong in-place buffer length, a second `CascadeSealer::seal` or a zero
+  `Stream` prefix are `InvalidParameters`; a suite other than
+  `MAXIMAL_SUITE` is `UnsupportedAlgorithm`).
 
 Known, documented exceptions:
 
@@ -40,6 +50,11 @@ Known, documented exceptions:
 - KEM encapsulation inside `pq_hpke::HpkeEnvelope::seal` (and therefore
   `pq_multi::seal_multi` / `dummy_wrap`) and `generate_recipient_key_pair`
   still use `rand::rngs::OsRng`, which panics if the OS entropy source fails.
+  The new `pq_cascade::seal_envelope` (and therefore
+  `pq_multi::seal_multi_cascade` / `dummy_cascade_wrap`), and every HPKE
+  sender context created with `setup_base_sender_inner` for a `CascadeSealer`,
+  share this limitation, because the single KEM encapsulation of a cascade
+  envelope goes through the same `pq_hpke` sender setup.
 - Legacy code behind `legacy-pqclean` and `cgv2-compat` is retained for
   migration only and is not covered by the contract.
 - Third-party crates may still contain internal assertions.
@@ -49,6 +64,19 @@ Known, documented exceptions:
 - Secret key material lives in zeroizing types (`Zeroizing`, `ZeroizeOnDrop`)
   and is never printed: `Debug` implementations of secret types are redacted.
 - Error values carry no key, seed or plaintext bytes.
+- `pq_cascade::Cascade` is not `Clone`, holds its layer keys in `Zeroizing`
+  buffers and has a redacted `Debug`; intermediate plaintext (the inner
+  ciphertext of a cascade, the padded single-layer body) and the HPKE exporter
+  outputs live in `Zeroizing` buffers. The `Cascade` of `seal_once` is
+  consumed, so one derived-nonce key can never seal a second message.
+- Known gap in a dependency: `aes-gcm-siv` 0.11.1 derives per-nonce
+  sub-keys into a `polyval::Polyval` that is only wiped on drop when
+  `polyval` is built with its `zeroize` feature. With the default build the
+  per-message POLYVAL sub-keys of the AES-256-GCM-SIV layer (not the root key
+  and not the layer key) can stay in freed memory. Even with that feature the
+  `aarch64` PMULL backend of `polyval` 0.6.2 has no wipe (an upstream TODO),
+  so Android builds remain affected; the portable and x86 CLMUL backends are
+  covered.
 
 ## Dependency and audit status
 

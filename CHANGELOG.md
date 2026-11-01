@@ -60,6 +60,44 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `OpKind::DescribeLifecycle` (`"describe_lifecycle"`, own `OpSet` bit,
   included in `OpSet::READ_PUBLIC`). `InMemoryProvider` stamps creation
   times at generate/rotate; `InMemoryProvider::with_clock` injects a clock.
+- `pq_cascade` (new module, additive, panic-free): a selectable one- or
+  two-layer AEAD over caller-supplied 32-byte keys, plus a two-layer variant of
+  the `HpkeEnvelope` (`CGH3`) container, for the "Maximal" protection level of
+  messengers. Nothing existing changes: `DEFAULT_SUITE`, `pq_hpke`, `pq_stream`
+  and `pq_multi::seal_multi` keep their signatures and wire formats.
+  - `Scheme` (non-exhaustive): `ChaCha20Poly1305` = 1, `Aes256GcmSiv` = 2,
+    `XChaCha20Poly1305` = 3 and `Cascade` = 4 (AES-256-GCM-SIV inside,
+    XChaCha20-Poly1305 outside). Every scheme expands the plaintext by exactly
+    32 bytes (`CASCADE_OVERHEAD`); the single-layer schemes carry 16 zero
+    filler bytes inside the AEAD, so the scheme cannot be read from the length.
+  - `Cascade`: independent sub-keys per scheme and caller `domain` from one
+    32-byte root key via `prf32`; the scheme id is part of every key and of the
+    AAD of every layer. `seal`/`open` take a `CascadeNonce` (`Counter` for
+    session frames, `Stream` for file chunks, same layout as `pq_stream`);
+    `seal_once` consumes the `Cascade` and derives the nonce from the key, so
+    one key can never seal two messages. In-place variants avoid copies.
+  - `seal_random`/`open_random`: random 192-bit nonce per value (`TryOsRng`),
+    for stored values.
+  - `MAXIMAL_SUITE` (`MlKem1024P384`, `Shake256`, `XChaCha20Poly1305`),
+    `seal_envelope`/`open_envelope`: AES-256-GCM-SIV inside, the HPKE
+    XChaCha20-Poly1305 context outside, with one KEM encapsulation. The result
+    is a normal `HpkeEnvelope`; the suite is pinned before decapsulation.
+  - `CascadeSealer`/`CascadeOpener`: one-shot wrappers around an HPKE context
+    for protocols that control `enc` and exporters themselves.
+  - Every open failure is the same `CryptError::AuthenticationFailed`; keys
+    and intermediate plaintext live in `Zeroizing` buffers.
+- `pq_multi` (feature `ml-kem-backend`): `seal_multi_cascade`,
+  `open_multi_cascade`, `dummy_cascade_wrap` and `WRAP_PAYLOAD_LEN`. The body
+  uses any `Scheme`; every wrap is a `MAXIMAL_SUITE` cascade envelope of
+  `version ‖ scheme_id ‖ CEK` (1 751 bytes whatever the scheme, so the body
+  scheme is invisible to relays). `open_multi_cascade` calls an `accept`
+  callback with the scheme before the body is decrypted (minimum-level
+  policies) and returns one opaque error for every failure. The recipient-set
+  binding is the same as for `seal_multi`.
+- Known-answer vectors for `pq_cascade` and `pq_multi`'s cascade variant,
+  computed independently with a Python reference model (`hashlib` plus
+  `cryptography`): `crates/core/tests/vectors/pq-cascade-kats.json` (listed in
+  `SHA256SUMS`) and `tests/pq_cascade_kats.rs`.
 
 ### Changed
 - `OpSet::READ_PUBLIC` (and `ALL`) now include `DescribeLifecycle`; grants
