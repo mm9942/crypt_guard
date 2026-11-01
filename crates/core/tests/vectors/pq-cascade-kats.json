@@ -25,6 +25,208 @@
    "tag": "c0875924c1c7987947deafd8780acf49"
   }
  },
+ "negatives": [
+  {
+   "id": "filler_nonzero/XChaCha20Poly1305/first_byte",
+   "scheme": 3,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "432f81fce4584c0be14cc6e5641387f84f21c702fa8ce953256ab62e90e182ff7c3f16976090b28e1c2f1da84796d66402b88124"
+  },
+  {
+   "id": "filler_nonzero/XChaCha20Poly1305/last_byte",
+   "scheme": 3,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "432f81fce4584c0be14cc6e5641387f84f21c702fb8ce953256ab62e90e182ff7c3f1696d4b6163ffa665a53afcac11c3d534b57"
+  },
+  {
+   "id": "filler_nonzero/XChaCha20Poly1305/all_ff",
+   "scheme": 3,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "432f81fce4584c0be14cc6e5641387f84f21c702047316acda9549d16f1e7d0083c0e968bd369b8de459e16b719c984035b95877"
+  },
+  {
+   "id": "no_filler/XChaCha20Poly1305",
+   "scheme": 3,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output without the 16 filler bytes",
+   "ct": "432f81fce4584c0be14cc6e5641387f84f21c702652da5798444ab082c21c5c7124c17b5"
+  },
+  {
+   "id": "filler_nonzero/Aes256GcmSiv/first_byte",
+   "scheme": 2,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "ca056a737385cf43085eeb21e3ff435cf155150ea22b1500999943e58916c67c26936f1787b93974bed865a0804c1c7ae774f659"
+  },
+  {
+   "id": "filler_nonzero/Aes256GcmSiv/last_byte",
+   "scheme": 2,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "be5cc3833cc8820c78a2fcf38da4d325e189ed9c51195187871e423e0e6893d1886c75672d98ffad516a46ae9ae71a72231c7990"
+  },
+  {
+   "id": "filler_nonzero/Aes256GcmSiv/all_ff",
+   "scheme": 2,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "f32f6c5fca85f6c3f47eef772416c642322cbd72d5496cb984f0598c860196ef55022181a04057b488b50b8c281cd92d5b7aeda5"
+  },
+  {
+   "id": "no_filler/Aes256GcmSiv",
+   "scheme": 2,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output without the 16 filler bytes",
+   "ct": "0f4563e1bfc301feb8b8f9fe258cce0ca008c667f794e2351563c97b1409d94a43fb3293"
+  },
+  {
+   "id": "filler_nonzero/ChaCha20Poly1305/first_byte",
+   "scheme": 1,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "975ab325c73f69cf5e2633291eb9d7384a7b4893199aa5e581391226b9ed33f89dea2a57b3b9fcf40853e2e38ee434b8769283e5"
+  },
+  {
+   "id": "filler_nonzero/ChaCha20Poly1305/last_byte",
+   "scheme": 1,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "975ab325c73f69cf5e2633291eb9d7384a7b4893189aa5e581391226b9ed33f89dea2a56c53bd6c7e00ebe95d3b6f9da0ba1ae44"
+  },
+  {
+   "id": "filler_nonzero/ChaCha20Poly1305/all_ff",
+   "scheme": 1,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output whose filler is not zero",
+   "ct": "975ab325c73f69cf5e2633291eb9d7384a7b4893e7655a1a7ec6edd94612cc076215d5a839c1338765d686e6c6455a73a54b548c"
+  },
+  {
+   "id": "no_filler/ChaCha20Poly1305",
+   "scheme": 1,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "authentic AEAD output without the 16 filler bytes",
+   "ct": "975ab325c73f69cf5e2633291eb9d7384a7b4893edf49ff219fa983db22e5969ac097987"
+  },
+  {
+   "id": "cascade/inner_corrupt_outer_valid",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "outer layer valid, inner ciphertext has a flipped bit",
+   "ct": "71b3d7c4e2cc0ec27edec4dd0949e0039d80207ee810c95567adb765640b7c1a79b269fe5fd964abe95f28ef3a9d61cf8456acd5"
+  },
+  {
+   "id": "cascade/inner_wrong_aad_outer_valid",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "outer valid, inner AAD lacks the caller aad",
+   "ct": "e59fada546c0967ee710adb8fa1bd1f374f81127b6e03169043070f9c7d7916106f88421a1e3bfa022db94bc0e2990ab75fc2f35"
+  },
+  {
+   "id": "cascade/layer_keys_swapped",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "inner under k_out, outer under k_in",
+   "ct": "a34967a645b47f4d70064a6e261090d8895be8b5dc9021fce75b69695c428f30cb49559bceba918796ffd0cb5ccdf95b63fa318e"
+  },
+  {
+   "id": "cascade/layer_order_swapped",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "XChaCha20-Poly1305 inside, AES-256-GCM-SIV outside",
+   "ct": "2f73f3669f8a9c09d8c654ab766e55e4ffe17be1983b22a56ea0efe15df2de57f6fddfdff04d7da2ef221d8bb5b19252df6f010b"
+  },
+  {
+   "id": "cascade/outer_only",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "single outer layer over pt || 0^16, no inner layer",
+   "ct": "66bd5fe650134698c2d6a772c142d580b3824aaab44e5dd582d92bafd2e658889091fdd43bc78ed52624223f74c7a7574364b451"
+  },
+  {
+   "id": "cascade/inner_only",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "single inner layer over pt || 0^16, no outer layer",
+   "ct": "a429c65b56edb9975761004b661993a598de51a719915e79411ad64e9713052a01b30a06c490d5887c9f6008aa9e0016f821b768"
+  },
+  {
+   "id": "cascade/swapped_aad_prefixes",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "inner uses A_OUT, outer uses A_IN",
+   "ct": "a952357728d7e88bc85ee1fdd7653a66b85e1f0c0c78981856240148541c634c50c6ef82be20976d1dcf6f516977e1042f7e71b6"
+  },
+  {
+   "id": "cascade/ctx_scheme_byte_substituted",
+   "scheme": 4,
+   "mode": "counter",
+   "domain_byte": 1,
+   "n": "5",
+   "n24": "010000000000000000000005000000000000000000000000",
+   "why": "all keys/AAD derived with scheme id 1 instead of 4",
+   "ct": "6a31746db5e68143c4a77184ab2ccdc82f1875de4035c89462dcf767691b992cd6fb3a52a822436d98368f06dd6ff3204ae18352"
+  }
+ ],
  "cases": [
   {
    "name": "main",
