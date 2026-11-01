@@ -97,7 +97,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Known-answer vectors for `pq_cascade` and `pq_multi`'s cascade variant,
   computed independently with a Python reference model (`hashlib` plus
   `cryptography`): `crates/core/tests/vectors/pq-cascade-kats.json` (listed in
-  `SHA256SUMS`) and `tests/pq_cascade_kats.rs`.
+  `SHA256SUMS`) and `tests/pq_cascade_kats.rs`. The model itself is
+  `crates/core/tests/vectors/pq_cascade_ref.py`; `pq_cascade_kats_gen.py`
+  regenerates the JSON byte for byte (`python3 -I`).
+- Documented limitation (see `SECURITY.md`): `aes-gcm-siv`'s POLYVAL sub-keys
+  of the AES-256-GCM-SIV layer are not reliably wiped from freed memory
+  (upstream `polyval` 0.6.2); the root key and the layer keys are unaffected.
 
 ### Changed
 - `OpSet::READ_PUBLIC` (and `ALL`) now include `DescribeLifecycle`; grants

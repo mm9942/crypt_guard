@@ -71,12 +71,20 @@ Known, documented exceptions:
   consumed, so one derived-nonce key can never seal a second message.
 - Known gap in a dependency: `aes-gcm-siv` 0.11.1 derives per-nonce
   sub-keys into a `polyval::Polyval` that is only wiped on drop when
-  `polyval` is built with its `zeroize` feature. With the default build the
-  per-message POLYVAL sub-keys of the AES-256-GCM-SIV layer (not the root key
-  and not the layer key) can stay in freed memory. Even with that feature the
-  `aarch64` PMULL backend of `polyval` 0.6.2 has no wipe (an upstream TODO),
-  so Android builds remain affected; the portable and x86 CLMUL backends are
-  covered.
+  `polyval` is built with its (optional) `zeroize` feature. With the default
+  build the per-message POLYVAL sub-keys of the AES-256-GCM-SIV layer (not the
+  root key and not the layer key) can stay in freed memory. Enabling
+  `polyval/zeroize` closes the gap only for the portable ("soft") backend,
+  which `polyval` 0.6.2 uses on every target except `x86`/`x86_64` and
+  `aarch64` builds with `--cfg polyval_armv8`; in particular a default
+  `aarch64` (Android) build is covered. It does **not** help on
+  `x86`/`x86_64` (nor on `aarch64` with `--cfg polyval_armv8`): there
+  `polyval` 0.6.2 wraps the hardware backend in an auto-detecting `union` of
+  `ManuallyDrop` fields without a `Drop` implementation, so the backend's
+  wipe never runs for the long-lived instance (only for the temporary clone
+  that `finalize_reset` consumes), and the PMULL backend has no wipe at all
+  (an upstream TODO). This is an upstream limitation; it is accepted and
+  tracked as open point 12 of the cipher-suite contract.
 
 ## Dependency and audit status
 

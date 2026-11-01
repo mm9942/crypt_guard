@@ -84,7 +84,9 @@
 //! schedule that is wiped with the `zeroize` feature of `aes`. Buffers that
 //! briefly hold plaintext are [`Zeroizing`]. Known gap of a third-party crate:
 //! `aes-gcm-siv` derives per-nonce sub-keys inside a `polyval::Polyval` that is
-//! built without its `zeroize` feature, so those message-specific sub-keys
+//! not reliably wiped (its optional `zeroize` feature is off by default and,
+//! even when on, has no effect on the `x86`/`x86_64` hardware backend of
+//! `polyval` 0.6.2; see `SECURITY.md`), so those message-specific sub-keys
 //! (not `root`, not `k_in`) can remain in freed stack memory.
 //!
 //! # Concurrency
@@ -2111,12 +2113,13 @@ mod tests {
 
     #[test]
     fn once_nonce_is_per_scheme_and_domain() -> TestResult {
-        let mut nonces = Vec::new();
+        let mut nonces: Vec<[u8; NONCE_LEN]> = Vec::new();
         for scheme in ALL {
             for domain in [DOMAIN, b"crypt_guard/test/other".as_slice()] {
                 let c = Cascade::new(scheme, &ROOT, domain)?;
-                assert!(!nonces.contains(&*c.once_nonce));
-                nonces.push(*c.once_nonce);
+                let nonce: [u8; NONCE_LEN] = *c.once_nonce;
+                assert!(!nonces.contains(&nonce));
+                nonces.push(nonce);
             }
         }
         // Deterministic for one (root, scheme, domain): the root key is a one-shot key.
@@ -2352,7 +2355,8 @@ mod tests {
         // The pinned suite itself must be Maximal; that is a local configuration error.
         for other in [
             DEFAULT_SUITE,
-            Suite::new(Kem::MlKem1024P384, Kdf::Shake256, Aead::ChaCha20Poly1305),
+            Suite::new(Kem::MlKem1024P384, Kdf::Shake256, Aead::Aes256GcmSiv),
+            Suite::new(Kem::MlKem768, Kdf::Shake256, Aead::XChaCha20Poly1305),
         ] {
             assert!(matches!(
                 open_envelope(other, &envelope, keys.private_key(), INFO, ENV_AAD),

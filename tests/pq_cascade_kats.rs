@@ -175,12 +175,20 @@ impl Vector {
     fn nonce(&self) -> Result<CascadeNonce, BoxErr> {
         match self.mode.as_str() {
             "counter" => Ok(CascadeNonce::Counter {
-                domain: self.domain_byte.ok_or("counter vector without domain_byte")?,
-                n: self.n.as_deref().ok_or("counter vector without n")?.parse()?,
+                domain: self
+                    .domain_byte
+                    .ok_or("counter vector without domain_byte")?,
+                n: self
+                    .n
+                    .as_deref()
+                    .ok_or("counter vector without n")?
+                    .parse()?,
             }),
             "stream" => Ok(CascadeNonce::Stream {
                 prefix: array(&unhex(
-                    self.prefix.as_deref().ok_or("stream vector without prefix")?,
+                    self.prefix
+                        .as_deref()
+                        .ok_or("stream vector without prefix")?,
                 )?)?,
                 index: self.index.ok_or("stream vector without index")?,
                 last: self.last.ok_or("stream vector without last")?,
@@ -315,13 +323,33 @@ fn subkeys_and_derived_nonces_match_the_crate_prf() -> TestResult {
             let k_in = prf32(&inputs.root, L_IN, &ctx)?;
             let k_out = prf32(&inputs.root, L_OUT, &ctx)?;
             let k_one = prf32(&inputs.root, L_ONE, &ctx)?;
-            assert_eq!(hex::encode(k_in.as_slice()), sub.k_in, "k_in {} / {id}", case.name);
-            assert_eq!(hex::encode(k_out.as_slice()), sub.k_out, "k_out {} / {id}", case.name);
-            assert_eq!(hex::encode(k_one.as_slice()), sub.k_one, "k_one {} / {id}", case.name);
+            assert_eq!(
+                hex::encode(k_in.as_slice()),
+                sub.k_in,
+                "k_in {} / {id}",
+                case.name
+            );
+            assert_eq!(
+                hex::encode(k_out.as_slice()),
+                sub.k_out,
+                "k_out {} / {id}",
+                case.name
+            );
+            assert_eq!(
+                hex::encode(k_one.as_slice()),
+                sub.k_one,
+                "k_one {} / {id}",
+                case.name
+            );
 
             let mut nonce = [0u8; NONCE_LEN];
             prf(&inputs.root, L_NONCE, &ctx, &mut nonce)?;
-            assert_eq!(hex::encode(nonce), sub.nonce_once, "nonce {} / {id}", case.name);
+            assert_eq!(
+                hex::encode(nonce),
+                sub.nonce_once,
+                "nonce {} / {id}",
+                case.name
+            );
 
             // Only the single-layer key of each scheme, plus both Cascade layer keys,
             // are ever used; they must be pairwise distinct.
@@ -333,7 +361,12 @@ fn subkeys_and_derived_nonces_match_the_crate_prf() -> TestResult {
         }
         distinct.sort();
         distinct.dedup();
-        assert_eq!(distinct.len(), 6, "sub-keys of case {} are not independent", case.name);
+        assert_eq!(
+            distinct.len(),
+            6,
+            "sub-keys of case {} are not independent",
+            case.name
+        );
     }
     // Contract 2.2.6: the Cascade layer keys of the contract inputs.
     let main = doc.cases.first().ok_or("main case missing")?;
@@ -367,7 +400,11 @@ fn vectors_seal_and_open_to_the_model_output() -> TestResult {
                     let nonce = v.nonce()?;
                     let cascade = inputs.cascade(scheme)?;
                     assert_eq!(cascade.scheme(), scheme);
-                    assert_eq!(cascade.seal(&nonce, &inputs.aad, &inputs.pt)?, ct, "seal {at}");
+                    assert_eq!(
+                        cascade.seal(&nonce, &inputs.aad, &inputs.pt)?,
+                        ct,
+                        "seal {at}"
+                    );
                     let opened = cascade.open(&nonce, &inputs.aad, &ct)?;
                     assert_eq!(opened.as_slice(), inputs.pt.as_slice(), "open {at}");
                 }
@@ -385,7 +422,11 @@ fn vectors_seal_and_open_to_the_model_output() -> TestResult {
                     assert_eq!(opened.as_slice(), inputs.pt.as_slice(), "open_once {at}");
                     // Opening twice is harmless; only sealing is one-shot.
                     let again = cascade.open_once(&inputs.aad, &ct)?;
-                    assert_eq!(again.as_slice(), inputs.pt.as_slice(), "open_once again {at}");
+                    assert_eq!(
+                        again.as_slice(),
+                        inputs.pt.as_slice(),
+                        "open_once again {at}"
+                    );
                 }
                 "random" => {}
                 other => return Err(BoxErr::from(format!("unknown mode {other} in {at}"))),
@@ -443,7 +484,10 @@ fn contract_2_2_6_vectors_are_present_verbatim() -> TestResult {
         "000000000000010000000300000000000000000000000000"
     );
     let random = find("random/Cascade")?;
-    assert_eq!(random.n24, "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7");
+    assert_eq!(
+        random.n24,
+        "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7"
+    );
     assert_eq!(
         hex::encode(random.sealed()?),
         "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7057f374419c4fdc4aae3e6a494831e67db98e6ef20e3f00f27501fbaf827112c2df118fa802cc302a0f0e41019ab7084def2c80d"
@@ -506,19 +550,34 @@ fn in_place_open_failure_leaves_no_plaintext_and_wrong_buffer_length_is_rejected
     let result = cascade.open_in_place(&nonce, b"aad-2", &mut buf);
     assert!(is_auth_failed(&result));
     assert!(
-        !buf.windows(inputs.pt.len()).any(|w| w == inputs.pt.as_slice()),
+        !buf.windows(inputs.pt.len())
+            .any(|w| w == inputs.pt.as_slice()),
         "plaintext leaked into the buffer of a failed open"
     );
 
     // Buffer length is a caller contract: plain_len + CASCADE_OVERHEAD, else InvalidParameters.
     let mut short = inputs.pt.clone();
-    short.resize(inputs.pt.len().saturating_add(CASCADE_OVERHEAD).saturating_sub(1), 0);
+    short.resize(
+        inputs
+            .pt
+            .len()
+            .saturating_add(CASCADE_OVERHEAD)
+            .saturating_sub(1),
+        0,
+    );
     assert!(matches!(
         cascade.seal_in_place(&nonce, &inputs.aad, &mut short, inputs.pt.len()),
         Err(CryptError::InvalidParameters)
     ));
     let mut long = inputs.pt.clone();
-    long.resize(inputs.pt.len().saturating_add(CASCADE_OVERHEAD).saturating_add(1), 0);
+    long.resize(
+        inputs
+            .pt
+            .len()
+            .saturating_add(CASCADE_OVERHEAD)
+            .saturating_add(1),
+        0,
+    );
     assert!(matches!(
         cascade.seal_in_place(&nonce, &inputs.aad, &mut long, inputs.pt.len()),
         Err(CryptError::InvalidParameters)
@@ -544,9 +603,20 @@ fn random_vectors_open_and_seal_random_round_trips() -> TestResult {
             assert_eq!(opened.as_slice(), inputs.pt.as_slice(), "open_random {at}");
 
             // Fresh random seal: n24 || ct, correct length, opens, never repeats.
-            let first = seal_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, &inputs.pt)?;
-            let second =
-                seal_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, &inputs.pt)?;
+            let first = seal_random(
+                scheme,
+                &inputs.root,
+                &inputs.domain,
+                &inputs.aad,
+                &inputs.pt,
+            )?;
+            let second = seal_random(
+                scheme,
+                &inputs.root,
+                &inputs.domain,
+                &inputs.aad,
+                &inputs.pt,
+            )?;
             let want = inputs
                 .pt
                 .len()
@@ -560,16 +630,14 @@ fn random_vectors_open_and_seal_random_round_trips() -> TestResult {
                 "random n24 repeated ({at})"
             );
             for sealed in [&first, &second] {
-                let plain =
-                    open_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, sealed)?;
+                let plain = open_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, sealed)?;
                 assert_eq!(plain.as_slice(), inputs.pt.as_slice(), "round trip {at}");
             }
 
             // Every byte, including the n24 prefix, is authenticated.
             for index in 0..sealed.len() {
                 let bad = flipped(&sealed, index, 0x01);
-                let result =
-                    open_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, &bad);
+                let result = open_random(scheme, &inputs.root, &inputs.domain, &inputs.aad, &bad);
                 assert!(is_auth_failed(&result), "flip at {index} accepted ({at})");
             }
             // Wrong AAD / domain / root / scheme.
@@ -613,7 +681,11 @@ fn random_vectors_open_and_seal_random_round_trips() -> TestResult {
                 );
             }
             // Truncation and extension.
-            let shorter: Vec<u8> = sealed.iter().copied().take(sealed.len().saturating_sub(1)).collect();
+            let shorter: Vec<u8> = sealed
+                .iter()
+                .copied()
+                .take(sealed.len().saturating_sub(1))
+                .collect();
             let mut longer = sealed.clone();
             longer.push(0x5a);
             for bad in [shorter, longer, Vec::new()] {
@@ -656,7 +728,11 @@ fn every_byte_flip_of_every_vector_fails_opaquely() -> TestResult {
                 }
             }
             // Truncated by one byte, extended by one byte, empty.
-            let shorter: Vec<u8> = ct.iter().copied().take(ct.len().saturating_sub(1)).collect();
+            let shorter: Vec<u8> = ct
+                .iter()
+                .copied()
+                .take(ct.len().saturating_sub(1))
+                .collect();
             let mut longer = ct.clone();
             longer.push(0);
             for bad in [shorter, longer, Vec::new()] {
@@ -699,27 +775,42 @@ fn wrong_aad_domain_root_scheme_and_nonce_fail() -> TestResult {
                 v.nonce()?
             };
             // Control: the right inputs open.
-            assert!(open_with(&cascade, &nonce, &inputs.aad).is_ok(), "control {at}");
+            assert!(
+                open_with(&cascade, &nonce, &inputs.aad).is_ok(),
+                "control {at}"
+            );
 
             // Wrong AAD (appended byte, and dropped when there is one).
             let mut longer_aad = inputs.aad.clone();
             longer_aad.push(b'!');
-            assert!(is_auth_failed(&open_with(&cascade, &nonce, &longer_aad)), "aad+ {at}");
+            assert!(
+                is_auth_failed(&open_with(&cascade, &nonce, &longer_aad)),
+                "aad+ {at}"
+            );
             if !inputs.aad.is_empty() {
-                assert!(is_auth_failed(&open_with(&cascade, &nonce, b"")), "aad- {at}");
+                assert!(
+                    is_auth_failed(&open_with(&cascade, &nonce, b"")),
+                    "aad- {at}"
+                );
             }
             // Wrong domain.
             let mut domain = inputs.domain.clone();
             domain.push(b'x');
             let other = Cascade::new(scheme, &inputs.root, &domain)?;
-            assert!(is_auth_failed(&open_with(&other, &nonce, &inputs.aad)), "domain {at}");
+            assert!(
+                is_auth_failed(&open_with(&other, &nonce, &inputs.aad)),
+                "domain {at}"
+            );
             // Wrong root.
             let mut root = inputs.root;
             if let Some(b) = root.last_mut() {
                 *b ^= 0x80;
             }
             let other = Cascade::new(scheme, &root, &inputs.domain)?;
-            assert!(is_auth_failed(&open_with(&other, &nonce, &inputs.aad)), "root {at}");
+            assert!(
+                is_auth_failed(&open_with(&other, &nonce, &inputs.aad)),
+                "root {at}"
+            );
             // Wrong scheme.
             for wrong in SCHEMES.into_iter().filter(|s| *s != scheme) {
                 let other = inputs.cascade(wrong)?;
@@ -734,18 +825,40 @@ fn wrong_aad_domain_root_scheme_and_nonce_fail() -> TestResult {
             }
             let wrong_nonces: Vec<CascadeNonce> = match nonce {
                 CascadeNonce::Counter { domain, n } => vec![
-                    CascadeNonce::Counter { domain, n: n.wrapping_add(1) },
-                    CascadeNonce::Counter { domain: domain ^ 0x01, n },
+                    CascadeNonce::Counter {
+                        domain,
+                        n: n.wrapping_add(1),
+                    },
+                    CascadeNonce::Counter {
+                        domain: domain ^ 0x01,
+                        n,
+                    },
                 ],
-                CascadeNonce::Stream { prefix, index, last } => {
+                CascadeNonce::Stream {
+                    prefix,
+                    index,
+                    last,
+                } => {
                     let mut other_prefix = prefix;
                     if let Some(b) = other_prefix.first_mut() {
                         *b ^= 0x10;
                     }
                     vec![
-                        CascadeNonce::Stream { prefix, index: index.wrapping_add(1), last },
-                        CascadeNonce::Stream { prefix, index, last: !last },
-                        CascadeNonce::Stream { prefix: other_prefix, index, last },
+                        CascadeNonce::Stream {
+                            prefix,
+                            index: index.wrapping_add(1),
+                            last,
+                        },
+                        CascadeNonce::Stream {
+                            prefix,
+                            index,
+                            last: !last,
+                        },
+                        CascadeNonce::Stream {
+                            prefix: other_prefix,
+                            index,
+                            last,
+                        },
                     ]
                 }
                 _ => return Err(BoxErr::from("unexpected CascadeNonce variant")),
@@ -757,7 +870,10 @@ fn wrong_aad_domain_root_scheme_and_nonce_fail() -> TestResult {
                 );
             }
             // A one-shot vector is not a counter vector and vice versa.
-            assert!(is_auth_failed(&cascade.open_once(&inputs.aad, &ct)), "once vs {at}");
+            assert!(
+                is_auth_failed(&cascade.open_once(&inputs.aad, &ct)),
+                "once vs {at}"
+            );
         }
     }
     Ok(())
@@ -771,10 +887,18 @@ fn negative_vectors_are_rejected() -> TestResult {
     let full_len = inputs.pt.len().saturating_add(CASCADE_OVERHEAD);
     for neg in &doc.negatives {
         let scheme = Scheme::from_id(neg.scheme).ok_or("unknown scheme in negative vector")?;
-        let nonce = CascadeNonce::Counter { domain: neg.domain_byte, n: neg.n.parse()? };
+        let nonce = CascadeNonce::Counter {
+            domain: neg.domain_byte,
+            n: neg.n.parse()?,
+        };
         let ct = unhex(&neg.ct)?;
         let result = inputs.cascade(scheme)?.open(&nonce, &inputs.aad, &ct);
-        assert!(result.is_err(), "negative vector {} was accepted: {}", neg.id, neg.why);
+        assert!(
+            result.is_err(),
+            "negative vector {} was accepted: {}",
+            neg.id,
+            neg.why
+        );
         if ct.len() == full_len {
             assert!(
                 is_auth_failed(&result),
@@ -824,7 +948,13 @@ fn stream_vectors_match_the_pq_stream_layout() -> TestResult {
             } else {
                 encryptor.encrypt_next(&body, &aad)?
             };
-            assert_eq!(sealed, v.ciphertext()?, "pq_stream layout {} / {}", case.name, v.id);
+            assert_eq!(
+                sealed,
+                v.ciphertext()?,
+                "pq_stream layout {} / {}",
+                case.name,
+                v.id
+            );
             checked = checked.saturating_add(1);
         }
     }
@@ -848,7 +978,11 @@ fn programming_errors_are_invalid_parameters() -> TestResult {
         ));
         let cascade = Cascade::new(scheme, &root, b"crypt_guard/test/cascade")?;
         // A zero STREAM prefix is rejected like `pq_stream::validate_prefix` does.
-        let zero_prefix = CascadeNonce::Stream { prefix: [0u8; 7], index: 0, last: false };
+        let zero_prefix = CascadeNonce::Stream {
+            prefix: [0u8; 7],
+            index: 0,
+            last: false,
+        };
         assert!(matches!(
             cascade.seal(&zero_prefix, b"", b"data"),
             Err(CryptError::InvalidParameters)
@@ -856,7 +990,10 @@ fn programming_errors_are_invalid_parameters() -> TestResult {
         // Debug output is redacted: no key material, no domain bytes.
         let debug = format!("{cascade:?}");
         assert!(!debug.contains("42"), "Debug leaked key bytes: {debug}");
-        assert!(!debug.contains("crypt_guard/test/cascade"), "Debug leaked the domain: {debug}");
+        assert!(
+            !debug.contains("crypt_guard/test/cascade"),
+            "Debug leaked the domain: {debug}"
+        );
     }
     Ok(())
 }
@@ -926,7 +1063,16 @@ mod multi {
         accept: &dyn Fn(Scheme) -> bool,
     ) -> Result<(Scheme, Zeroizing<Vec<u8>>), CryptError> {
         let fp = key.public_key().fingerprint();
-        open_multi_cascade(MAXIMAL_SUITE, key.private_key(), &fp, ct, index, header, INFO, accept)
+        open_multi_cascade(
+            MAXIMAL_SUITE,
+            key.private_key(),
+            &fp,
+            ct,
+            index,
+            header,
+            INFO,
+            accept,
+        )
     }
 
     fn open_ok(
@@ -974,10 +1120,15 @@ mod multi {
         let mut wraps = Vec::new();
         for (key, fp) in keys.iter().zip(fps.iter()) {
             let info_i = wrap_info(INFO, &set_hash, fp)?;
-            let envelope = seal_envelope(MAXIMAL_SUITE, key.public_key(), &info_i, HEADER, wrap_pt)?;
+            let envelope =
+                seal_envelope(MAXIMAL_SUITE, key.public_key(), &info_i, HEADER, wrap_pt)?;
             wraps.push(envelope.try_to_bytes()?);
         }
-        Ok(MultiRecipientCiphertext { body, wraps, recipient_set_hash: set_hash })
+        Ok(MultiRecipientCiphertext {
+            body,
+            wraps,
+            recipient_set_hash: set_hash,
+        })
     }
 
     #[test]
@@ -988,7 +1139,11 @@ mod multi {
         for scheme in SCHEMES {
             let ct = seal(scheme, &keys, PAYLOAD)?;
             assert_eq!(ct.wraps.len(), 3);
-            assert_eq!(ct.body.len(), PAYLOAD.len() + CASCADE_OVERHEAD, "{scheme:?}");
+            assert_eq!(
+                ct.body.len(),
+                PAYLOAD.len() + CASCADE_OVERHEAD,
+                "{scheme:?}"
+            );
             for wrap in &ct.wraps {
                 assert_eq!(wrap.len(), WRAP_LEN, "{scheme:?}");
                 // Header bytes are identical for every scheme: the level is invisible.
@@ -996,7 +1151,10 @@ mod multi {
                 let envelope = HpkeEnvelope::from_bytes(wrap)?;
                 assert_eq!(envelope.suite(), MAXIMAL_SUITE);
                 assert_eq!(envelope.encapsulation().len(), 1665);
-                assert_eq!(envelope.ciphertext().len(), WRAP_PAYLOAD_LEN + CASCADE_OVERHEAD);
+                assert_eq!(
+                    envelope.ciphertext().len(),
+                    WRAP_PAYLOAD_LEN + CASCADE_OVERHEAD
+                );
             }
         }
         Ok(())
@@ -1016,7 +1174,10 @@ mod multi {
         assert_ne!(first, second, "dummy wraps must be random");
         let envelope = HpkeEnvelope::from_bytes(&first)?;
         assert_eq!(envelope.suite(), MAXIMAL_SUITE);
-        assert_eq!(envelope.ciphertext().len(), WRAP_PAYLOAD_LEN + CASCADE_OVERHEAD);
+        assert_eq!(
+            envelope.ciphertext().len(),
+            WRAP_PAYLOAD_LEN + CASCADE_OVERHEAD
+        );
 
         // Nobody can open a dummy: put it into a real ciphertext and try every member.
         let mut padded = real.clone();
@@ -1033,7 +1194,10 @@ mod multi {
         let keys = members(3)?;
         for scheme in SCHEMES {
             let ct = seal(scheme, &keys, PAYLOAD)?;
-            assert!(!contains(&ct.body, PAYLOAD), "{scheme:?} body contains the plaintext");
+            assert!(
+                !contains(&ct.body, PAYLOAD),
+                "{scheme:?} body contains the plaintext"
+            );
             for (index, key) in keys.iter().enumerate() {
                 let (got, plain) = open_ok(key, &ct, index)?;
                 assert_eq!(got, scheme, "scheme reported to recipient {index}");
@@ -1117,7 +1281,12 @@ mod multi {
         let key = keys.first().ok_or("missing member")?;
         for body_scheme in SCHEMES {
             for claimed in SCHEMES {
-                let ct = assemble(&keys, body_scheme, &CEK, &wrap_plaintext(1, claimed.id(), &CEK))?;
+                let ct = assemble(
+                    &keys,
+                    body_scheme,
+                    &CEK,
+                    &wrap_plaintext(1, claimed.id(), &CEK),
+                )?;
                 let result = open_ok(key, &ct, 0);
                 if claimed == body_scheme {
                     let (got, plain) = result?;
@@ -1168,7 +1337,11 @@ mod multi {
                 true
             });
             assert!(is_auth_failed(&result), "{what} was accepted");
-            assert_eq!(calls.get(), 0, "accept must not see a defective wrap ({what})");
+            assert_eq!(
+                calls.get(),
+                0,
+                "accept must not see a defective wrap ({what})"
+            );
         }
         Ok(())
     }
@@ -1245,7 +1418,13 @@ mod multi {
         assert!(open_ok(first, &ct, 0).is_ok(), "control");
 
         // Header AAD and info.
-        assert!(is_auth_failed(&open_with(first, &ct, 0, b"group=7;epoch=4;msg=42", &|_| true)));
+        assert!(is_auth_failed(&open_with(
+            first,
+            &ct,
+            0,
+            b"group=7;epoch=4;msg=42",
+            &|_| true
+        )));
         let fp = first.public_key().fingerprint();
         let result = open_multi_cascade(
             MAXIMAL_SUITE,
@@ -1338,18 +1517,26 @@ mod multi {
                     *b ^= 0x01;
                 }
             }
-            assert!(is_auth_failed(&open_ok(key, &bad, 0)), "wrap byte {position} flip accepted");
+            assert!(
+                is_auth_failed(&open_ok(key, &bad, 0)),
+                "wrap byte {position} flip accepted"
+            );
         }
         for position in 0..ct.body.len() {
             let mut bad = ct.clone();
             if let Some(b) = bad.body.get_mut(position) {
                 *b ^= 0x80;
             }
-            assert!(is_auth_failed(&open_ok(key, &bad, 0)), "body byte {position} flip accepted");
+            assert!(
+                is_auth_failed(&open_ok(key, &bad, 0)),
+                "body byte {position} flip accepted"
+            );
         }
         // Undecodable wraps: truncated, extended, empty, garbage.
         for bad_wrap in [
-            ct.wraps.first().map(|w| w.iter().copied().take(WRAP_LEN - 1).collect::<Vec<u8>>()),
+            ct.wraps
+                .first()
+                .map(|w| w.iter().copied().take(WRAP_LEN - 1).collect::<Vec<u8>>()),
             ct.wraps.first().map(|w| {
                 let mut longer = w.clone();
                 longer.push(0);
@@ -1381,7 +1568,10 @@ mod multi {
                 seal_multi_cascade(other, Scheme::Cascade, &public, HEADER, INFO, PAYLOAD),
                 Err(CryptError::UnsupportedAlgorithm)
             ));
-            assert!(matches!(dummy_cascade_wrap(other), Err(CryptError::UnsupportedAlgorithm)));
+            assert!(matches!(
+                dummy_cascade_wrap(other),
+                Err(CryptError::UnsupportedAlgorithm)
+            ));
         }
 
         // Opening: a receiver pinned to another suite refuses a Maximal wrap ...
@@ -1413,13 +1603,33 @@ mod multi {
 
         // Plain seal_multi under the Maximal suite (same envelope suite, other construction).
         let plain = seal_multi(MAXIMAL_SUITE, &public, HEADER, INFO, PAYLOAD)?;
-        let opened = open_multi(MAXIMAL_SUITE, key.private_key(), &fp, &plain, 0, HEADER, INFO)?;
-        assert_eq!(opened.as_slice(), PAYLOAD, "control: the plain family still works");
+        let opened = open_multi(
+            MAXIMAL_SUITE,
+            key.private_key(),
+            &fp,
+            &plain,
+            0,
+            HEADER,
+            INFO,
+        )?;
+        assert_eq!(
+            opened.as_slice(),
+            PAYLOAD,
+            "control: the plain family still works"
+        );
         assert!(is_auth_failed(&open_ok(key, &plain, 0)));
 
         // Cascade ciphertext through the plain opener.
         let cascade = seal(Scheme::ChaCha20Poly1305, &keys, PAYLOAD)?;
-        let result = open_multi(MAXIMAL_SUITE, key.private_key(), &fp, &cascade, 0, HEADER, INFO);
+        let result = open_multi(
+            MAXIMAL_SUITE,
+            key.private_key(),
+            &fp,
+            &cascade,
+            0,
+            HEADER,
+            INFO,
+        );
         assert!(is_auth_failed(&result));
         Ok(())
     }

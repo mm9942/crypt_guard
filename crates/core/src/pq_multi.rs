@@ -169,10 +169,13 @@ const MULTI_BODY: &[u8] = b"crypt_guard/v3/multi-recipient/body";
 /// One payload encrypted for a set of recipients.
 ///
 /// # Description
-/// - `body`: ChaCha20-Poly1305 ciphertext of the payload under the CEK.
+/// - `body`: ciphertext of the payload under the CEK: ChaCha20-Poly1305 for
+///   [`seal_multi`], the selected [`crate::pq_cascade::Scheme`]
+///   (`payload + 32` bytes) for [`seal_multi_cascade`].
 /// - `wraps`: one [`HpkeEnvelope`] encoding per recipient, in the order of
-///   the `recipients` passed to [`seal_multi`]; [`dummy_wrap`]s may be
-///   appended or mixed in.
+///   the `recipients` passed to [`seal_multi`] or [`seal_multi_cascade`];
+///   [`dummy_wrap`]s (respectively [`dummy_cascade_wrap`]s) may be appended or
+///   mixed in.
 /// - `recipient_set_hash`: [`recipient_set_hash`] of the recipients'
 ///   fingerprints, authenticated by every wrap and by the body.
 ///
@@ -565,13 +568,8 @@ pub fn seal_multi_cascade(
     let mut wraps = Vec::with_capacity(recipients.len());
     for (recipient, fingerprint) in recipients.iter().zip(fingerprints.iter()) {
         let info_i = wrap_info(info, &set_hash, fingerprint)?;
-        let envelope = pq_cascade::seal_envelope(
-            suite,
-            recipient,
-            &info_i,
-            header_aad,
-            wrap_pt.as_slice(),
-        )?;
+        let envelope =
+            pq_cascade::seal_envelope(suite, recipient, &info_i, header_aad, wrap_pt.as_slice())?;
         wraps.push(envelope.try_to_bytes()?);
     }
 
