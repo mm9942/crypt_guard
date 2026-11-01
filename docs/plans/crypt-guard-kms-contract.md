@@ -111,24 +111,47 @@ pub struct KekSeed(Zeroizing<[u8; 32]>);
 /// Identifies which KEK sealed a container (not secret).
 pub struct KekId([u8; 16]);   // = SHAKE256("crypt_guard/keystore/kek-id/v1", seed)[..16]
 
+/// A KEK that can seal and unseal *file keys* without ever exporting itself.
+/// Software backends hold a `KekSeed`; TPM2, PKCS#11 and Secure-Enclave
+/// backends hold only a handle, so the API never assumes the seed is readable.
+pub trait Kek: Send + Sync {
+    fn id(&self) -> KekId;
+    /// Wrap a fresh 32-byte file key; the result is stored in the container header.
+    fn seal(&self, file_key: &FileKey, aad: &[u8]) -> Result<WrappedFileKey>;
+    /// Unwrap a file key from a container header. Opaque failure.
+    fn unseal(&self, wrapped: &WrappedFileKey, aad: &[u8]) -> Result<FileKey>;
+    /// Derive a sub-KEK bound to `label` (hub-derived mode: one sub-KEK per
+    /// principal); software KEKs derive with `prf32`, hardware KEKs via a
+    /// wrapped per-label seed they create once and store next to the container.
+    fn derive(&self, label: &[u8]) -> Result<Box<dyn Kek>>;
+}
+
 pub trait KekProvider: Send + Sync + 'static {
     /// Stable backend name for logs, config and audit ("key-file", "systemd-credential", …).
     fn backend(&self) -> &'static str;
-    /// Load the seed. Fails closed; never creates material unless `create` was requested.
-    fn load(&self) -> Result<KekSeed>;
-    /// Create a fresh seed in this backend; `Err(Exists)` if one is already there.
-    fn create(&self) -> Result<KekSeed>;
-    /// Replace the stored seed (used by `kek rotate` after the container was re-sealed).
-    fn store(&self, seed: &KekSeed) -> Result<()>;
-    /// Destroy the stored seed (crypto-shredding of everything sealed under it).
+    /// Open the KEK. Fails closed; never creates material.
+    fn open(&self) -> Result<Box<dyn Kek>>;
+    /// Create a fresh KEK in this backend; `Err(Exists)` if one is already there.
+    fn create(&self) -> Result<Box<dyn Kek>>;
+    /// Destroy the stored KEK (crypto-shredding of everything sealed under it).
     fn destroy(&self) -> Result<()>;
-    /// What this backend protects against (used by `crypt-guard-kms doctor` and docs).
-    fn protection(&self) -> Protection;
+    /// What this backend protects against (used by `doctor`, docs and by
+    /// embedders such as Harwness' `AuthStrength::HardwareBacked`).
+    fn capabilities(&self) -> Capabilities;
 }
 ```
 
-`Protection` is a bitset: `AtRestOnDisk`, `BoundToUser`, `BoundToMachine`,
-`BoundToHardware`, `RequiresPresence`, `SurvivesReboot`.
+`Capabilities` is a bitset: `AtRestOnDisk`, `BoundToUser`, `BoundToMachine`,
+`HardwareBacked`, `RequiresPresence`, `SurvivesReboot`, `Exportable` (only
+software backends; needed by `kek backup`). Software backends additionally
+implement `ExportableKek::seed(&self) -> &KekSeed` behind that capability.
+
+Shape agreed with the Harwness session (its draft
+`docs/planning/30-crypto-infrastructure/kms-user-crypto-contract.md`, PR
+#166): `load/seal/unseal/capabilities` map onto `open` + `Kek::seal/unseal`
++ `capabilities`; its `hub-derived` mode is `Kek::derive(principal)`, its
+`per-user` mode is an `open()` on a provider running under the user's uid
+whose `Kek` the daemon keeps in memory until a TTL.
 
 Backends, each behind a feature and selected **only** by configuration
 (`[kek] provider = "…"`, F11):
@@ -266,7 +289,13 @@ closed, F14). Then, if the partition has any `unit`/`cgroup_prefix` rule:
 
 Policy matchers in config: `uid = 1001`, `gid = 950`, `unit =
 "myapp.service"`, `cgroup_prefix = "/user.slice/user-1000.slice/"`. A rule
-may require both (`uid` *and* `unit`). This answers the "cgroup v2 + Linux
+may require both (`uid` *and* `unit`). Two rules from the Harwness draft are
+adopted: a cgroup condition **only narrows** a uid grant, never widens it
+(there is no cgroup-only grant), and cgroup paths are evaluated only when the
+cgroup directory is **not delegated** to the peer's uid (owner root or the
+daemon's uid; in a delegated subtree the user can move processes freely, so
+the path proves nothing). Delegation is checked by `stat` on
+`/sys/fs/cgroup/<path>` at decision time. This answers the "cgroup v2 + Linux
 user" question: yes, with the pidfd re-check it is race-free, and the KEK
 itself is never handed out — identity only selects a partition and a grant
 set, exactly like vaultd's uid → partition.
@@ -458,7 +487,17 @@ Versions seen on crates.io on 2026-11-01: `keyring 4.2.0` (Harwness uses
 
 ## 6. Open points
 
-1. **comnet-mcp extraction** into a shared crate (asked in the comnet chat).
+0. **Harwness alignment** (its PR #166): Harwness consumes crypt_guard only
+   from crates.io, so `crypt_guard_keystore` (trait + software backends) and
+   the `SeedStore`/`SealedProvider` change must ship in the next crates.io
+   release (3.2.0 is already the additive target of PR #25). A `HAKS`
+   compatibility reader for harw-auth-hub's existing stores stays on the
+   Harwness side (`CGKS` is the upstream format). Harwness' `pkcs11` and
+   `command` providers are `custom` providers there, not upstream backends.
+   Answered to the Harwness session on 2026-11-01.
+1. **comnet-mcp extraction** into a shared crate (asked in the comnet chat;
+   answer: possible after comnet wave D, by DEC, with no comnet types in the
+   API and `BoxFuture`/logging as generics).
 2. **comnet-vault on `crypt_guard_keystore`** instead of `KeyFileSealer`
    (asked). If yes, `KekProvider` must stay object-safe and `no_std`-free
    only; Android Keystore would become a `custom` provider in comnet-ffi.
