@@ -342,6 +342,41 @@ MlDsa65Impl::verify(&public_key, b"signed payload", &signature)?;
 # #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
 ```
 
+#### Seed-derived keys, context strings and fingerprints
+
+For key management, store only the 32-byte seed and re-derive the key pair
+from it. Sign with a FIPS 204 **context string** per purpose, so a signature
+made for one protocol message can never be replayed as another. These
+functions never panic: entropy comes from `TryOsRng`, and signing is
+*hedged* (fresh randomness is mixed into every signature).
+
+```rust,no_run
+# #[cfg(feature = "ml-dsa-backend")]
+# fn main() -> Result<(), crypt_guard::error::CryptError> {
+use crypt_guard::sign::ml_dsa::MlDsa87Impl;
+
+// 1. A fresh seed; keep it in your key-management boundary.
+let seed = MlDsa87Impl::generate_seed()?;
+
+// 2. The same seed always re-derives the same key pair.
+let (signing_key, verifying_key) = MlDsa87Impl::keypair_from_seed(seed.as_slice())?;
+
+// 3. Domain-separate every purpose with its own context (at most 255 bytes).
+let sig = MlDsa87Impl::sign_with_context(&signing_key, b"payload", b"myapp:msg:v1")?;
+MlDsa87Impl::verify_with_context(&verifying_key, b"payload", b"myapp:msg:v1", &sig)?;
+
+// 4. A stable 32-byte key id, bound to the parameter set.
+let key_id: [u8; 32] = MlDsa87Impl::fingerprint(&verifying_key)?;
+# let _ = key_id;
+# Ok(())
+# }
+# #[cfg(not(feature = "ml-dsa-backend"))] fn main() {}
+```
+
+`pq_hpke::RecipientPublicKey::fingerprint()` gives the matching 32-byte id
+for encryption keys. Use `sign_with_context_deterministic` only for
+known-answer tests.
+
 SLH-DSA (hash-based, larger signatures, more conservative security
 assumptions than ML-DSA) works the same way, with `SlhDsaShake128fImpl` (or
 one of its five siblings) in place of `MlDsa65Impl`:

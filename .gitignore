@@ -3,6 +3,7 @@ target/
 *.md
 !README.md
 !CHANGELOG.md
+!SECURITY.md
 .github/
 Falcon1024/
 key/

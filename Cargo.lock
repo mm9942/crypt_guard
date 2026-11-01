@@ -490,6 +490,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "sha3 0.11.0",
  "tempfile",
  "trybuild",
  "turboshake",

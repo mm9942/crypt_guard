@@ -43,4 +43,11 @@ cargo test -p crypt_guard --features hyper
 step "transport dependencies stay behind their features"
 ./scripts/check_dep_gates.sh
 
+step "no accidental semver break against the last published release"
+command -v cargo-semver-checks >/dev/null 2>&1 || {
+    echo "cargo-semver-checks is required: cargo install cargo-semver-checks --locked" >&2
+    exit 1
+}
+cargo semver-checks check-release --workspace
+
 step "release checks passed for $version"

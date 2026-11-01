@@ -9,6 +9,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- ML-DSA (`MlDsa44Impl`, `MlDsa65Impl`, `MlDsa87Impl`), all additive and
+  panic-free:
+  - `generate_seed`, `keypair_from_seed`, `try_keypair` and
+    `verifying_key_from_seed`: seed-based key management without the
+    panicking `OsRng` path;
+  - `sign_with_context` (hedged, FIPS 204 randomized variant via `TryOsRng`),
+    `sign_with_context_deterministic` (for known-answer tests) and
+    `verify_with_context`;
+  - `fingerprint`: `SHA3-256` key id bound to the parameter set;
+  - constants `PARAMETER_SET_ID`, `VERIFYING_KEY_LEN`, `SIGNATURE_LEN`,
+    plus `ML_DSA_SEED_LEN`, `ML_DSA_MAX_CONTEXT_LEN`, `ML_DSA_FINGERPRINT_LEN`.
+- `pq_hpke::RecipientPublicKey::fingerprint`: `SHA3-256` key id bound to the KEM.
+- Vendored LAMPS / RFC 9881 example keys
+  (`crates/core/tests/vectors/ml-dsa-lamps-example-keys.json`) as a
+  known-answer test for seed-based key derivation.
+- `SECURITY.md` is now actually tracked (it was excluded by `.gitignore`).
+- `scripts/release_checks.sh` runs `cargo semver-checks` before a release.
+
 ## [3.1.0] - 2026-09-27
 
 ### Added
