@@ -8,8 +8,8 @@ use crypt_guard_core::error::CryptError;
 use crypt_guard_core::pq_hpke::{EnvelopeError, Error as HpkeError};
 use crypt_guard_service::{
     CryptoContext, CryptoOperation, CryptoProvider, CryptoRequest, CryptoResponse, CryptoService,
-    CryptoServiceError, DescribeKey, Encrypt, ErrorKind, KeyId, KeyNamespace, KeyRef, NullProvider,
-    PublicBlob, RequestId, SecretBytes,
+    CryptoServiceError, DescribeKey, DescribeLifecycle, Encrypt, ErrorKind, KeyId, KeyNamespace,
+    KeyRef, NullProvider, PublicBlob, RequestId, SecretBytes,
 };
 
 fn key() -> KeyRef {
@@ -82,6 +82,19 @@ async fn null_provider_is_unsupported() {
     assert_eq!(err, CryptoServiceError::Unsupported);
 }
 
+#[tokio::test]
+async fn null_provider_does_not_describe_lifecycles() {
+    let request = CryptoRequest::new(
+        RequestId(3),
+        CryptoOperation::DescribeLifecycle(DescribeLifecycle { key: key() }),
+    );
+    let err = CryptoService::new(NullProvider)
+        .oneshot(request)
+        .await
+        .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Unsupported);
+}
+
 #[cfg(feature = "buffer")]
 #[tokio::test]
 async fn network_handle_clones_share_one_service() {
@@ -98,6 +111,95 @@ async fn network_handle_clones_share_one_service() {
     for h in [handle, clone] {
         let err = h.oneshot(describe()).await.unwrap_err();
         assert_eq!(service_error(err), CryptoServiceError::Unsupported);
+    }
+}
+
+#[cfg(feature = "buffer")]
+mod fallible_stack {
+    //! `try_network_handle`: typed errors instead of the panics of
+    //! `network_handle`.
+
+    use super::*;
+    use crypt_guard_service::{service_error, try_network_handle, StackConfig};
+
+    /// `tokio::sync::Semaphore::MAX_PERMITS`.
+    const MAX_CAPACITY: usize = usize::MAX >> 3;
+
+    fn stack_config(queue_bound: usize, max_in_flight: usize) -> StackConfig {
+        StackConfig {
+            queue_bound,
+            max_in_flight,
+        }
+    }
+
+    fn unusable_configs() -> [StackConfig; 6] {
+        [
+            stack_config(0, 2),
+            stack_config(4, 0),
+            stack_config(0, 0),
+            stack_config(MAX_CAPACITY + 1, 2),
+            stack_config(4, MAX_CAPACITY + 1),
+            stack_config(usize::MAX, usize::MAX),
+        ]
+    }
+
+    /// Plain `#[test]`: no Tokio runtime in this context.
+    #[test]
+    fn without_a_runtime_is_unavailable() {
+        let result = try_network_handle(CryptoService::new(NullProvider), StackConfig::default());
+        assert_eq!(result.err(), Some(CryptoServiceError::Unavailable));
+    }
+
+    /// Plain `#[test]`: the configuration is checked before the runtime.
+    #[test]
+    fn unusable_config_is_malformed_even_without_a_runtime() {
+        for config in unusable_configs() {
+            let result = try_network_handle(CryptoService::new(NullProvider), config);
+            assert_eq!(
+                result.err(),
+                Some(CryptoServiceError::Malformed),
+                "{config:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unusable_config_is_malformed_inside_a_runtime() {
+        for config in unusable_configs() {
+            let result = try_network_handle(CryptoService::new(NullProvider), config);
+            assert_eq!(
+                result.err(),
+                Some(CryptoServiceError::Malformed),
+                "{config:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn inside_a_runtime_clones_share_one_service() {
+        let Ok(handle) = try_network_handle(CryptoService::new(NullProvider), stack_config(4, 2))
+        else {
+            panic!("a runtime is present and the config is valid");
+        };
+        let clone = handle.clone();
+        for h in [handle, clone] {
+            let err = h.oneshot(describe()).await.unwrap_err();
+            assert_eq!(service_error(err), CryptoServiceError::Unsupported);
+        }
+    }
+
+    #[tokio::test]
+    async fn smallest_valid_config_serves_sequential_requests() {
+        let Ok(mut handle) = try_network_handle(
+            CryptoService::new(EchoProvider { seen: Vec::new() }),
+            stack_config(1, 1),
+        ) else {
+            panic!("a runtime is present and the config is valid");
+        };
+        for _ in 0..3 {
+            let response = (&mut handle).oneshot(describe()).await.unwrap();
+            assert!(matches!(response, CryptoResponse::PublicKey(_)));
+        }
     }
 }
 

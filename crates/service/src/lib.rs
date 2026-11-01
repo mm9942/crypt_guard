@@ -15,7 +15,7 @@
 //! | [`CryptoRequest`], [`CryptoResponse`], [`CryptoOperation`] | no |
 //! | [`CryptoService`] | no |
 //! | `NetworkHandle` (feature `buffer`) | **yes**: channel handle only |
-//! | [`KeyRef`], blobs, [`CryptoContext`] | yes: not secret |
+//! | [`KeyRef`], blobs, [`CryptoContext`], [`KeyLifecycle`] | yes: not secret |
 //!
 //! These are checked at compile time by the crate's invariant tests.
 //!
@@ -24,6 +24,11 @@
 //! Providers: [`InMemoryProvider`] (reference, in-process keys) and
 //! [`NullProvider`]. Wrap any provider in [`PolicyProvider`] with an
 //! [`Authorizer`] such as [`NamespacePolicy`] to enforce per-caller grants.
+//!
+//! Key versions carry advisory [`KeyLifecycle`] timestamps, read with
+//! [`CryptoOperation::DescribeLifecycle`]. With feature `buffer`,
+//! `try_network_handle` is the panic-free constructor of the cloneable
+//! `NetworkHandle` (`network_handle` panics outside a Tokio runtime).
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
@@ -32,6 +37,7 @@
 mod blob;
 mod error;
 mod key;
+mod lifecycle;
 mod memory;
 mod op;
 mod policy;
@@ -47,19 +53,20 @@ pub use key::{
     KeyAlgorithm, KeyId, KeyMetadata, KeyNamespace, KeyRef, KeyState, KeyVersion,
     SignatureAlgorithm, MAX_NAME_LEN,
 };
+pub use lifecycle::KeyLifecycle;
 pub use memory::InMemoryProvider;
 pub use op::{
     CryptoContext, CryptoOperation, CryptoRequest, CryptoResponse, Decrypt, DescribeKey,
-    DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey, OpKind, Principal,
-    RequestContext, RequestId, RewrapKey, RotateKey, Sign, UnwrapKey, VerificationResult, Verify,
-    WrapKey,
+    DescribeLifecycle, DestroyKey, DisableKey, EnableKey, Encrypt, GenerateKey, GetPublicKey,
+    OpKind, Principal, RequestContext, RequestId, RewrapKey, RotateKey, Sign, UnwrapKey,
+    VerificationResult, Verify, WrapKey,
 };
 pub use policy::{AllowAll, Authorizer, NamespacePolicy, OpSet, PolicyProvider};
 pub use provider::{CryptoProvider, NullProvider};
 pub use secret::{SecretBytes, SecretEgress};
 pub use service::{CryptoFuture, CryptoService};
 #[cfg(feature = "buffer")]
-pub use stack::{network_handle, service_error, NetworkHandle, StackConfig};
+pub use stack::{network_handle, service_error, try_network_handle, NetworkHandle, StackConfig};
 
 /// Re-export of the core PQ HPKE module, whose `Suite` appears in
 /// [`KeyAlgorithm::Hpke`].

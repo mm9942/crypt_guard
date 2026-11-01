@@ -25,7 +25,8 @@ pub type CryptoFuture = Ready<Result<CryptoResponse, CryptoServiceError>>;
 /// clone key state or force shared ownership of cryptographic state. To hand
 /// it to a transport that needs a cloneable service (Hyper's
 /// `TowerToHyperService`), wrap it in the bounded buffer stack
-/// (`network_handle`, feature `buffer`), which clones only a channel handle.
+/// (`try_network_handle`, or the panicking `network_handle`; feature
+/// `buffer`), which clones only a channel handle.
 pub struct CryptoService<P> {
     provider: P,
 }

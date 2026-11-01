@@ -10,8 +10,10 @@ repository.workspace = true
 default = []
 # Bounded `tower::buffer::Buffer` + `ConcurrencyLimit` stack that turns the
 # non-Clone `CryptoService` into a cloneable network handle. Requires a Tokio
-# runtime at construction time.
-buffer = ["dep:tower"]
+# runtime at construction time; the direct `tokio` dependency (already pulled
+# in by `tower/buffer`) lets `try_network_handle` detect a missing runtime
+# instead of panicking.
+buffer = ["dep:tower", "dep:tokio"]
 # ML-DSA signing keys in `InMemoryProvider`.
 ml-dsa = ["crypt_guard_core/ml-dsa-backend"]
 
@@ -22,6 +24,10 @@ crypt_guard_core = { workspace = true }
 tower-service = "0.3.3"
 zeroize = "1.8.1"
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit"], optional = true }
+# `rt`: `runtime::Handle::try_current` / `Handle::spawn`; `sync`:
+# `sync::Semaphore::MAX_PERMITS` (capacity bound checked by
+# `try_network_handle`). Both are already enabled through `tower/buffer`.
+tokio = { version = "1", optional = true, default-features = false, features = ["rt", "sync"] }
 
 [dev-dependencies]
 static_assertions = "1.1.0"

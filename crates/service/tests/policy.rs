@@ -4,10 +4,10 @@
 
 use crypt_guard_service::{
     pq_hpke::DEFAULT_SUITE, CiphertextBlob, CryptoContext, CryptoOperation, CryptoProvider,
-    CryptoRequest, CryptoResponse, CryptoServiceError, Decrypt, Encrypt, GenerateKey,
-    InMemoryProvider, KeyAlgorithm, KeyId, KeyNamespace, KeyRef, NamespacePolicy, OpKind, OpSet,
-    PolicyProvider, Principal, RequestContext, RequestId, RewrapKey, SecretBytes, UnwrapKey,
-    WrapKey,
+    CryptoRequest, CryptoResponse, CryptoServiceError, Decrypt, DescribeLifecycle, Encrypt,
+    GenerateKey, InMemoryProvider, KeyAlgorithm, KeyId, KeyNamespace, KeyRef, NamespacePolicy,
+    OpKind, OpSet, PolicyProvider, Principal, RequestContext, RequestId, RewrapKey, SecretBytes,
+    UnwrapKey, WrapKey,
 };
 
 fn ns(name: &str) -> KeyNamespace {
@@ -308,6 +308,7 @@ fn op_kind_is_secret_egress_exactly_for_decrypt_and_unwrap() {
         OpKind::Verify,
         OpKind::WrapKey,
         OpKind::RewrapKey,
+        OpKind::DescribeLifecycle,
     ] {
         assert!(
             !kind.is_secret_egress(),
@@ -339,9 +340,84 @@ fn op_kind_is_mutation_exactly_for_lifecycle_ops() {
         OpKind::WrapKey,
         OpKind::UnwrapKey,
         OpKind::RewrapKey,
+        OpKind::DescribeLifecycle,
     ] {
         assert!(!kind.is_mutation(), "{kind:?} should not be a mutation");
     }
+}
+
+#[test]
+fn describe_lifecycle_kind_name_and_namespace() {
+    let op = CryptoOperation::DescribeLifecycle(DescribeLifecycle {
+        key: key("ns1", "k1"),
+    });
+    assert_eq!(op.kind(), OpKind::DescribeLifecycle);
+    assert_eq!(op.name(), "describe_lifecycle");
+    assert_eq!(OpKind::DescribeLifecycle.name(), "describe_lifecycle");
+    assert!(!op.is_mutation());
+    let namespaces = op.namespaces();
+    assert_eq!(namespaces[0].map(KeyNamespace::as_str), Some("ns1"));
+    assert_eq!(namespaces[1], None);
+}
+
+#[test]
+fn describe_lifecycle_needs_its_own_grant_in_the_key_namespace() {
+    let describe_lifecycle = |namespace: &str| {
+        CryptoOperation::DescribeLifecycle(DescribeLifecycle {
+            key: key(namespace, "k1"),
+        })
+    };
+    let mut policy = NamespacePolicy::new();
+    policy.grant(Principal::new("admin"), ns("app"), OpSet::ADMIN);
+    policy.grant(Principal::new("admin"), ns("other"), OpSet::ADMIN);
+    policy.grant(Principal::new("reader"), ns("app"), OpSet::READ_PUBLIC);
+    policy.grant(
+        Principal::new("describer"),
+        ns("app"),
+        OpSet::NONE.with(OpKind::Describe),
+    );
+    let mut provider = PolicyProvider::new(InMemoryProvider::new(), policy);
+    for (id, namespace) in [(1, "app"), (2, "other")] {
+        provider
+            .execute(CryptoRequest::with_context(
+                ctx("admin", id),
+                generate_op(namespace, "k1"),
+            ))
+            .unwrap();
+    }
+
+    // READ_PUBLIC covers DescribeLifecycle.
+    let resp = provider
+        .execute(CryptoRequest::with_context(
+            ctx("reader", 3),
+            describe_lifecycle("app"),
+        ))
+        .unwrap();
+    assert!(matches!(resp, CryptoResponse::Lifecycle(_)));
+
+    // ... but only in the granted namespace.
+    let err = provider
+        .execute(CryptoRequest::with_context(
+            ctx("reader", 4),
+            describe_lifecycle("other"),
+        ))
+        .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Forbidden);
+
+    // An explicit Describe-only grant does not imply DescribeLifecycle.
+    let err = provider
+        .execute(CryptoRequest::with_context(
+            ctx("describer", 5),
+            describe_lifecycle("app"),
+        ))
+        .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Forbidden);
+
+    // Anonymous callers are unauthenticated, as for every operation.
+    let err = provider
+        .execute(CryptoRequest::new(RequestId(6), describe_lifecycle("app")))
+        .unwrap_err();
+    assert_eq!(err, CryptoServiceError::Unauthenticated);
 }
 
 #[test]

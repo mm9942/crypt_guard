@@ -1875,7 +1875,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         ChaCha20Poly1305, Nonce as ChaCha20Poly1305Nonce, XChaCha20Poly1305,
         XNonce as XChaCha20Poly1305Nonce,
     };
-    use p256::elliptic_curve::sec1::ToEncodedPoint;
+    use p256::elliptic_curve::sec1::ToSec1Point;
     use p256::{ecdh::diffie_hellman, PublicKey as P256PublicKey, SecretKey as P256SecretKey};
     use p384::{
         ecdh::diffie_hellman as p384_diffie_hellman, PublicKey as P384PublicKey,
@@ -2241,7 +2241,7 @@ pub mod draft_ietf_hpke_pq_05_full {
             match kem {
                 Kem::MlKem768P256 => {
                     let (pq, _, scalar) = derive_hybrid_key_pair(seed)?;
-                    let point = scalar.public_key().to_encoded_point(false);
+                    let point = scalar.public_key().to_sec1_point(false);
                     let mut bytes = Vec::with_capacity(MLKEM768_P256_PUBLIC_KEY_BYTES);
                     bytes.extend_from_slice(pq.as_bytes());
                     bytes.extend_from_slice(point.as_bytes());
@@ -2249,7 +2249,7 @@ pub mod draft_ietf_hpke_pq_05_full {
                 }
                 Kem::MlKem1024P384 => {
                     let (pq, _, scalar) = derive_hybrid_p384_key_pair(seed)?;
-                    let point = scalar.public_key().to_encoded_point(false);
+                    let point = scalar.public_key().to_sec1_point(false);
                     let mut bytes = Vec::with_capacity(MLKEM1024_P384_PUBLIC_KEY_BYTES);
                     bytes.extend_from_slice(pq.as_bytes());
                     bytes.extend_from_slice(point.as_bytes());
@@ -2373,12 +2373,12 @@ pub mod draft_ietf_hpke_pq_05_full {
         let comb = combine_hybrid(
             pss.as_bytes(),
             ss_t.raw_secret_bytes().as_slice(),
-            eph.public_key().to_encoded_point(false).as_bytes(),
+            eph.public_key().to_sec1_point(false).as_bytes(),
             &key.bytes[ML_KEM_768_PUBLIC_KEY_BYTES..],
         );
         let mut bytes = Vec::with_capacity(MLKEM768_P256_ENCAPSULATION_BYTES);
         bytes.extend_from_slice(pqenc.as_bytes());
-        bytes.extend_from_slice(eph.public_key().to_encoded_point(false).as_bytes());
+        bytes.extend_from_slice(eph.public_key().to_sec1_point(false).as_bytes());
         Ok((HybridEncapsulation { kem, bytes }, MlKemSharedSecret(comb)))
     }
     fn hybrid_decapsulate(
@@ -2526,7 +2526,7 @@ pub mod draft_ietf_hpke_pq_05_full {
         let rpk = P384PublicKey::from_sec1_bytes(&key.bytes[ML_KEM_1024_PUBLIC_KEY_BYTES..])
             .map_err(|_| Error::InvalidRecipientPublicKey)?;
         let ss_t = p384_diffie_hellman(eph.to_nonzero_scalar(), rpk.as_affine());
-        let eph_bytes = eph.public_key().to_encoded_point(false);
+        let eph_bytes = eph.public_key().to_sec1_point(false);
         let comb = combine_hybrid_for(
             pss.as_bytes(),
             ss_t.raw_secret_bytes().as_slice(),
@@ -2735,6 +2735,29 @@ pub mod draft_ietf_hpke_pq_05_full {
                 RecipientPublicKeyInner::MlKem1024(value) => value.as_bytes(),
                 RecipientPublicKeyInner::Hybrid(value) => value.as_bytes(),
             }
+        }
+
+        /// Compute the stable 32-byte fingerprint of this public key.
+        ///
+        /// # Description
+        /// `SHA3-256("crypt_guard/v3/fingerprint/pq-hpke" ‖ 0x00 ‖ kem_id_be16 ‖ len_be32 ‖ pk)`.
+        /// The KEM id is bound in, so identical bytes under different KEMs can never
+        /// share a fingerprint. Use it as a key id in directories and envelopes.
+        ///
+        /// # Concurrency
+        /// Pure function; callable from any thread.
+        pub fn fingerprint(&self) -> [u8; 32] {
+            let bytes = self.as_bytes();
+            // Public keys are at most a few KiB, so the length always fits in u32;
+            // saturate instead of truncating should that ever change.
+            let len = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+            let mut h = Sha3_256::new();
+            sha3::Digest::update(&mut h, b"crypt_guard/v3/fingerprint/pq-hpke");
+            sha3::Digest::update(&mut h, [0u8]);
+            sha3::Digest::update(&mut h, self.kem.id().to_be_bytes());
+            sha3::Digest::update(&mut h, len.to_be_bytes());
+            sha3::Digest::update(&mut h, bytes);
+            h.finalize().into()
         }
     }
 

@@ -1,10 +1,23 @@
 name: RustTests
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  # Controlled CI (same model as Harwness): no automatic push/PR runs. Every
+  # run is started on purpose with workflow_dispatch on a pushed revision,
+  # after the full local lane run (fmt, clippy -D warnings, all test lanes,
+  # dep gates, cargo deny) by the session that pushed it. A red run is fixed
+  # and re-run, never skipped. To switch the automatic triggers back on,
+  # uncomment the two blocks below; the jobs need no change.
+  #
+  # push:
+  #   branches: [ "main" ]
+  # pull_request:
+  #   branches: [ "main" ]
+  workflow_dispatch:
+
+# A new run for the same ref cancels the one still running.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Jobs only read the repository.
 permissions:

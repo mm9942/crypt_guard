@@ -637,6 +637,39 @@ impl From<crate::signed_hpke::SignedHpkeError> for CryptError {
     }
 }
 
+// ── `crate::sharing::SharingError` (Shamir secret sharing) ───────────────────
+//
+// | Source variant                  | `CryptError` variant                   |
+// |----------------------------------|----------------------------------------|
+// | `InvalidThreshold { .. }`        | `InvalidParameters`                    |
+// | `InvalidShareIndex`              | `InvalidParameters`                    |
+// | `DuplicateShareIndex { .. }`     | `InvalidParameters`                    |
+// | `TooFewShares { .. }`            | `InvalidParameters`                    |
+// | `TooManyShares { .. }`           | `InvalidParameters`                    |
+// | `InvalidSecretLength { .. }`     | `InvalidDataLength`                    |
+// | `ShareLengthMismatch { .. }`     | `InvalidDataLength`                    |
+// | `CommitmentMismatch { .. }`      | `AuthenticationFailed`                 |
+// | `EntropyUnavailable`             | `CustomError` (fixed text, no secrets) |
+impl From<crate::sharing::SharingError> for CryptError {
+    fn from(err: crate::sharing::SharingError) -> Self {
+        use crate::sharing::SharingError as E;
+        match err {
+            E::InvalidThreshold { .. }
+            | E::InvalidShareIndex
+            | E::DuplicateShareIndex { .. }
+            | E::TooFewShares { .. }
+            | E::TooManyShares { .. } => CryptError::InvalidParameters,
+            E::InvalidSecretLength { .. } | E::ShareLengthMismatch { .. } => {
+                CryptError::InvalidDataLength
+            }
+            E::CommitmentMismatch { .. } => CryptError::AuthenticationFailed,
+            E::EntropyUnavailable => {
+                CryptError::CustomError("os entropy source unavailable".to_owned())
+            }
+        }
+    }
+}
+
 /// Format an internal-invariant HPKE PQ error for [`CryptError::CustomError`].
 ///
 /// # Description

@@ -6,6 +6,7 @@
 use crate::{
     blob::{CiphertextBlob, MessageBlob, PublicBlob, SignatureBlob},
     key::{KeyAlgorithm, KeyId, KeyMetadata, KeyNamespace, KeyRef},
+    lifecycle::KeyLifecycle,
     secret::SecretBytes,
 };
 
@@ -85,6 +86,20 @@ pub struct GetPublicKey {
 /// Fetch non-secret metadata of a key version.
 #[derive(Debug)]
 pub struct DescribeKey {
+    /// The key.
+    pub key: KeyRef,
+}
+
+/// Fetch the non-secret lifecycle timestamps of a key version.
+///
+/// Answered with [`CryptoResponse::Lifecycle`]. Resolution matches
+/// [`DescribeKey`]: an unversioned [`KeyRef`] means the current primary
+/// version, and disabled or destroyed versions are still described (only an
+/// unknown key or version is [`NotFound`](crate::CryptoServiceError::NotFound)).
+/// To learn which version an unversioned reference resolved to, send
+/// [`DescribeKey`] first and describe its versioned [`KeyRef`].
+#[derive(Debug)]
+pub struct DescribeLifecycle {
     /// The key.
     pub key: KeyRef,
 }
@@ -229,6 +244,8 @@ pub enum CryptoOperation {
     UnwrapKey(UnwrapKey),
     /// See [`RewrapKey`].
     RewrapKey(RewrapKey),
+    /// See [`DescribeLifecycle`].
+    DescribeLifecycle(DescribeLifecycle),
 }
 
 /// Payload-free kind of a [`CryptoOperation`], for policy decisions.
@@ -263,6 +280,8 @@ pub enum OpKind {
     UnwrapKey,
     /// [`CryptoOperation::RewrapKey`]
     RewrapKey,
+    /// [`CryptoOperation::DescribeLifecycle`]
+    DescribeLifecycle,
 }
 
 impl OpKind {
@@ -283,6 +302,7 @@ impl OpKind {
             Self::WrapKey => "wrap",
             Self::UnwrapKey => "unwrap",
             Self::RewrapKey => "rewrap",
+            Self::DescribeLifecycle => "describe_lifecycle",
         }
     }
 
@@ -322,6 +342,7 @@ impl CryptoOperation {
             Self::WrapKey(_) => OpKind::WrapKey,
             Self::UnwrapKey(_) => OpKind::UnwrapKey,
             Self::RewrapKey(_) => OpKind::RewrapKey,
+            Self::DescribeLifecycle(_) => OpKind::DescribeLifecycle,
         }
     }
 
@@ -353,6 +374,7 @@ impl CryptoOperation {
             Self::WrapKey(op) => [Some(&op.key.namespace), None],
             Self::UnwrapKey(op) => [Some(&op.key.namespace), None],
             Self::RewrapKey(op) => [Some(&op.from.namespace), Some(&op.to.namespace)],
+            Self::DescribeLifecycle(op) => [Some(&op.key.namespace), None],
         }
     }
 }
@@ -413,4 +435,6 @@ pub enum CryptoResponse {
     Signature(SignatureBlob),
     /// A verification outcome.
     Verification(VerificationResult),
+    /// Lifecycle timestamps of a key version (describe lifecycle).
+    Lifecycle(KeyLifecycle),
 }
